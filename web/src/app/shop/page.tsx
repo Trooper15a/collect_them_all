@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button, Segmented, inputCls } from "@/components/ui";
 
 type Category = "all" | "sealed" | "singles" | "retail" | "tools";
+type Country = "us" | "ca";
 
 interface Store {
   name: string;
@@ -17,7 +18,9 @@ interface Store {
   note?: string;
 }
 
-const RETAIL: Store[] = [
+/* ── Canada ── */
+
+const CA_RETAIL: Store[] = [
   { name: "Pokemon Center CA", url: "https://www.pokemoncenter.com/en-ca", location: "Official", tags: ["sealed", "retail"], sealed: "https://www.pokemoncenter.com/en-ca/category/booster-packs", note: "Always MSRP" },
   { name: "Walmart Canada", url: "https://www.walmart.ca/en/browse/toys/trading-cards/pokemon-cards/10011_31745_6000204969672", location: "Nationwide", tags: ["sealed", "retail"], sealed: "https://www.walmart.ca/en/browse/toys/trading-cards/pokemon-cards/pokemon-booster-blister-packs/10011_31745_6000204969672_6000203427077", note: "MSRP, packs/ETBs/bundles" },
   { name: "Best Buy Canada", url: "https://www.bestbuy.ca/en-ca/shop/toys-games-education/pokemon-booster-box", location: "Nationwide", tags: ["sealed", "retail"], sealed: "https://www.bestbuy.ca/en-ca/shop/toys-games-education/pokemon-booster-box", note: "Booster boxes & ETBs" },
@@ -29,7 +32,7 @@ const RETAIL: Store[] = [
   { name: "Toys R Us Canada", url: "https://www.toysrus.ca", location: "Nationwide", tags: ["sealed", "retail"], search: "https://www.toysrus.ca/search?q=pokemon", note: "Packs & bundles" },
 ];
 
-const SPECIALTY: Store[] = [
+const CA_SPECIALTY: Store[] = [
   { name: "401 Games", url: "https://store.401games.ca", location: "Toronto", tags: ["sealed", "singles"], sealed: "https://store.401games.ca/collections/pokemon-sealed-product", singles: "https://store.401games.ca/collections/pokemon-singles", search: "https://store.401games.ca/pages/search-results?q=", note: "46k+ singles, sealed, graded" },
   { name: "Hobbiesville", url: "https://hobbiesville.com", location: "Ottawa / Toronto", tags: ["sealed", "singles"], sealed: "https://hobbiesville.com/collections/pokemon-booster-boxes", singles: "https://hobbiesville.com/collections/pokemon-trading-cards", search: "https://hobbiesville.com/search?q=", freeShip: "$175+", note: "Largest CA selection" },
   { name: "Face to Face Games", url: "https://facetofacegames.com", location: "Multi-city", tags: ["sealed", "singles"], sealed: "https://facetofacegames.com/en-us/collections/pokemon-sealed", singles: "https://facetofacegames.com/en-us/collections/pokemon-singles", search: "https://facetofacegames.com/en-us/search?q=", note: "Largest CA TCG retailer, buylist" },
@@ -55,9 +58,46 @@ const SPECIALTY: Store[] = [
   { name: "Pop Collectibles", url: "https://popcollectibles.ca", location: "Canada", tags: ["sealed"], search: "https://popcollectibles.ca/search?q=", note: "Costco-exclusive bundles" },
 ];
 
-const TOOLS: Store[] = [
+const CA_TOOLS: Store[] = [
   { name: "TrackaCard", url: "https://trackacard.ca", location: "Canada", tags: ["tools"], note: "Compare prices across 35+ CA stores, price alerts" },
   { name: "TCG Archives", url: "https://marketplace.tcgarchives.ca", location: "Canada", tags: ["tools"], note: "P2P marketplace, no commission, ID-verified" },
+];
+
+/* ── United States ── */
+
+const US_RETAIL: Store[] = [
+  { name: "Pokemon Center US", url: "https://www.pokemoncenter.com", location: "Official", tags: ["sealed", "retail"], sealed: "https://www.pokemoncenter.com/category/booster-packs", note: "Always MSRP, exclusive promos" },
+  { name: "Target", url: "https://www.target.com/c/pokemon-trading-cards/-/N-hj0av", location: "Nationwide", tags: ["sealed", "retail"], sealed: "https://www.target.com/c/pokemon-trading-cards/-/N-hj0av", note: "MSRP sealed, in-store & online" },
+  { name: "Walmart US", url: "https://www.walmart.com/browse/pokemon-trading-cards/8933968_3735623_4013989", location: "Nationwide", tags: ["sealed", "retail"], sealed: "https://www.walmart.com/browse/pokemon-trading-cards/8933968_3735623_4013989", note: "MSRP packs, ETBs, bundles" },
+  { name: "Best Buy US", url: "https://www.bestbuy.com/site/trading-cards/pokemon-trading-cards/pcmcat1606830050498.c", location: "Nationwide", tags: ["sealed", "retail"], sealed: "https://www.bestbuy.com/site/trading-cards/pokemon-trading-cards/pcmcat1606830050498.c", note: "Booster boxes & ETBs" },
+  { name: "Costco US", url: "https://www.costco.com", location: "Nationwide", tags: ["sealed", "retail"], search: "https://www.costco.com/CatalogSearch?dept=All&keyword=pokemon", note: "Exclusive bundles, best value/pack. Membership required" },
+  { name: "GameStop US", url: "https://www.gamestop.com/shop/trading-cards/pokemon-trading-cards", location: "Nationwide", tags: ["sealed", "retail"], sealed: "https://www.gamestop.com/shop/trading-cards/pokemon-trading-cards", note: "Sealed packs, tins, in-store pickup" },
+  { name: "Amazon US", url: "https://www.amazon.com/s?k=pokemon+tcg+booster+box", location: "Nationwide", tags: ["sealed", "retail"], search: "https://www.amazon.com/s?k=pokemon+tcg+", note: "Wide selection, check seller ratings" },
+  { name: "Walgreens", url: "https://www.walgreens.com", location: "Nationwide", tags: ["sealed", "retail"], search: "https://www.walgreens.com/search/results.jsp?Ntt=pokemon+cards", note: "Exclusive packs & tins" },
+  { name: "Dollar Tree", url: "https://www.dollartree.com", location: "Nationwide", tags: ["sealed", "retail"], search: "https://www.dollartree.com/searchresults?Ntt=pokemon", note: "$1.25 mini packs (3 cards)" },
+];
+
+const US_SPECIALTY: Store[] = [
+  { name: "TCGPlayer", url: "https://www.tcgplayer.com", location: "Online marketplace", tags: ["sealed", "singles"], sealed: "https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&view=grid&ProductTypeName=Booster%20Box", singles: "https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&view=grid", search: "https://www.tcgplayer.com/search/pokemon/product?q=", freeShip: "$5+ (Direct)", note: "Largest TCG marketplace, price tracking, verified sellers" },
+  { name: "Card Kingdom", url: "https://www.cardkingdom.com", location: "Seattle, WA", tags: ["sealed", "singles"], sealed: "https://www.cardkingdom.com/purchasing/mtg_sealed", singles: "https://www.cardkingdom.com/pokemon", search: "https://www.cardkingdom.com/catalog/search?search=header&filter%5Bname%5D=", note: "Top reputation, instant buylist" },
+  { name: "ChannelFireball", url: "https://www.channelfireball.com", location: "Online", tags: ["sealed", "singles"], sealed: "https://www.channelfireball.com/collections/pokemon-sealed-product", singles: "https://www.channelfireball.com/collections/pokemon-singles", search: "https://www.channelfireball.com/search?q=", note: "Major TCG retailer, events" },
+  { name: "Troll and Toad", url: "https://www.trollandtoad.com", location: "Kentucky", tags: ["sealed", "singles"], sealed: "https://www.trollandtoad.com/pokemon/7085", singles: "https://www.trollandtoad.com/pokemon/7085", search: "https://www.trollandtoad.com/category.php?selected-cat=7085&search-words=", freeShip: "$35+", note: "Huge inventory, graded cards, buylist" },
+  { name: "Safari Zone", url: "https://safarizone.co", location: "Online", tags: ["sealed", "singles"], sealed: "https://safarizone.co/collections/pokemon-sealed-products", singles: "https://safarizone.co/collections/pokemon-singles", search: "https://safarizone.co/search?q=", note: "EN + JP specialist, competitive prices" },
+  { name: "Smoke and Mirrors Hobby", url: "https://smokeandmirrorshobby.com", location: "Online", tags: ["sealed", "singles"], sealed: "https://smokeandmirrorshobby.com/collections/pokemon", search: "https://smokeandmirrorshobby.com/search?q=", note: "Below-MSRP sealed products" },
+  { name: "Dave & Adam's", url: "https://www.dacardworld.com", location: "New York", tags: ["sealed", "singles"], sealed: "https://www.dacardworld.com/gaming/pokemon", search: "https://www.dacardworld.com/search?q=", freeShip: "$199+", note: "Major distributor, cases & boxes" },
+  { name: "Collector's Cache", url: "https://collectorscache.com", location: "Kansas", tags: ["sealed", "singles"], sealed: "https://collectorscache.com/collections/pokemon-sealed", singles: "https://collectorscache.com/collections/pokemon-singles", search: "https://collectorscache.com/search?q=", note: "Singles + sealed, buylist" },
+  { name: "Full Grip Games", url: "https://fullgripgames.com", location: "Ohio", tags: ["sealed", "singles"], sealed: "https://fullgripgames.com/collections/pokemon-sealed-products", singles: "https://fullgripgames.com/collections/pokemon-singles", search: "https://fullgripgames.com/search?q=", note: "Large singles inventory" },
+  { name: "PokeVault", url: "https://pokevault.com", location: "Online", tags: ["sealed", "singles"], search: "https://pokevault.com/search.php?search_query=", note: "Japanese cards & accessories specialist" },
+  { name: "PlazaJapan", url: "https://www.plazajapan.com", location: "Japan → US", tags: ["sealed"], sealed: "https://www.plazajapan.com/c/tcg/pokemon/", search: "https://www.plazajapan.com/search.html?search=pokemon+", note: "Authentic JP sealed, ships to US" },
+  { name: "Gamenerdz", url: "https://www.gamenerdz.com", location: "Online", tags: ["sealed"], sealed: "https://www.gamenerdz.com/pokemon", search: "https://www.gamenerdz.com/search?q=", freeShip: "$75+", note: "Daily deals, competitive sealed prices" },
+  { name: "Zulu's Board Game Cafe", url: "https://zulusgames.com", location: "Washington", tags: ["sealed", "singles"], search: "https://zulusgames.com/search?q=", note: "Local shop with online store" },
+  { name: "TCG Stadium", url: "https://tcgstadium.com", location: "Online", tags: ["sealed", "singles"], sealed: "https://tcgstadium.com/collections/pokemon-sealed", singles: "https://tcgstadium.com/collections/pokemon-singles", search: "https://tcgstadium.com/search?q=", note: "Fast shipping, EN + JP" },
+  { name: "CardShop Live", url: "https://cardshoplive.com", location: "Online", tags: ["sealed", "singles"], search: "https://cardshoplive.com/search?q=", note: "Live breaks & sealed products" },
+];
+
+const US_TOOLS: Store[] = [
+  { name: "TCGPlayer Market", url: "https://www.tcgplayer.com", location: "USA", tags: ["tools"], note: "Price tracking, market data, seller comparison" },
+  { name: "PriceCharting", url: "https://www.pricecharting.com/category/pokemon-cards", location: "USA", tags: ["tools"], note: "Historical price trends, graded card values" },
 ];
 
 interface RestockAlert {
@@ -69,6 +109,7 @@ interface RestockAlert {
   via: string;
   free?: boolean;
   price?: string;
+  country: Country | "both";
 }
 
 const RESTOCK_ALERTS: RestockAlert[] = [
@@ -80,15 +121,17 @@ const RESTOCK_ALERTS: RestockAlert[] = [
     stores: "Walmart, Best Buy, Pokemon Center, EB Games, Costco, 160+ local shops across every province",
     via: "Discord",
     free: true,
+    country: "ca",
   },
   {
     name: "TrackaLacker",
-    url: "https://www.trackalacker.com/ca/products/showcase/all-new-pokemon",
+    url: "https://www.trackalacker.com",
     join: "https://www.trackalacker.com",
     note: "Free app with push notifications. 150k+ users. Checks hot items every few seconds.",
-    stores: "Pokemon Center, Walmart, Best Buy, Costco, GameStop + CA coverage",
+    stores: "Pokemon Center, Walmart, Best Buy, Costco, GameStop, Target + CA coverage",
     via: "iOS / Android app + Discord",
     free: true,
+    country: "both",
   },
   {
     name: "PokeToolz",
@@ -98,31 +141,55 @@ const RESTOCK_ALERTS: RestockAlert[] = [
     stores: "Major Canadian retailers + local shops",
     via: "Discord",
     price: "Paid",
+    country: "ca",
   },
   {
     name: "PokeScan",
     url: "https://mypokescan.com",
     join: "https://mypokescan.com",
     note: "Monitors 100+ stores across US, Canada, UK, EU, Australia & Japan.",
-    stores: "100+ stores including Canadian retailers",
+    stores: "100+ stores including Target, Walmart, Best Buy, GameStop, Pokemon Center",
     via: "Discord",
     price: "$8.99/mo",
+    country: "both",
   },
   {
     name: "PokeNotify",
     url: "https://www.pokenotify.com",
     join: "https://www.pokenotify.com",
     note: "Native app with ZIP/postal code in-store alerts. 20k+ members.",
-    stores: "Multi-region including Canada",
+    stores: "Multi-region including US & Canada",
     via: "iOS / Android app + Discord",
     price: "Paid",
+    country: "both",
+  },
+  {
+    name: "Stock Informer",
+    url: "https://www.stockinformer.com/checker-pokemon-tcg",
+    join: "https://www.stockinformer.com",
+    note: "US-focused restock tracker for major retailers. Free browser alerts.",
+    stores: "Target, Walmart, Best Buy, Amazon, GameStop, Pokemon Center",
+    via: "Browser + Email",
+    free: true,
+    country: "us",
   },
 ];
 
+const COUNTRY_DATA = {
+  us: { retail: US_RETAIL, specialty: US_SPECIALTY, tools: US_TOOLS, label: "Shop USA", sub: "US stores only. Prices in USD.", currency: "USD" },
+  ca: { retail: CA_RETAIL, specialty: CA_SPECIALTY, tools: CA_TOOLS, label: "Shop Canada", sub: "Canadian stores only. No customs, no duties, prices in CAD.", currency: "CAD" },
+} as const;
+
 
 export default function ShopPage() {
+  const [country, setCountry] = useState<Country>("us");
   const [cat, setCat] = useState<Category>("all");
   const [q, setQ] = useState("");
+
+  const data = COUNTRY_DATA[country];
+  const RETAIL = data.retail;
+  const SPECIALTY = data.specialty;
+  const TOOLS = data.tools;
 
   const allStores = [...RETAIL, ...SPECIALTY];
   const filtered = cat === "all" ? allStores
@@ -130,6 +197,8 @@ export default function ShopPage() {
     : cat === "singles" ? allStores.filter((s) => s.tags.includes("singles"))
     : cat === "retail" ? RETAIL
     : TOOLS;
+
+  const alerts = RESTOCK_ALERTS.filter((a) => a.country === country || a.country === "both");
 
   function searchStores() {
     if (!q.trim()) return;
@@ -141,8 +210,26 @@ export default function ShopPage() {
   return (
     <div className="pb-24">
       <header className="pt-2 pb-3">
-        <h1 className="text-xl font-bold">Shop Canada</h1>
-        <p className="text-xs text-muted mt-1">Canadian stores only. No customs, no duties, prices in CAD.</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold">{data.label}</h1>
+            <p className="text-xs text-muted mt-1">{data.sub}</p>
+          </div>
+          <div className="flex rounded-lg overflow-hidden border border-line">
+            <button
+              onClick={() => setCountry("us")}
+              className={`px-3 py-1.5 text-xs font-semibold transition-colors ${country === "us" ? "bg-accent text-white" : "text-muted hover:text-fg"}`}
+            >
+              🇺🇸 US
+            </button>
+            <button
+              onClick={() => setCountry("ca")}
+              className={`px-3 py-1.5 text-xs font-semibold transition-colors ${country === "ca" ? "bg-accent text-white" : "text-muted hover:text-fg"}`}
+            >
+              🇨🇦 CA
+            </button>
+          </div>
+        </div>
       </header>
 
       <div className="flex gap-2">
@@ -208,12 +295,12 @@ export default function ShopPage() {
         </section>
       )}
 
-      {(cat === "all" || cat === "tools") && (
+      {(cat === "all" || cat === "tools") && alerts.length > 0 && (
         <section className="mt-5">
           <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">Restock alerts</h2>
-          <p className="text-xs text-muted mb-3">Get notified the moment Canadian stores restock Pokemon products. These services monitor store websites 24/7 so you never miss a drop.</p>
+          <p className="text-xs text-muted mb-3">Get notified the moment stores restock Pokemon products. These services monitor store websites 24/7 so you never miss a drop.</p>
           <ul className="card-surface rounded-2xl divide-y divide-line overflow-hidden">
-            {RESTOCK_ALERTS.map((a) => (
+            {alerts.map((a) => (
               <li key={a.name} className="p-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
