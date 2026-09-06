@@ -97,46 +97,50 @@ export default function HomePage() {
   return (
     <div>
       <header className="pt-2 pb-1 flex items-baseline justify-between">
-        <h1 className="text-xl font-bold">Portfolio</h1>
+        <h1 className="text-xl font-bold uppercase tracking-wider">My Binder</h1>
         <span className="text-[11px] text-muted">{c} · fx {data.fxDate}</span>
       </header>
 
       <div className="card-surface rounded-3xl p-5 mt-2">
-        <div className="text-xs text-muted">Total value</div>
-        <div className="text-4xl font-bold tabular tracking-tight mt-1">
+        <div className="text-4xl font-bold tabular tracking-tight">
           <Money amount={s.value} currency={c} />
         </div>
-        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
-          <span>
-            <span className="text-muted">24h </span>
-            <Delta amount={s.change24h} pct={s.change24hPct} currency={c} />
-          </span>
-          <span>
-            <span className="text-muted">All time </span>
-            <Delta amount={s.cost > 0 ? s.gain : null} pct={s.gainPct} currency={c} />
-          </span>
-        </div>
+        {s.change24h !== 0 && (
+          <div className={`inline-flex items-center gap-1 mt-2 px-3 py-1 rounded-full text-xs font-semibold ${s.change24h >= 0 ? "bg-up/15 text-up" : "bg-down/15 text-down"}`}>
+            {s.change24h >= 0 ? "▲" : "▼"} <Money amount={Math.abs(s.change24h)} currency={c} /> today
+          </div>
+        )}
         <div className="mt-3 -mx-2">
           <PriceChart data={data.series.map((p) => ({ date: p.date, value: p.value }))} currency={c} height={150} />
         </div>
         <div className="mt-2 flex justify-center">
           <Segmented value={range} onChange={setRange} size="xs" options={RANGES.map((r) => ({ value: r, label: r }))} />
         </div>
-        <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+        <div className="mt-4 flex items-center justify-center gap-6 text-center">
+          <div>
+            <div className="text-2xl font-bold tabular">{s.itemCount}</div>
+            <div className="text-[10px] text-muted uppercase tracking-wider">Cards</div>
+          </div>
+          <div className="w-px h-8 bg-line" />
+          <div>
+            <div className="text-2xl font-bold tabular">{s.uniqueCount}</div>
+            <div className="text-[10px] text-muted uppercase tracking-wider">Unique</div>
+          </div>
+          <div className="w-px h-8 bg-line" />
+          <div>
+            <div className="text-2xl font-bold tabular">{data.stats?.portfolioCount ?? 0}</div>
+            <div className="text-[10px] text-muted uppercase tracking-wider">Binders</div>
+          </div>
+        </div>
+        <div className="mt-3 grid grid-cols-3 gap-2 text-center">
           <Stat label="Cost basis" value={<Money amount={s.cost} currency={c} />} />
           <Stat label="Net gain" value={<Delta amount={s.cost > 0 ? s.gain : null} currency={c} />} />
-          <Stat label="Cards" value={<span className="tabular">{s.itemCount}</span>} />
+          <Stat label="All time" value={<Delta pct={s.gainPct} />} />
         </div>
       </div>
 
       {!empty && data.stats && (
         <div className="card-surface rounded-3xl p-4 mt-3">
-          <div className="text-xs text-muted mb-3">Collection</div>
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <Stat label="Total cards" value={<span className="tabular">{data.stats.totalCards}</span>} />
-            <Stat label="Unique" value={<span className="tabular">{data.stats.uniqueCards}</span>} />
-            <Stat label="Portfolios" value={<span className="tabular">{data.stats.portfolioCount}</span>} />
-          </div>
           {data.stats.closestSet && (
             <div className="mt-4">
               <div className="flex items-baseline justify-between">
@@ -164,6 +168,31 @@ export default function HomePage() {
           )}
         </div>
       )}
+
+      <Section title="Discover">
+        <div className="grid grid-cols-2 gap-2">
+          <Link href="/sets" className="card-surface rounded-2xl p-4 text-center hover:bg-white/[0.03] border border-line">
+            <div className="w-10 h-10 mx-auto rounded-full bg-accent/10 flex items-center justify-center">
+              <svg viewBox="0 0 24 24" className="w-5 h-5 text-accent" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="4" y="4" width="7" height="7" rx="1.5" />
+                <rect x="13" y="4" width="7" height="7" rx="1.5" />
+                <rect x="4" y="13" width="7" height="7" rx="1.5" />
+                <rect x="13" y="13" width="7" height="7" rx="1.5" />
+              </svg>
+            </div>
+            <div className="text-xs font-medium mt-2">Browse Sets</div>
+          </Link>
+          <Link href="/opens" className="card-surface rounded-2xl p-4 text-center hover:bg-white/[0.03] border border-line">
+            <div className="w-10 h-10 mx-auto rounded-full bg-accent/10 flex items-center justify-center">
+              <svg viewBox="0 0 24 24" className="w-5 h-5 text-accent" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                <path d="m3.3 7 8.7 5 8.7-5M12 22V12" />
+              </svg>
+            </div>
+            <div className="text-xs font-medium mt-2">Box Opens</div>
+          </Link>
+        </div>
+      </Section>
 
       {alerts.length > 0 && (
         <Section title={`Price alerts${alerts.some((a) => a.triggered) ? ` · ${alerts.filter((a) => a.triggered).length} triggered` : ""}`}>
@@ -207,11 +236,36 @@ export default function HomePage() {
         </Section>
       )}
 
-      <Section title="Tools">
-        <div className="grid grid-cols-3 gap-2">
-          <ToolLink href="/grade" icon="🔍" label="Grade Estimator" />
-          <ToolLink href="/opens" icon="📦" label="Box Opens" />
-          <ToolLink href="/shop" icon="🛒" label="Shop Canada" />
+      <Section title="Quick actions">
+        <div className="grid grid-cols-3 gap-3">
+          <Link href="/portfolios" className="flex flex-col items-center gap-2">
+            <div className="w-14 h-14 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center">
+              <svg viewBox="0 0 24 24" className="w-6 h-6 text-accent" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                <path d="M12 11v6M9 14h6" />
+              </svg>
+            </div>
+            <span className="text-[11px] font-medium text-center">Create Binder</span>
+          </Link>
+          <Link href="/grade" className="flex flex-col items-center gap-2">
+            <div className="w-14 h-14 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center">
+              <svg viewBox="0 0 24 24" className="w-6 h-6 text-accent" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.35-4.35" />
+              </svg>
+            </div>
+            <span className="text-[11px] font-medium text-center">Grade Estimator</span>
+          </Link>
+          <Link href="/shop" className="flex flex-col items-center gap-2">
+            <div className="w-14 h-14 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center">
+              <svg viewBox="0 0 24 24" className="w-6 h-6 text-accent" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 3h2l.4 2M7 13h10l4-8H5.4" />
+                <circle cx="7.5" cy="19.5" r="1.5" />
+                <circle cx="17.5" cy="19.5" r="1.5" />
+              </svg>
+            </div>
+            <span className="text-[11px] font-medium text-center">Shop</span>
+          </Link>
         </div>
       </Section>
 
@@ -255,15 +309,6 @@ function Stat({ label, value }: { label: string; value: React.ReactNode }) {
       <div className="text-[10px] text-muted uppercase tracking-wider">{label}</div>
       <div className="text-sm font-semibold mt-0.5">{value}</div>
     </div>
-  );
-}
-
-function ToolLink({ href, icon, label }: { href: string; icon: string; label: string }) {
-  return (
-    <Link href={href} className="card-surface rounded-2xl p-3 text-center hover:bg-white/[0.03] border border-line">
-      <div className="text-2xl">{icon}</div>
-      <div className="text-xs font-medium mt-1">{label}</div>
-    </Link>
   );
 }
 

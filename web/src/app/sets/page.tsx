@@ -43,7 +43,7 @@ export default function SetsPage() {
   return (
     <div>
       <header className="pt-2 pb-3">
-        <h1 className="text-xl font-bold">Sets</h1>
+        <h1 className="text-xl font-bold uppercase tracking-wider">Sets</h1>
       </header>
       <input className={inputCls} placeholder="Filter sets…" value={q} onChange={(e) => setQ(e.target.value)} />
       <div className="mt-3 flex flex-wrap gap-2 items-center">

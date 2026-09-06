@@ -116,7 +116,7 @@ export default function PortfolioPage() {
           </div>
         ) : (
           <h1 className="text-xl font-bold flex-1 truncate" onClick={() => setRenaming(true)}>
-            {data.portfolio.name}
+            {data.portfolio.name} <span className="text-muted text-sm">✎</span>
           </h1>
         )}
         <button onClick={remove} className="text-xs text-down">
@@ -180,30 +180,30 @@ export default function PortfolioPage() {
           </Empty>
         </div>
       ) : (
-        <ul className="mt-3 card-surface rounded-2xl divide-y divide-line overflow-hidden">
+        <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
           {items.map((i) => (
-            <li key={i.id} className="flex items-center gap-3 p-3">
+            <div key={i.id} className="card-surface rounded-2xl overflow-hidden flex flex-col">
               <Link href={`/cards/${encodeURIComponent(i.card.id)}`}>
-                <CardImage id={i.card.id} className="w-12 rounded-md" alt="" />
+                <CardImage id={i.card.id} className="w-full" alt="" />
               </Link>
-              <div className="flex-1 min-w-0" onClick={() => setEditing(i)}>
-                <div className="font-medium truncate">{i.card.name}</div>
-                <div className="text-xs text-muted truncate">
-                  {i.card.setName} {i.card.cardNumber && `#${i.card.cardNumber}`} · {variantLabel(i.variantType)} · {i.isGraded ? `${i.gradingCompany} ${i.grade}` : i.condition} · ×{i.quantity}
+              <div className="p-2.5 flex-1 flex flex-col gap-0.5" onClick={() => setEditing(i)}>
+                <div className="font-medium text-sm leading-tight line-clamp-2">{i.card.name}</div>
+                <div className="text-[11px] text-muted truncate">
+                  {i.card.setName} {i.card.cardNumber && `#${i.card.cardNumber}`}
                 </div>
                 <TcgBadge tcg={i.card.tcg} lang={i.card.language} />
-              </div>
-              <div className="text-right" onClick={() => setEditing(i)}>
-                <div className="font-semibold">
-                  <Money amount={i.value} currency={c} />
+                <div className="mt-auto pt-1 flex items-center justify-between">
+                  <span className="font-semibold text-sm">
+                    <Money amount={i.value} currency={c} />
+                  </span>
+                  <span className="text-[11px]">
+                    <Delta pct={i.change24hPct} />
+                  </span>
                 </div>
-                <div className="text-xs">
-                  <Delta amount={i.gain} pct={i.gainPct} currency={c} />
-                </div>
               </div>
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
 
       {editing && (

@@ -66,7 +66,7 @@ export default function SettingsPage() {
   return (
     <div>
       <header className="pt-2 pb-3">
-        <h1 className="text-xl font-bold">Settings</h1>
+        <h1 className="text-xl font-bold uppercase tracking-wider">Settings</h1>
       </header>
 
       <Section title="Display">

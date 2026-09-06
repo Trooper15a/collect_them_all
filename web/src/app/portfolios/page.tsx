@@ -70,7 +70,7 @@ export default function PortfoliosPage() {
   return (
     <div>
       <header className="pt-2 pb-3 flex items-center justify-between">
-        <h1 className="text-xl font-bold">Portfolios</h1>
+        <h1 className="text-xl font-bold uppercase tracking-wider">My Binders</h1>
         <Button variant="ghost" className="px-3 py-1.5 text-xs" onClick={() => setCreating((v) => !v)}>
           + New
         </Button>

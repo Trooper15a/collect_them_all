@@ -7,7 +7,7 @@ const tabs = [
   { href: "/", label: "Home", icon: HomeIcon },
   { href: "/scan", label: "Scan", icon: ScanIcon },
   { href: "/shop", label: "Shop", icon: ShopIcon },
-  { href: "/portfolios", label: "Portfolios", icon: FolderIcon },
+  { href: "/portfolios", label: "Binders", icon: FolderIcon },
   { href: "/sets", label: "Sets", icon: GridIcon },
   { href: "/settings", label: "Settings", icon: GearIcon },
 ];

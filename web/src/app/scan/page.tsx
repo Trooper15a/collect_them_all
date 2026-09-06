@@ -110,7 +110,7 @@ export default function ScanPage() {
   return (
     <div>
       <header className="pt-2 pb-3">
-        <h1 className="text-xl font-bold">Scan / Search</h1>
+        <h1 className="text-xl font-bold uppercase tracking-wider">Find a Card</h1>
       </header>
 
       <div className="flex gap-2">
