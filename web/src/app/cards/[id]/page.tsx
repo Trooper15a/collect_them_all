@@ -264,12 +264,8 @@ export default function CardPage() {
 
       <Section title="Sold listings">
         <div className="card-surface rounded-2xl p-4 space-y-2 text-sm">
-          <a href={ebaySoldUrl(card, false)} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-xl bg-white/[0.03] border border-line px-3 py-2.5 hover:bg-white/[0.06]">
+          <a href={ebaySoldUrl(card)} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-xl bg-white/[0.03] border border-line px-3 py-2.5 hover:bg-white/[0.06]">
             <span>eBay sold listings (raw)</span>
-            <span className="text-accent">↗</span>
-          </a>
-          <a href={ebaySoldUrl(card, true)} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-xl bg-white/[0.03] border border-line px-3 py-2.5 hover:bg-white/[0.06]">
-            <span>eBay sold listings (PSA graded)</span>
             <span className="text-accent">↗</span>
           </a>
           {"tcgplayerUrl" in meta && typeof meta.tcgplayerUrl === "string" && (
@@ -278,7 +274,15 @@ export default function CardPage() {
               <span className="text-accent">↗</span>
             </a>
           )}
-          <div className="text-xs text-muted">Opens eBay pre-filtered to sold and completed items, newest first. POP reports are still to come.</div>
+          <div className="mt-3 mb-1 text-xs font-semibold text-muted uppercase tracking-wider">PSA graded sold</div>
+          <div className="grid grid-cols-5 gap-1.5">
+            {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map((g) => (
+              <a key={g} href={ebaySoldUrl(card, g)} target="_blank" rel="noreferrer" className="flex items-center justify-center rounded-lg bg-white/[0.03] border border-line py-2 hover:bg-white/[0.06] hover:border-accent/40 transition-colors">
+                <span className="text-xs font-semibold">PSA {g}</span>
+              </a>
+            ))}
+          </div>
+          <div className="text-xs text-muted mt-2">Opens eBay pre-filtered to sold and completed items, newest first.</div>
         </div>
       </Section>
 
@@ -324,16 +328,15 @@ export default function CardPage() {
   );
 }
 
-/** eBay search pre-filtered to sold + completed listings, most recent first. */
-function ebaySoldUrl(card: NormalizedCard, graded: boolean) {
+function ebaySoldUrl(card: NormalizedCard, psaGrade?: number) {
   const num = (card.cardNumber ?? "").split("/")[0].replace(/^0+(?=\d)/, "");
-  const name = card.name.replace(/\s+-\s+\d+\/\d+$/, ""); // TCGPlayer names carry " - 007/165"
-  const terms = [name, num, card.language === "jap" ? "japanese" : "", graded ? "PSA" : "", card.tcg === "pokemon" ? "pokemon" : ""].filter(Boolean).join(" ");
+  const name = card.name.replace(/\s+-\s+\d+\/\d+$/, "");
+  const terms = [name, num, card.language === "jap" ? "japanese" : "", psaGrade != null ? `PSA ${psaGrade}` : "", card.tcg === "pokemon" ? "pokemon" : ""].filter(Boolean).join(" ");
   const u = new URL("https://www.ebay.com/sch/i.html");
   u.searchParams.set("_nkw", terms);
   u.searchParams.set("LH_Sold", "1");
   u.searchParams.set("LH_Complete", "1");
-  u.searchParams.set("_sop", "13"); // end date: recent first
+  u.searchParams.set("_sop", "13");
   return u.toString();
 }
 
