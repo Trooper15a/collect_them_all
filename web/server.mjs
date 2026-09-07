@@ -21,5 +21,5 @@ await app.prepare();
 https
   .createServer({ key, cert }, (req, res) => handle(req, res))
   .listen(port, "0.0.0.0", () => {
-    console.log(`[collectr] ready on https://0.0.0.0:${port} (${new Date().toISOString()})`);
+    console.log(`[ripnpull] ready on https://0.0.0.0:${port} (${new Date().toISOString()})`);
   });

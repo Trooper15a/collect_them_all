@@ -3,11 +3,11 @@ import { refreshOwnedPrices, snapshotPortfolios } from "./portfolio";
 import { importTcgcsv } from "./tcgcsv";
 import { checkWishlistTargets } from "./wishlist";
 
-const globalForCron = globalThis as unknown as { __collectrCron?: boolean };
+const globalForCron = globalThis as unknown as { __ripnpullCron?: boolean };
 
 export function startCron() {
-  if (globalForCron.__collectrCron) return;
-  globalForCron.__collectrCron = true;
+  if (globalForCron.__ripnpullCron) return;
+  globalForCron.__ripnpullCron = true;
   const schedule = process.env.PRICE_REFRESH_CRON ?? "30 3 * * *";
   cron.schedule(schedule, async () => {
     console.log("[cron] importing TCGCSV prices...");

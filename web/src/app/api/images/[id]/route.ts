@@ -27,7 +27,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       const img = indexCard(id)?.img;
       if (!img) return new NextResponse("no image", { status: 404 });
       const url = src === "tcgdex" ? `${img.replace(/\/(high|low)\.webp$/, "")}/${size}.webp` : img;
-      upstream = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 collectr-clone-personal/0.1" } });
+      upstream = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 ripnpull/0.1" } });
     } else {
       const cards = await db.select({ imageUrl: schema.cards.imageUrl }).from(schema.cards).where(eq(schema.cards.id, id)).limit(1);
       let url = cards[0]?.imageUrl;
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       if (!url) return new NextResponse("no image", { status: 404 });
       if (size === "low" && src === "sf") url = url.replace("/large/", "/normal/");
       if (src === "tp") url = url.replace(/_\d+w\.jpg$/, size === "low" ? "_400w.jpg" : "_in_1000x1000.jpg");
-      upstream = await fetch(url, { headers: { "User-Agent": "collectr-clone-personal/0.1" } });
+      upstream = await fetch(url, { headers: { "User-Agent": "ripnpull/0.1" } });
     }
     if (!upstream.ok) return new NextResponse("upstream error", { status: upstream.status });
     const type = upstream.headers.get("Content-Type") ?? "image/jpeg";

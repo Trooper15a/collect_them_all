@@ -40,7 +40,7 @@ export function defaultCategoryIds(): number[] {
 type J = any;
 
 async function getJson(url: string): Promise<J> {
-  const res = await fetch(url, { headers: { "User-Agent": "collectr-clone-personal/0.1" }, signal: AbortSignal.timeout(60_000) });
+  const res = await fetch(url, { headers: { "User-Agent": "ripnpull/0.1" }, signal: AbortSignal.timeout(60_000) });
   if (!res.ok) throw new Error(`TCGCSV ${res.status} ${url}`);
   return res.json();
 }

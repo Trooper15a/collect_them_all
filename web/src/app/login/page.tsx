@@ -11,7 +11,7 @@ function LoginInner() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
       <div className="text-center">
-        <h1 className="text-3xl font-bold">Collect Them All</h1>
+        <h1 className="text-3xl font-bold">RipnPull</h1>
         <p className="text-muted mt-2">Sign in to track your collection</p>
       </div>
 

@@ -12,7 +12,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   try {
     let upstream: Response | null = null;
     if (set.imageUrl) {
-      upstream = await fetch(set.imageUrl, { headers: { "User-Agent": "collectr-clone-personal/0.1" } });
+      upstream = await fetch(set.imageUrl, { headers: { "User-Agent": "ripnpull/0.1" } });
     } else if (set.tcg === "pokemon" && hasPokewalletKey() && pokewalletLimiter.remaining.hour > 10) {
       await pokewalletLimiter.acquire();
       const url = new URL(`${POKEWALLET_BASE}/sets/${encodeURIComponent(set.code)}/image`);

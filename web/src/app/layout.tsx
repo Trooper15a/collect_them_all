@@ -11,10 +11,10 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Collect Them All",
+  title: "RipnPull",
   description: "AI-powered TCG portfolio tracker",
   manifest: "/manifest.json",
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Collect Them All" },
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "RipnPull" },
   icons: { icon: "/icons/icon-192.png", apple: "/icons/apple-touch-icon.png" },
 };
 

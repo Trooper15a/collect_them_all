@@ -1,8 +1,8 @@
-/* Collect Them All service worker: app shell + model + images + offline API caching. */
+/* RipnPull service worker: app shell + model + images + offline API caching. */
 const VERSION = "v2";
-const SHELL = `cta-shell-${VERSION}`;
-const MODEL = `cta-model-${VERSION}`;
-const IMAGES = `cta-images-${VERSION}`;
+const SHELL = `rnp-shell-${VERSION}`;
+const MODEL = `rnp-model-${VERSION}`;
+const IMAGES = `rnp-images-${VERSION}`;
 const API_DATA = `cta-api-${VERSION}`;
 
 const OFFLINE_API_PATTERNS = [

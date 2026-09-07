@@ -1,6 +1,6 @@
 {
-  "name": "Collect Them All",
-  "short_name": "CTA",
+  "name": "RipnPull",
+  "short_name": "RipnPull",
   "description": "AI-powered TCG portfolio tracker",
   "start_url": "/",
   "scope": "/",

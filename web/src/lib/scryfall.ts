@@ -1,7 +1,7 @@
 import type { CardPrices, NormalizedCard } from "./types";
 
 const BASE = "https://api.scryfall.com";
-const HEADERS = { "User-Agent": "collectr-clone-personal/0.1", Accept: "application/json" };
+const HEADERS = { "User-Agent": "ripnpull/0.1", Accept: "application/json" };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type J = any;

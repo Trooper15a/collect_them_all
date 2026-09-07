@@ -3,10 +3,10 @@
  *
  * Usage:
  *   1. Make sure your Postgres is running (docker compose up db)
- *   2. Push the schema:  DATABASE_URL=postgresql://collectr:collectr_dev@localhost:5432/collectr npx drizzle-kit push
- *   3. Run this script:  DATABASE_URL=postgresql://collectr:collectr_dev@localhost:5432/collectr npx tsx scripts/migrate-to-postgres.ts [path/to/collectr.db]
+ *   2. Push the schema:  DATABASE_URL=postgresql://ripnpull:ripnpull_dev@localhost:5432/ripnpull npx drizzle-kit push
+ *   3. Run this script:  DATABASE_URL=postgresql://ripnpull:ripnpull_dev@localhost:5432/ripnpull npx tsx scripts/migrate-to-postgres.ts [path/to/ripnpull.db]
  *
- * The SQLite path defaults to ./data/collectr.db if not provided.
+ * The SQLite path defaults to ./data/ripnpull.db if not provided.
  */
 
 import Database from "better-sqlite3";
@@ -15,7 +15,7 @@ import path from "node:path";
 
 const BATCH = 500;
 
-const sqlitePath = process.argv[2] ?? path.join(process.cwd(), "data", "collectr.db");
+const sqlitePath = process.argv[2] ?? path.join(process.cwd(), "data", "ripnpull.db");
 const pgUrl = process.env.DATABASE_URL!;
 if (!pgUrl) {
   console.error("DATABASE_URL env var is required");
