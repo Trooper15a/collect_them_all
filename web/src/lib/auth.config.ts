@@ -14,9 +14,16 @@ export default {
   callbacks: {
     authorized({ auth, request }) {
       const isLoggedIn = !!auth?.user;
-      const isLoginPage = request.nextUrl.pathname.startsWith("/login");
-      if (isLoginPage) return true;
-      if (!isLoggedIn) return false;
+      const { pathname } = request.nextUrl;
+      const isLoginPage = pathname.startsWith("/login");
+      const isLandingPage = pathname === "/landing";
+      if (isLoginPage || isLandingPage) return true;
+      if (!isLoggedIn) {
+        if (pathname === "/") {
+          return Response.redirect(new URL("/landing", request.nextUrl.origin));
+        }
+        return false;
+      }
       return true;
     },
   },

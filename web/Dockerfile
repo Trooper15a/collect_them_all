@@ -15,6 +15,11 @@ RUN mkdir -p public/ort && \
     for f in node_modules/onnxruntime-web/dist/ort-wasm*.wasm node_modules/onnxruntime-web/dist/ort-wasm*.mjs; do \
       [ -f "$f" ] && cp "$f" public/ort/; \
     done
+# Download scanner model from GitHub Release (files are .gitignored)
+RUN mkdir -p public/model && \
+    wget -q -O public/model/card_embedder.onnx https://github.com/Trooper15a/collect_them_all/releases/download/model-v1/card_embedder.onnx && \
+    wget -q -O public/model/embeddings.bin https://github.com/Trooper15a/collect_them_all/releases/download/model-v1/embeddings.bin && \
+    wget -q -O public/model/index.json https://github.com/Trooper15a/collect_them_all/releases/download/model-v1/index.json
 RUN npm run build
 
 # ── Stage 3: Production ──

@@ -303,8 +303,24 @@ export default function CardPage() {
           <div className="mt-3 mb-1 text-xs font-semibold text-muted uppercase tracking-wider">PSA graded sold</div>
           <div className="grid grid-cols-5 gap-1.5">
             {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map((g) => (
-              <a key={g} href={ebaySoldUrl(card, g)} target="_blank" rel="noreferrer" className="flex items-center justify-center rounded-lg bg-white/[0.03] border border-line py-2 hover:bg-white/[0.06] hover:border-accent/40 transition-colors">
+              <a key={g} href={ebaySoldUrl(card, `PSA ${g}`)} target="_blank" rel="noreferrer" className="flex items-center justify-center rounded-lg bg-white/[0.03] border border-line py-2 hover:bg-white/[0.06] hover:border-accent/40 transition-colors">
                 <span className="text-xs font-semibold">PSA {g}</span>
+              </a>
+            ))}
+          </div>
+          <div className="mt-3 mb-1 text-xs font-semibold text-muted uppercase tracking-wider">BGS graded sold</div>
+          <div className="grid grid-cols-5 gap-1.5">
+            {["10", "9.5", "9", "8.5", "8", "7.5", "7", "6.5", "6", "5"].map((g) => (
+              <a key={g} href={ebaySoldUrl(card, `BGS ${g}`)} target="_blank" rel="noreferrer" className="flex items-center justify-center rounded-lg bg-white/[0.03] border border-line py-2 hover:bg-white/[0.06] hover:border-accent/40 transition-colors">
+                <span className="text-xs font-semibold">BGS {g}</span>
+              </a>
+            ))}
+          </div>
+          <div className="mt-3 mb-1 text-xs font-semibold text-muted uppercase tracking-wider">CGC graded sold</div>
+          <div className="grid grid-cols-5 gap-1.5">
+            {["10", "9.5", "9", "8.5", "8", "7.5", "7", "6.5", "6", "5"].map((g) => (
+              <a key={g} href={ebaySoldUrl(card, `CGC ${g}`)} target="_blank" rel="noreferrer" className="flex items-center justify-center rounded-lg bg-white/[0.03] border border-line py-2 hover:bg-white/[0.06] hover:border-accent/40 transition-colors">
+                <span className="text-xs font-semibold">CGC {g}</span>
               </a>
             ))}
           </div>
@@ -357,10 +373,10 @@ export default function CardPage() {
   );
 }
 
-function ebaySoldUrl(card: NormalizedCard, psaGrade?: number) {
+function ebaySoldUrl(card: NormalizedCard, grade?: string) {
   const num = (card.cardNumber ?? "").split("/")[0].replace(/^0+(?=\d)/, "");
   const name = card.name.replace(/\s+-\s+\d+\/\d+$/, "");
-  const terms = [name, num, card.language === "jap" ? "japanese" : "", psaGrade != null ? `PSA ${psaGrade}` : "", card.tcg === "pokemon" ? "pokemon" : ""].filter(Boolean).join(" ");
+  const terms = [name, num, card.language === "jap" ? "japanese" : "", grade ?? "", card.tcg === "pokemon" ? "pokemon" : ""].filter(Boolean).join(" ");
   const u = new URL("https://www.ebay.com/sch/i.html");
   u.searchParams.set("_nkw", terms);
   u.searchParams.set("LH_Sold", "1");
