@@ -15,12 +15,16 @@ RUN mkdir -p public/ort && \
     for f in node_modules/onnxruntime-web/dist/ort-wasm*.wasm node_modules/onnxruntime-web/dist/ort-wasm*.mjs; do \
       [ -f "$f" ] && cp "$f" public/ort/; \
     done
-# Download scanner model from GitHub Release (files are .gitignored)
-# Install curl for redirect-following downloads, BusyBox wget can fail on GitHub redirects
-RUN apk add --no-cache curl && mkdir -p public/model && \
-    curl -fsSL -o public/model/card_embedder.onnx "https://github.com/Trooper15a/collect_them_all/releases/download/model-v1/card_embedder.onnx" && \
-    curl -fsSL -o public/model/embeddings.bin "https://github.com/Trooper15a/collect_them_all/releases/download/model-v1/embeddings.bin" && \
-    curl -fsSL -o public/model/index.json "https://github.com/Trooper15a/collect_them_all/releases/download/model-v1/index.json" && \
+# Download scanner model from GitHub Release (private repo needs auth token)
+ARG GITHUB_TOKEN
+RUN apk add --no-cache curl jq && mkdir -p public/model && \
+    RELEASE_JSON=$(curl -fsSL -H "Authorization: token ${GITHUB_TOKEN}" \
+      "https://api.github.com/repos/Trooper15a/collect_them_all/releases/tags/model-v1") && \
+    for FILE in card_embedder.onnx embeddings.bin index.json; do \
+      ASSET_URL=$(echo "$RELEASE_JSON" | jq -r ".assets[] | select(.name==\"$FILE\") | .url") && \
+      curl -fsSL -H "Authorization: token ${GITHUB_TOKEN}" -H "Accept: application/octet-stream" \
+        -o "public/model/$FILE" "$ASSET_URL"; \
+    done && \
     ls -lh public/model/
 RUN npm run build
 
