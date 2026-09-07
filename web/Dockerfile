@@ -10,6 +10,11 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# Copy onnxruntime-web WASM files to public/ort (postinstall is skipped)
+RUN mkdir -p public/ort && \
+    for f in node_modules/onnxruntime-web/dist/ort-wasm*.wasm node_modules/onnxruntime-web/dist/ort-wasm*.mjs; do \
+      [ -f "$f" ] && cp "$f" public/ort/; \
+    done
 RUN npm run build
 
 # ── Stage 3: Production ──
@@ -24,9 +29,6 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-# ONNX model files (used by card scanner)
-COPY --from=builder /app/public/model ./public/model
 
 USER nextjs
 EXPOSE 3000
