@@ -21,7 +21,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     sessionsTable: schema.sessions,
     verificationTokensTable: schema.verificationTokens,
   }),
-  session: { strategy: "database" },
+  session: { strategy: "jwt" },
   events: {
     async signIn({ user }) {
       if (user.id) await claimOrphanData(user.id);
@@ -29,8 +29,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   callbacks: {
     ...authConfig.callbacks,
-    session({ session, user }) {
-      session.user.id = user.id;
+    jwt({ token, user }) {
+      if (user) token.id = user.id;
+      return token;
+    },
+    session({ session, token }) {
+      session.user.id = token.id as string;
       return session;
     },
   },

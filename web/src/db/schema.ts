@@ -1,4 +1,4 @@
-import { boolean, doublePrecision, index, integer, pgTable, primaryKey, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { bigint, boolean, doublePrecision, index, integer, pgTable, primaryKey, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 /* ─── Auth tables (NextAuth / Auth.js) ─── */
 
@@ -160,7 +160,7 @@ export const settings = pgTable("settings", {
 export const apiCache = pgTable("api_cache", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
-  expiresAt: integer("expires_at").notNull(),
+  expiresAt: bigint("expires_at", { mode: "number" }).notNull(),
 });
 
 export const sets = pgTable(
