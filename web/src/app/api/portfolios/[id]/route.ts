@@ -1,8 +1,9 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { TCG_IDS } from "@/lib/types";
 import { db, schema } from "@/db";
+import { requireUserId } from "@/lib/auth";
 import { getSetting } from "@/lib/cache";
 import { getRates } from "@/lib/currency";
 import { RANGES, type Range } from "@/lib/format";
@@ -20,35 +21,40 @@ function parseId(id: string) {
 }
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const userId = await requireUserId();
   const id = parseId((await ctx.params).id);
   if (!id) return NextResponse.json({ error: "Bad id" }, { status: 400 });
-  const portfolio = db.select().from(schema.portfolios).where(eq(schema.portfolios.id, id)).get();
+  const rows = await db.select().from(schema.portfolios).where(and(eq(schema.portfolios.id, id), eq(schema.portfolios.userId, userId))).limit(1);
+  const portfolio = rows[0];
   if (!portfolio) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const currency = req.nextUrl.searchParams.get("currency") ?? getSetting("currency", "USD");
+  const currency = req.nextUrl.searchParams.get("currency") ?? await getSetting("currency", "USD");
   const rangeParam = req.nextUrl.searchParams.get("range") ?? "1M";
   const range = (RANGES as readonly string[]).includes(rangeParam) ? (rangeParam as Range) : "1M";
   try {
     const fx = await getRates();
-    const items = await valuedItems(id, currency, fx);
-    return NextResponse.json({ portfolio, items, summary: summarize(items), series: valueSeries(id, range, currency, fx), currency });
+    const items = await valuedItems(id, currency, fx, userId);
+    return NextResponse.json({ portfolio, items, summary: summarize(items), series: await valueSeries(id, range, currency, fx), currency });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Failed" }, { status: 500 });
   }
 }
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const userId = await requireUserId();
   const id = parseId((await ctx.params).id);
   if (!id) return NextResponse.json({ error: "Bad id" }, { status: 400 });
+  const exists = await db.select().from(schema.portfolios).where(and(eq(schema.portfolios.id, id), eq(schema.portfolios.userId, userId))).limit(1);
+  if (!exists[0]) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const parsed = Patch.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
-  const row = db.update(schema.portfolios).set(parsed.data).where(eq(schema.portfolios.id, id)).returning().get();
-  if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json(row);
+  const result = await db.update(schema.portfolios).set(parsed.data).where(eq(schema.portfolios.id, id)).returning();
+  return NextResponse.json(result[0]);
 }
 
 export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const userId = await requireUserId();
   const id = parseId((await ctx.params).id);
   if (!id) return NextResponse.json({ error: "Bad id" }, { status: 400 });
-  db.delete(schema.portfolios).where(eq(schema.portfolios.id, id)).run();
+  await db.delete(schema.portfolios).where(and(eq(schema.portfolios.id, id), eq(schema.portfolios.userId, userId)));
   return NextResponse.json({ ok: true });
 }

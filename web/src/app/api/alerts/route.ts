@@ -9,15 +9,15 @@ const Body = z.object({
 });
 
 export async function GET() {
-  const alerts = listAlerts();
-  return NextResponse.json({ alerts, triggered: alerts.filter((a) => a.triggered).length });
+  const alerts = await listAlerts();
+  return NextResponse.json({ alerts, triggered: alerts.filter((a: { triggered: boolean }) => a.triggered).length });
 }
 
 export async function POST(req: NextRequest) {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
   try {
-    return NextResponse.json(upsertAlert(parsed.data.cardId, parsed.data.thresholdPct, parsed.data.variantType), { status: 201 });
+    return NextResponse.json(await upsertAlert(parsed.data.cardId, parsed.data.thresholdPct, parsed.data.variantType), { status: 201 });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Failed" }, { status: 400 });
   }

@@ -11,7 +11,7 @@ function csvCell(v: unknown) {
 }
 
 export async function GET(req: NextRequest) {
-  const currency = req.nextUrl.searchParams.get("currency") ?? getSetting("currency", "USD");
+  const currency = req.nextUrl.searchParams.get("currency") ?? await getSetting("currency", "USD");
   const fx = await getRates();
   const items = await valuedItems(null, currency, fx);
   const header = [

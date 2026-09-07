@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
+import { requireUserId } from "@/lib/auth";
 import { getSetting } from "@/lib/cache";
 import { convert, getRates, type Rates } from "@/lib/currency";
 import { RANGES, type Range } from "@/lib/format";
@@ -29,21 +30,22 @@ function slim(i: ValuedItem) {
 }
 
 export async function GET(req: NextRequest) {
-  const currency = req.nextUrl.searchParams.get("currency") ?? getSetting("currency", "USD");
+  const userId = await requireUserId();
+  const currency = req.nextUrl.searchParams.get("currency") ?? await getSetting("currency", "USD");
   const rangeParam = req.nextUrl.searchParams.get("range") ?? "1M";
   const range = (RANGES as readonly string[]).includes(rangeParam) ? (rangeParam as Range) : "1M";
   try {
     const fx = await getRates();
-    const items = await valuedItems(null, currency, fx);
+    const items = await valuedItems(null, currency, fx, userId);
     const summary = summarize(items);
-    const series = valueSeries(null, range, currency, fx);
+    const series = await valueSeries(null, range, currency, fx);
     const mostValuable = [...items].sort((a, b) => b.value - a.value).slice(0, 10).map(slim);
     const movers = items.filter((i) => i.change24hPct != null);
     const trending = [...movers].sort((a, b) => Math.abs(b.change24hPct ?? 0) - Math.abs(a.change24hPct ?? 0)).slice(0, 10).map(slim);
     const withGain = items.filter((i) => i.gain != null);
     const biggestGains = [...withGain].sort((a, b) => (b.gain ?? 0) - (a.gain ?? 0)).filter((i) => (i.gain ?? 0) > 0).slice(0, 5).map(slim);
     const biggestLosses = [...withGain].sort((a, b) => (a.gain ?? 0) - (b.gain ?? 0)).filter((i) => (i.gain ?? 0) < 0).slice(0, 5).map(slim);
-    const stats = collectionStats(items, currency, fx);
+    const stats = await collectionStats(items, currency, fx);
     return NextResponse.json({ currency, range, summary, series, mostValuable, trending, biggestGains, biggestLosses, stats, fxDate: fx.date });
   } catch (err) {
     console.error("dashboard error", err);
@@ -51,7 +53,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-function collectionStats(items: ValuedItem[], currency: string, fx: Rates) {
+async function collectionStats(items: ValuedItem[], currency: string, fx: Rates) {
   const totalCards = items.reduce((s, i) => s + i.quantity, 0);
   const uniqueCards = new Set(items.map((i) => i.card.id)).size;
   const portfolioCount = new Set(items.map((i) => i.portfolioId)).size;
@@ -70,8 +72,8 @@ function collectionStats(items: ValuedItem[], currency: string, fx: Rates) {
   }
   for (const [key, entry] of setOwnership) {
     const [tcg, code, lang] = key.split(":");
-    const row = db.select({ cnt: sql<number>`count(*)` }).from(schema.cards).where(sql`tcg = ${tcg} AND set_code = ${code} AND language = ${lang} AND card_number IS NOT NULL`).get();
-    entry.total = row?.cnt ?? 0;
+    const rows = await db.select({ cnt: sql<number>`count(*)` }).from(schema.cards).where(sql`tcg = ${tcg} AND set_code = ${code} AND language = ${lang} AND card_number IS NOT NULL`);
+    entry.total = rows[0]?.cnt ?? 0;
   }
 
   let closestSet: { name: string; owned: number; total: number; pct: number; missing: number } | null = null;
@@ -84,10 +86,19 @@ function collectionStats(items: ValuedItem[], currency: string, fx: Rates) {
     }
   }
 
+  let totalOwned = 0;
+  let totalInSets = 0;
+  for (const entry of setOwnership.values()) {
+    totalOwned += entry.owned.size;
+    totalInSets += entry.total;
+  }
+  const overallPct = totalInSets > 0 ? Math.round((totalOwned / totalInSets) * 100) : 0;
+  const setsStarted = setOwnership.size;
+
   let cheapestMissing: { id: string; name: string; setName: string | null; price: number } | null = null;
   if (closestSet) {
     const ownedIds = new Set(items.map((i) => i.card.id));
-    const allCards = db.select().from(schema.cards).where(sql`set_name = ${closestSet.name} AND card_number IS NOT NULL AND prices_json IS NOT NULL`).all();
+    const allCards = await db.select().from(schema.cards).where(sql`set_name = ${closestSet.name} AND card_number IS NOT NULL AND prices_json IS NOT NULL`);
     for (const row of allCards) {
       if (ownedIds.has(row.id)) continue;
       const prices = row.pricesJson ? JSON.parse(row.pricesJson) : {};
@@ -100,5 +111,5 @@ function collectionStats(items: ValuedItem[], currency: string, fx: Rates) {
     }
   }
 
-  return { totalCards, uniqueCards, portfolioCount, closestSet, cheapestMissing };
+  return { totalCards, uniqueCards, portfolioCount, closestSet, cheapestMissing, overallPct, setsStarted };
 }

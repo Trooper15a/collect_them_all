@@ -15,13 +15,11 @@ export async function GET(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: "Invalid query" }, { status: 400 });
   try {
     const sets = await listSets(parsed.data.tcg, parsed.data.lang);
-    // Distinct owned cards per set (keyed like sets.id = tcg:code:language).
-    const ownedRows = db
+    const ownedRows = await db
       .select({ tcg: schema.cards.tcg, code: schema.cards.setCode, language: schema.cards.language, n: sql<number>`count(distinct ${schema.cards.cardNumber})` })
       .from(schema.portfolioItems)
       .innerJoin(schema.cards, eq(schema.portfolioItems.cardId, schema.cards.id))
-      .groupBy(schema.cards.tcg, schema.cards.setCode, schema.cards.language)
-      .all();
+      .groupBy(schema.cards.tcg, schema.cards.setCode, schema.cards.language);
     const owned: Record<string, number> = {};
     for (const r of ownedRows) if (r.code) owned[`${r.tcg}:${r.code}:${r.language}`] = r.n;
     return NextResponse.json({ sets, owned });

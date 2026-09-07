@@ -9,14 +9,14 @@ const Body = z.object({
 
 /** GET /api/tcgcsv -> import status + available categories */
 export async function GET() {
-  return NextResponse.json({ status: importStatus(), categories: TCGCSV_CATEGORIES, defaults: defaultCategoryIds() });
+  return NextResponse.json({ status: await importStatus(), categories: TCGCSV_CATEGORIES, defaults: defaultCategoryIds() });
 }
 
 /** POST /api/tcgcsv { categories?: [3,85] } -> starts an import in the background and returns immediately */
 export async function POST(req: NextRequest) {
   const parsed = Body.safeParse((await req.json().catch(() => ({}))) ?? {});
   if (!parsed.success) return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
-  const status = importStatus();
+  const status = await importStatus();
   if (status.running) return NextResponse.json({ error: "Import already running", status }, { status: 409 });
   const cats = parsed.data.categories ?? defaultCategoryIds();
   importTcgcsv(cats, { onlyGroups: parsed.data.onlyGroups }).catch((e) => console.error("[tcgcsv] import failed", e));

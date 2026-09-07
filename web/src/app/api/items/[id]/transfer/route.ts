@@ -13,17 +13,16 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Validation failed" }, { status: 400 });
 
-  const item = db.select().from(schema.portfolioItems).where(eq(schema.portfolioItems.id, id)).get();
-  if (!item) return NextResponse.json({ error: "Item not found" }, { status: 404 });
+  const items = await db.select().from(schema.portfolioItems).where(eq(schema.portfolioItems.id, id)).limit(1);
+  if (!items[0]) return NextResponse.json({ error: "Item not found" }, { status: 404 });
 
-  const target = db.select().from(schema.portfolios).where(eq(schema.portfolios.id, parsed.data.toPortfolioId)).get();
-  if (!target) return NextResponse.json({ error: "Target portfolio not found" }, { status: 404 });
+  const targets = await db.select().from(schema.portfolios).where(eq(schema.portfolios.id, parsed.data.toPortfolioId)).limit(1);
+  if (!targets[0]) return NextResponse.json({ error: "Target portfolio not found" }, { status: 404 });
 
-  db.update(schema.portfolioItems)
+  await db.update(schema.portfolioItems)
     .set({ portfolioId: parsed.data.toPortfolioId })
-    .where(eq(schema.portfolioItems.id, id))
-    .run();
+    .where(eq(schema.portfolioItems.id, id));
 
   snapshotPortfolios().catch(() => undefined);
-  return NextResponse.json({ ok: true, movedTo: target.name });
+  return NextResponse.json({ ok: true, movedTo: targets[0].name });
 }

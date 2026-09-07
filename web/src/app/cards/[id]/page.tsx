@@ -8,6 +8,7 @@ import { PriceChart } from "@/components/PriceChart";
 import { Button, CardImage, Empty, Money, Section, Segmented, Skeleton, TcgBadge } from "@/components/ui";
 import { RANGES, type Range, fmtMoney, rangeToDays } from "@/lib/format";
 import { convert, type Rates } from "@/lib/fx";
+import { marketplaceLinks } from "@/lib/marketplace";
 import { type MarketPrices, type NormalizedCard, variantLabel } from "@/lib/types";
 
 interface HistoryPoint {
@@ -34,6 +35,7 @@ export default function CardPage() {
   const [alert, setAlert] = useState<{ id: number; thresholdPct: number } | null | undefined>(undefined);
   const [alertOpen, setAlertOpen] = useState(false);
   const [threshold, setThreshold] = useState("10");
+  const [wishlisted, setWishlisted] = useState(false);
 
   const loadAlert = () =>
     fetch("/api/alerts")
@@ -69,9 +71,27 @@ export default function CardPage() {
       })
       .catch((e) => setError(e.message));
 
+  const loadWishlist = () =>
+    fetch("/api/wishlist")
+      .then((r) => r.json())
+      .then((d) => {
+        const found = (d.items ?? []).some((i: { card: { id: string } }) => i.card.id === id);
+        setWishlisted(found);
+      })
+      .catch(() => undefined);
+  const toggleWishlist = async () => {
+    if (wishlisted) {
+      await fetch("/api/wishlist", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cardId: id }) });
+    } else {
+      await fetch("/api/wishlist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cardId: id }) });
+    }
+    setWishlisted(!wishlisted);
+  };
+
   useEffect(() => {
     load();
     loadAlert();
+    loadWishlist();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -239,12 +259,18 @@ export default function CardPage() {
             </div>
           </div>
         )}
-        {active?.url && (
-          <a href={active.url} target="_blank" rel="noreferrer" className="block mt-3 text-xs text-accent">
-            View on {market === "tcgplayer" ? "TCGPlayer" : "CardMarket"} ↗
-          </a>
-        )}
       </div>
+
+      <Section title="Buy">
+        <div className="card-surface rounded-2xl p-4 space-y-2 text-sm">
+          {marketplaceLinks(card, card.prices).map((link) => (
+            <a key={link.label} href={link.url} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-xl bg-white/[0.03] border border-line px-3 py-2.5 hover:bg-white/[0.06]">
+              <span>{link.label}</span>
+              <span className="text-accent">↗</span>
+            </a>
+          ))}
+        </div>
+      </Section>
 
       <Section title="Details">
         <dl className="card-surface rounded-2xl p-4 grid grid-cols-2 gap-y-2 text-sm">
@@ -287,7 +313,10 @@ export default function CardPage() {
       </Section>
 
       <div className="fixed bottom-[92px] inset-x-0 px-4 pointer-events-none">
-        <div className="max-w-3xl mx-auto flex justify-end">
+        <div className="max-w-3xl mx-auto flex justify-end gap-2">
+          <button onClick={toggleWishlist} className={`pointer-events-auto w-12 h-12 rounded-full border flex items-center justify-center text-lg shadow-lg ${wishlisted ? "bg-down/20 border-down/40 text-down" : "bg-elev border-line text-muted"}`} aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}>
+            {wishlisted ? "♥" : "♡"}
+          </button>
           <Button className="pointer-events-auto shadow-[0_10px_30px_rgba(250,204,21,0.35)]" onClick={() => setAdding(true)}>
             + Add to portfolio
           </Button>

@@ -103,8 +103,19 @@ export default function SetsPage() {
                     {s.code.toUpperCase()} · {langLabel(s.language)} {s.releaseDate && `· ${s.releaseDate.slice(0, 7)}`}
                   </div>
                 </div>
-                <div className="text-right text-xs">
-                  {owned[s.id] ? <span className="text-up font-semibold">{owned[s.id]} owned</span> : <span className="text-muted">{s.total ?? "—"} cards</span>}
+                <div className="text-right text-xs w-24 shrink-0">
+                  {owned[s.id] && s.total ? (
+                    <>
+                      <span className="text-up font-semibold">{owned[s.id]}/{s.total}</span>
+                      <div className="mt-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                        <div className="h-full rounded-full bg-up transition-all" style={{ width: `${Math.min(100, Math.round((owned[s.id] / s.total) * 100))}%` }} />
+                      </div>
+                    </>
+                  ) : owned[s.id] ? (
+                    <span className="text-up font-semibold">{owned[s.id]} owned</span>
+                  ) : (
+                    <span className="text-muted">{s.total ?? "—"} cards</span>
+                  )}
                 </div>
               </Link>
             </li>

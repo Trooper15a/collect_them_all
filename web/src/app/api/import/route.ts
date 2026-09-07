@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
       text = await req.text();
     }
     if (!text.trim()) return NextResponse.json({ error: "Empty file" }, { status: 400 });
-    const rows = previewImport(text);
+    const rows = await previewImport(text);
     const summary = {
       total: rows.length,
       matched: rows.filter((r) => r.status === "matched").length,
@@ -43,7 +43,7 @@ export async function PUT(req: NextRequest) {
   const parsed = Commit.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Validation failed" }, { status: 400 });
   try {
-    const result = commitImport(parsed.data.rows, parsed.data.defaultPortfolio);
+    const result = await commitImport(parsed.data.rows, parsed.data.defaultPortfolio);
     snapshotPortfolios().catch(() => undefined);
     return NextResponse.json(result);
   } catch (e) {

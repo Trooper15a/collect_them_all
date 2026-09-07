@@ -113,16 +113,16 @@ function numPrefix(n: string | null | undefined) {
   return (n ?? "").split("/")[0].trim().replace(/^0+(?=\d)/, "").toLowerCase();
 }
 
-function findCard(row: ImportRow): { match: NormalizedCard | null; candidates: number } {
+async function findCard(row: ImportRow): Promise<{ match: NormalizedCard | null; candidates: number }> {
   if (row.cardId) {
-    const r = db.select().from(schema.cards).where(eq(schema.cards.id, row.cardId)).get();
-    if (r) return { match: rowToCard(r), candidates: 1 };
+    const r = await db.select().from(schema.cards).where(eq(schema.cards.id, row.cardId)).limit(1);
+    if (r[0]) return { match: rowToCard(r[0]), candidates: 1 };
   }
   const nameWords = row.name.split(/\s+/).filter(Boolean).slice(0, 4);
   const conds = nameWords.map((w) => like(schema.cards.name, `%${w}%`));
   if (row.language) conds.push(eq(schema.cards.language, row.language));
   conds.push(sql`card_number is not null`);
-  const rows = db.select().from(schema.cards).where(and(...conds)).limit(400).all().map(rowToCard);
+  const rows = (await db.select().from(schema.cards).where(and(...conds)).limit(400)).map(rowToCard);
   if (!rows.length) return { match: null, candidates: 0 };
   const wantNum = numPrefix(row.number);
   const wantSet = (row.set ?? "").toLowerCase();
@@ -134,7 +134,7 @@ function findCard(row: ImportRow): { match: NormalizedCard | null; candidates: n
       else if (c.name.toLowerCase().startsWith(nameLc)) score += 3;
       if (wantNum && numPrefix(c.cardNumber) === wantNum) score += 4;
       if (wantSet && ((c.setName ?? "").toLowerCase().includes(wantSet) || (c.setCode ?? "").toLowerCase() === wantSet)) score += 3;
-      if (c.id.startsWith("tp:")) score += 1; // prefer the priced bulk source
+      if (c.id.startsWith("tp:")) score += 1;
       if (bestPrice(c.prices)) score += 1;
       return { c, score };
     })
@@ -146,9 +146,11 @@ function findCard(row: ImportRow): { match: NormalizedCard | null; candidates: n
   return { match: top.c, candidates: ties.length };
 }
 
-export function previewImport(text: string): ImportRow[] {
+export async function previewImport(text: string): Promise<ImportRow[]> {
   const records = parseCsv(text);
-  return records.map((raw, i) => {
+  const results: ImportRow[] = [];
+  for (let i = 0; i < records.length; i++) {
+    const raw = records[i];
     const name = col(raw, COL.name) ?? "";
     const row: ImportRow = {
       line: i + 2,
@@ -172,57 +174,61 @@ export function previewImport(text: string): ImportRow[] {
     if (!name && !row.cardId) {
       row.status = "error";
       row.error = "missing name";
-      return row;
+      results.push(row);
+      continue;
     }
-    const { match, candidates } = findCard(row);
+    const { match, candidates } = await findCard(row);
     if (match) {
       const bp = bestPrice(match.prices, row.variant ?? undefined);
       row.match = { id: match.id, name: match.name, setName: match.setName ?? null, cardNumber: match.cardNumber ?? null, language: match.language, price: bp?.amount ?? null, currency: bp?.currency ?? null };
       row.status = candidates > 1 ? "ambiguous" : "matched";
     }
     row.candidates = candidates;
-    return row;
-  });
+    results.push(row);
+  }
+  return results;
 }
 
-export function commitImport(rows: ImportRow[], defaultPortfolio: string) {
+export async function commitImport(rows: ImportRow[], defaultPortfolio: string) {
   let added = 0;
   const skipped: number[] = [];
   const portfolioIds = new Map<string, number>();
-  const getPortfolio = (name: string) => {
+  const getPortfolio = async (name: string) => {
     const key = name.trim() || defaultPortfolio;
     if (portfolioIds.has(key)) return portfolioIds.get(key)!;
-    const existing = db.select().from(schema.portfolios).where(eq(schema.portfolios.name, key)).get();
-    const id = existing?.id ?? db.insert(schema.portfolios).values({ name: key, tcgId: null, language: null, createdAt: nowIso() }).returning().get().id;
+    const existing = await db.select().from(schema.portfolios).where(eq(schema.portfolios.name, key)).limit(1);
+    if (existing[0]) {
+      portfolioIds.set(key, existing[0].id);
+      return existing[0].id;
+    }
+    const result = await db.insert(schema.portfolios).values({ name: key, tcgId: null, language: null, createdAt: nowIso() }).returning();
+    const id = result[0].id;
     portfolioIds.set(key, id);
     return id;
   };
-  db.transaction(() => {
-    for (const r of rows) {
-      if (!r.match || r.status === "error") {
-        skipped.push(r.line);
-        continue;
-      }
-      const graded = /^(y|yes|true|1)$/i.test(col(r.raw, COL.graded) ?? "");
-      db.insert(schema.portfolioItems)
-        .values({
-          portfolioId: getPortfolio(r.portfolio ?? ""),
-          cardId: r.match.id,
-          quantity: r.quantity,
-          variantType: r.variant ?? "normal",
-          condition: r.condition,
-          isGraded: graded,
-          gradingCompany: graded ? col(r.raw, COL.company) : null,
-          grade: graded ? col(r.raw, COL.grade) : null,
-          certNumber: graded ? col(r.raw, COL.cert) : null,
-          costBasis: r.cost,
-          costCurrency: ["USD", "EUR", "GBP", "CAD", "JPY", "AUD"].includes(r.currency) ? r.currency : "USD",
-          notes: r.notes,
-          addedAt: nowIso(),
-        })
-        .run();
-      added++;
+  for (const r of rows) {
+    if (!r.match || r.status === "error") {
+      skipped.push(r.line);
+      continue;
     }
-  });
+    const graded = /^(y|yes|true|1)$/i.test(col(r.raw, COL.graded) ?? "");
+    await db.insert(schema.portfolioItems)
+      .values({
+        portfolioId: await getPortfolio(r.portfolio ?? ""),
+        cardId: r.match.id,
+        quantity: r.quantity,
+        variantType: r.variant ?? "normal",
+        condition: r.condition,
+        isGraded: graded,
+        gradingCompany: graded ? col(r.raw, COL.company) : null,
+        grade: graded ? col(r.raw, COL.grade) : null,
+        certNumber: graded ? col(r.raw, COL.cert) : null,
+        costBasis: r.cost,
+        costCurrency: ["USD", "EUR", "GBP", "CAD", "JPY", "AUD"].includes(r.currency) ? r.currency : "USD",
+        notes: r.notes,
+        addedAt: nowIso(),
+      });
+    added++;
+  }
   return { added, skipped };
 }

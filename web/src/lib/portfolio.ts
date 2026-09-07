@@ -22,21 +22,17 @@ export interface ValuedItem {
   costCurrency: string;
   notes: string | null;
   addedAt: string;
-  /** Unit price in the card's market currency. */
   unitPrice: { amount: number; currency: "USD" | "EUR"; variant: string } | null;
-  /** Totals in the display currency. */
   value: number;
   cost: number | null;
   gain: number | null;
   gainPct: number | null;
-  /** 24h change per unit, display currency. */
   change24h: number | null;
   change24hPct: number | null;
 }
 
 const CONDITION_MULT: Record<string, number> = { NM: 1, LP: 0.85, MP: 0.7, HP: 0.5, DMG: 0.35 };
 
-/** Rough graded multipliers used only when no graded sales data is cached. */
 const GRADE_MULT: Record<string, number> = {
   "PSA 10": 3.0, "PSA 9": 1.4, "PSA 8": 1.0, "BGS 10": 4.5, "BGS 9.5": 2.5, "BGS 9": 1.3, "CGC 10": 2.8, "CGC 9.5": 1.6, "CGC 9": 1.2,
 };
@@ -49,28 +45,30 @@ export function unitValue(card: NormalizedCard, variant: string, condition: stri
   return { amount: bp.amount * mult, currency: bp.currency, variant: bp.variant, raw: bp.amount };
 }
 
-function yesterdayPrice(cardId: string, variant: string): { tcgplayerMarket: number | null; cardmarketAvg: number | null } | null {
-  const rows = db
+async function yesterdayPrice(cardId: string, variant: string): Promise<{ tcgplayerMarket: number | null; cardmarketAvg: number | null } | null> {
+  const rows = await db
     .select()
     .from(schema.priceHistory)
     .where(and(eq(schema.priceHistory.cardId, cardId), eq(schema.priceHistory.variantType, variant), sql`date < ${today()}`))
     .orderBy(sql`date desc`)
-    .limit(1)
-    .all();
+    .limit(1);
   return rows[0] ?? null;
 }
 
-export async function valuedItems(portfolioId: number | null, displayCurrency: string, rates?: Rates): Promise<ValuedItem[]> {
+export async function valuedItems(portfolioId: number | null, displayCurrency: string, rates?: Rates, userId?: string | null): Promise<ValuedItem[]> {
   const fx = rates ?? (await getRates());
-  const rows = db
+  const conditions = [];
+  if (portfolioId != null) conditions.push(eq(schema.portfolioItems.portfolioId, portfolioId));
+  if (userId) conditions.push(eq(schema.portfolios.userId, userId));
+  const rows = await db
     .select({ item: schema.portfolioItems, card: schema.cards, portfolioName: schema.portfolios.name })
     .from(schema.portfolioItems)
     .innerJoin(schema.cards, eq(schema.portfolioItems.cardId, schema.cards.id))
     .innerJoin(schema.portfolios, eq(schema.portfolioItems.portfolioId, schema.portfolios.id))
-    .where(portfolioId == null ? sql`1=1` : eq(schema.portfolioItems.portfolioId, portfolioId))
-    .all();
+    .where(conditions.length ? and(...conditions) : sql`1=1`);
 
-  return rows.map(({ item, card: cardRow, portfolioName }) => {
+  const result: ValuedItem[] = [];
+  for (const { item, card: cardRow, portfolioName } of rows) {
     const card = rowToCard(cardRow);
     const uv = unitValue(card, item.variantType, item.condition, item.isGraded, item.gradingCompany, item.grade);
     const unitDisplay = uv ? convert(uv.amount, uv.currency, displayCurrency, fx) : 0;
@@ -82,7 +80,7 @@ export async function valuedItems(portfolioId: number | null, displayCurrency: s
     let change24h: number | null = null;
     let change24hPct: number | null = null;
     if (uv) {
-      const prev = yesterdayPrice(card.id, uv.variant);
+      const prev = await yesterdayPrice(card.id, uv.variant);
       const prevAmount = prev ? (uv.currency === "USD" ? prev.tcgplayerMarket : prev.cardmarketAvg) : null;
       if (prevAmount != null && prevAmount > 0) {
         const delta = uv.raw - prevAmount;
@@ -90,7 +88,7 @@ export async function valuedItems(portfolioId: number | null, displayCurrency: s
         change24hPct = (delta / prevAmount) * 100;
       }
     }
-    return {
+    result.push({
       id: item.id,
       portfolioId: item.portfolioId,
       portfolioName,
@@ -113,8 +111,9 @@ export async function valuedItems(portfolioId: number | null, displayCurrency: s
       gainPct,
       change24h,
       change24hPct,
-    };
-  });
+    });
+  }
+  return result;
 }
 
 export function summarize(items: ValuedItem[]) {
@@ -136,41 +135,38 @@ export function summarize(items: ValuedItem[]) {
   };
 }
 
-/** Snapshot every portfolio (and the aggregate) for today in USD. */
 export async function snapshotPortfolios() {
   const fx = await getRates();
   const date = today();
   const all = await valuedItems(null, "USD", fx);
   const byPortfolio = new Map<number, ValuedItem[]>();
   for (const it of all) byPortfolio.set(it.portfolioId, [...(byPortfolio.get(it.portfolioId) ?? []), it]);
-  const write = (portfolioId: number | null, items: ValuedItem[]) => {
+  const write = async (portfolioId: number | null, items: ValuedItem[]) => {
     const s = summarize(items);
-    db.insert(schema.portfolioSnapshots)
+    await db.insert(schema.portfolioSnapshots)
       .values({ portfolioId, date, valueUsd: s.value, costUsd: s.cost, itemCount: s.itemCount })
-      .onConflictDoUpdate({ target: [schema.portfolioSnapshots.portfolioId, schema.portfolioSnapshots.date], set: { valueUsd: s.value, costUsd: s.cost, itemCount: s.itemCount } })
-      .run();
+      .onConflictDoUpdate({ target: [schema.portfolioSnapshots.portfolioId, schema.portfolioSnapshots.date], set: { valueUsd: s.value, costUsd: s.cost, itemCount: s.itemCount } });
   };
-  write(0, all);
-  for (const p of db.select().from(schema.portfolios).all()) write(p.id, byPortfolio.get(p.id) ?? []);
+  await write(0, all);
+  const portfolios = await db.select().from(schema.portfolios);
+  for (const p of portfolios) await write(p.id, byPortfolio.get(p.id) ?? []);
 }
 
-export function valueSeries(portfolioId: number | null, range: Range, displayCurrency: string, fx: Rates) {
+export async function valueSeries(portfolioId: number | null, range: Range, displayCurrency: string, fx: Rates) {
   const days = rangeToDays(range);
-  const rows = db
+  const rows = await db
     .select()
     .from(schema.portfolioSnapshots)
     .where(and(eq(schema.portfolioSnapshots.portfolioId, portfolioId ?? 0), days ? gte(schema.portfolioSnapshots.date, daysAgo(days)) : sql`1=1`))
-    .orderBy(schema.portfolioSnapshots.date)
-    .all();
+    .orderBy(schema.portfolioSnapshots.date);
   return rows.map((r) => ({ date: r.date, value: convert(r.valueUsd, "USD", displayCurrency, fx), cost: convert(r.costUsd, "USD", displayCurrency, fx) }));
 }
 
-/** Refresh prices for every owned card. Respects the PokéWallet rate budget and stops early when it runs out. */
 export async function refreshOwnedPrices(opts: { maxCards?: number; onlyStale?: boolean } = {}) {
-  const ids = [...new Set(db.select({ cardId: schema.portfolioItems.cardId }).from(schema.portfolioItems).all().map((r) => r.cardId))];
-  const cards = ids.length ? db.select().from(schema.cards).where(inArray(schema.cards.id, ids)).all() : [];
+  const itemRows = await db.select({ cardId: schema.portfolioItems.cardId }).from(schema.portfolioItems);
+  const ids = [...new Set(itemRows.map((r) => r.cardId))];
+  const cards = ids.length ? await db.select().from(schema.cards).where(inArray(schema.cards.id, ids)) : [];
   const stale = opts.onlyStale === false ? cards : cards.filter((c) => !c.priceUpdatedAt || Date.now() - Date.parse(c.priceUpdatedAt) > 20 * 3600 * 1000);
-  // Non-PokéWallet sources are free, do them first; PokéWallet cards use the budget.
   const ordered = [...stale.filter((c) => !c.id.startsWith("pw:")), ...stale.filter((c) => c.id.startsWith("pw:"))];
   let refreshed = 0;
   let failed = 0;
@@ -187,23 +183,22 @@ export async function refreshOwnedPrices(opts: { maxCards?: number; onlyStale?: 
       failed++;
     }
   }
-  // Make sure cards with no history yet still get a row for today.
   for (const c of cards) {
     const card = await getCard(c.id).catch(() => null);
-    if (card) recordIfMissing(card);
+    if (card) await recordIfMissing(card);
   }
   await snapshotPortfolios();
   return { refreshed, failed, skipped, total: cards.length };
 }
 
-function recordIfMissing(card: NormalizedCard) {
-  const exists = db
+async function recordIfMissing(card: NormalizedCard) {
+  const exists = await db
     .select({ id: schema.priceHistory.id })
     .from(schema.priceHistory)
     .where(and(eq(schema.priceHistory.cardId, card.id), eq(schema.priceHistory.date, today())))
-    .get();
-  if (exists) return;
+    .limit(1);
+  if (exists[0]) return;
   const prices = card.prices as CardPrices;
   if (!prices.tcgplayer && !prices.cardmarket) return;
-  recordPriceSnapshot(card);
+  await recordPriceSnapshot(card);
 }

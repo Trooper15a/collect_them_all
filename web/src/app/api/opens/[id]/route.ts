@@ -8,19 +8,22 @@ import { bestPrice } from "@/lib/types";
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const openId = Number(id);
-  const open = db.select().from(schema.boxOpens).where(eq(schema.boxOpens.id, openId)).get();
+  const opens = await db.select().from(schema.boxOpens).where(eq(schema.boxOpens.id, openId)).limit(1);
+  const open = opens[0];
   if (!open) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const currency = getSetting("currency", "USD");
+  const currency = await getSetting("currency", "USD");
   const fx = await getRates();
-  const items = db.select().from(schema.boxOpenItems).where(eq(schema.boxOpenItems.boxOpenId, openId)).all();
+  const items = await db.select().from(schema.boxOpenItems).where(eq(schema.boxOpenItems.boxOpenId, openId));
 
-  const detailed = items.map((item) => {
-    const card = db.select().from(schema.cards).where(eq(schema.cards.id, item.cardId)).get();
+  const detailed = [];
+  for (const item of items) {
+    const cards = await db.select().from(schema.cards).where(eq(schema.cards.id, item.cardId)).limit(1);
+    const card = cards[0];
     const prices = card?.pricesJson ? JSON.parse(card.pricesJson) : null;
     const bp = bestPrice(prices, item.variantType);
     const value = bp ? convert(bp.amount, bp.currency, currency, fx) * item.quantity : 0;
-    return {
+    detailed.push({
       id: item.id,
       cardId: item.cardId,
       name: card?.name ?? "Unknown",
@@ -30,8 +33,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       variantType: item.variantType,
       quantity: item.quantity,
       value,
-    };
-  });
+    });
+  }
 
   const totalValue = detailed.reduce((s, i) => s + i.value, 0);
   const costDisplay = convert(open.cost, open.costCurrency, currency, fx);
@@ -58,6 +61,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  db.delete(schema.boxOpens).where(eq(schema.boxOpens.id, Number(id))).run();
+  await db.delete(schema.boxOpens).where(eq(schema.boxOpens.id, Number(id)));
   return NextResponse.json({ ok: true });
 }

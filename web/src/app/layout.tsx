@@ -4,6 +4,7 @@ import { TabBar } from "@/components/TabBar";
 import { PwaRegister } from "@/components/PwaRegister";
 import { ThemeScript } from "@/components/ThemeScript";
 import { OfflineBanner } from "@/components/OfflineStatus";
+import { AuthProvider } from "@/components/AuthProvider";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -32,12 +33,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeScript />
       </head>
       <body className="min-h-full flex flex-col">
-        <main className="flex-1 w-full max-w-3xl mx-auto px-4 pt-[max(env(safe-area-inset-top),12px)] safe-bottom">
-          <OfflineBanner />
-          {children}
-        </main>
-        <TabBar />
-        <PwaRegister />
+        <AuthProvider>
+          <main className="flex-1 w-full max-w-3xl mx-auto px-4 pt-[max(env(safe-area-inset-top),12px)] safe-bottom">
+            <OfflineBanner />
+            {children}
+          </main>
+          <TabBar />
+          <PwaRegister />
+        </AuthProvider>
       </body>
     </html>
   );

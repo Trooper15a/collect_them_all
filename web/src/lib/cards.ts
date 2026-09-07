@@ -72,10 +72,10 @@ export function toSummary(c: NormalizedCard): CardSummary {
 }
 
 /** Insert/update the card row and record today's price snapshot. */
-export function upsertCard(c: NormalizedCard, opts: { touchPrices?: boolean } = { touchPrices: true }) {
+export async function upsertCard(c: NormalizedCard, opts: { touchPrices?: boolean } = { touchPrices: true }) {
   const now = nowIso();
   const hasPrices = !!(c.prices.tcgplayer || c.prices.cardmarket);
-  db.insert(schema.cards)
+  await db.insert(schema.cards)
     .values({
       id: c.id,
       tcg: c.tcg,
@@ -111,13 +111,12 @@ export function upsertCard(c: NormalizedCard, opts: { touchPrices?: boolean } = 
         ...(c.meta ? { metaJson: JSON.stringify(c.meta) } : {}),
         updatedAt: now,
       },
-    })
-    .run();
-  if (hasPrices && opts.touchPrices !== false) recordPriceSnapshot(c);
+    });
+  if (hasPrices && opts.touchPrices !== false) await recordPriceSnapshot(c);
 }
 
 /** Write today's price rows (one per market+variant) and the compact price_history row. */
-export function recordPriceSnapshot(c: NormalizedCard, date = today()) {
+export async function recordPriceSnapshot(c: NormalizedCard, date = today()) {
   const now = nowIso();
   const markets: ("tcgplayer" | "cardmarket")[] = ["tcgplayer", "cardmarket"];
   const variantSet = new Set<string>();
@@ -126,7 +125,7 @@ export function recordPriceSnapshot(c: NormalizedCard, date = today()) {
     if (!mp) continue;
     for (const [variant, v] of Object.entries(mp.variants)) {
       variantSet.add(variant);
-      db.insert(schema.cardPrices)
+      await db.insert(schema.cardPrices)
         .values({
           cardId: c.id,
           date,
@@ -156,14 +155,13 @@ export function recordPriceSnapshot(c: NormalizedCard, date = today()) {
             avg30: v.avg30 ?? null,
             updatedAt: now,
           },
-        })
-        .run();
+        });
     }
   }
   for (const variant of variantSet) {
     const tp = c.prices.tcgplayer?.variants[variant];
     const cm = c.prices.cardmarket?.variants[variant] ?? c.prices.cardmarket?.variants.normal;
-    db.insert(schema.priceHistory)
+    await db.insert(schema.priceHistory)
       .values({
         cardId: c.id,
         date,
@@ -174,8 +172,7 @@ export function recordPriceSnapshot(c: NormalizedCard, date = today()) {
       .onConflictDoUpdate({
         target: [schema.priceHistory.cardId, schema.priceHistory.date, schema.priceHistory.variantType],
         set: { tcgplayerMarket: tp?.market ?? null, cardmarketAvg: cm?.market ?? cm?.trend ?? cm?.avg7 ?? null },
-      })
-      .run();
+      });
   }
 }
 
@@ -191,13 +188,14 @@ async function fetchRemote(cardId: string): Promise<NormalizedCard> {
 
 /** Get a card, from the local DB when fresh, otherwise from its API (and cache it). */
 export async function getCard(cardId: string, opts: { forceRefresh?: boolean } = {}): Promise<NormalizedCard | null> {
-  const row = db.select().from(schema.cards).where(eq(schema.cards.id, cardId)).get();
-  if (row && cardId.startsWith("tp:")) return rowToCard(row); // bulk-imported; refreshed nightly, never fetched individually
+  const rows = await db.select().from(schema.cards).where(eq(schema.cards.id, cardId)).limit(1);
+  const row = rows[0];
+  if (row && cardId.startsWith("tp:")) return rowToCard(row);
   const stale = !row || !row.priceUpdatedAt || Date.now() - Date.parse(row.priceUpdatedAt) > PRICE_TTL_MS;
   if (row && !stale && !opts.forceRefresh) return rowToCard(row);
   try {
     const fresh = await fetchRemote(cardId);
-    upsertCard(fresh);
+    await upsertCard(fresh);
     return fresh;
   } catch (err) {
     if (row) return rowToCard(row);
@@ -226,8 +224,6 @@ export async function searchCards(opts: SearchOpts): Promise<{ cards: CardSummar
   const warnings: string[] = [];
   if (!q) return { cards: [], warnings };
 
-  // Multi-word queries match every word against name, number, set code or set name
-  // ("pikachu 025", "gardevoir mega symphonia"). Rarity shorthand (sar, ar, sr, ur, hr, chr, rr) filters by rarity.
   const rarityWords: string[] = [];
   const words = q
     .split(/\s+/)
@@ -241,20 +237,17 @@ export async function searchCards(opts: SearchOpts): Promise<{ cards: CardSummar
   for (const r of rarityWords) conditions.push(like(schema.cards.rarity, `%${r}%`));
   if (tcg !== "all") conditions.push(eq(schema.cards.tcg, tcg));
   if (lang !== "all") conditions.push(eq(schema.cards.language, lang));
-  const localRows = db
+  const localRows = await db
     .select()
     .from(schema.cards)
     .where(and(...conditions))
     .orderBy(sql`case when prices_json is null then 1 else 0 end, length(name)`)
-    .limit(400)
-    .all();
+    .limit(400);
   const merged = new Map<string, NormalizedCard>(localRows.map((r) => [r.id, rowToCard(r)]));
 
-  // When TCGCSV has been imported for a game, the local table is complete for English cards: skip the
-  // live API (saves the PokéWallet budget). Japanese Pokémon still goes to PokéWallet for CardMarket data.
-  const localComplete = (t: string) => hasTcgcsvData(t, lang === "all" ? undefined : lang) && merged.size > 0;
+  const localComplete = async (t: string) => (await hasTcgcsvData(t, lang === "all" ? undefined : lang)) && merged.size > 0;
   const remote: Promise<NormalizedCard[]>[] = [];
-  if ((tcg === "all" || tcg === "pokemon") && !(localComplete("pokemon") && lang !== "jap")) {
+  if ((tcg === "all" || tcg === "pokemon") && !((await localComplete("pokemon")) && lang !== "jap")) {
     if (hasPokewalletKey()) {
       remote.push(
         cached(`pw:search:${q}:${limit}`, 6 * 3600, () => pwSearch(q, limit)).catch((e: Error) => {
@@ -264,7 +257,7 @@ export async function searchCards(opts: SearchOpts): Promise<{ cards: CardSummar
       );
     } else warnings.push("PokéWallet API key not configured; Pokémon results are local only.");
   }
-  if ((tcg === "all" || tcg === "mtg") && lang !== "jap" && !localComplete("mtg")) {
+  if ((tcg === "all" || tcg === "mtg") && lang !== "jap" && !(await localComplete("mtg"))) {
     remote.push(
       cached(`sf:search:${q}:${limit}`, 6 * 3600, () => sfSearch(q, limit)).catch((e: Error) => {
         warnings.push(`Scryfall: ${e.message}`);
@@ -272,7 +265,7 @@ export async function searchCards(opts: SearchOpts): Promise<{ cards: CardSummar
       }),
     );
   }
-  if ((tcg === "all" || tcg === "yugioh") && lang !== "jap" && !localComplete("yugioh")) {
+  if ((tcg === "all" || tcg === "yugioh") && lang !== "jap" && !(await localComplete("yugioh"))) {
     remote.push(
       cached(`ygo:search:${q}:${limit}`, 6 * 3600, () => ygoSearch(q, limit)).catch((e: Error) => {
         warnings.push(`YGOProDeck: ${e.message}`);
@@ -286,12 +279,10 @@ export async function searchCards(opts: SearchOpts): Promise<{ cards: CardSummar
       if (lang !== "all" && c.language !== lang) continue;
       if (!merged.has(c.id)) {
         merged.set(c.id, c);
-        upsertCard(c);
+        await upsertCard(c);
       }
     }
   }
-  // The same printing can arrive from two sources (tp: bulk + pw: live). Keep one entry per
-  // set+number+language, prefer the TCGCSV row, and carry the CardMarket block over from PokéWallet.
   const byPrinting = new Map<string, NormalizedCard>();
   for (const c of merged.values()) {
     const numKey = (c.cardNumber ?? "").split("/")[0].trim().replace(/^0+(?=\d)/, "").toLowerCase();
@@ -307,14 +298,13 @@ export async function searchCards(opts: SearchOpts): Promise<{ cards: CardSummar
     if (!keep.prices.tcgplayer && other.prices.tcgplayer) keep.prices = { ...keep.prices, tcgplayer: other.prices.tcgplayer };
     byPrinting.set(key, keep);
   }
-  const displayCurrency = getSetting("currency", "USD");
+  const displayCurrency = await getSetting("currency", "USD");
   const fx = await getRates();
   const cards = [...byPrinting.values()].map((c) => {
     const s = toSummary(c);
     s.display = s.price ? { amount: convert(s.price.amount, s.price.currency, displayCurrency, fx), currency: displayCurrency } : null;
     return s;
   });
-  // Exact name hits first, then singles by price; sealed products (no number) sink unless the query asks for them.
   const ql = q.toLowerCase();
   const wantsSealed = /box|etb|bundle|pack|case|collection|tin|display/.test(ql);
   cards.sort((a, b) => {
@@ -331,12 +321,11 @@ export async function searchCards(opts: SearchOpts): Promise<{ cards: CardSummar
 
 /** Price history: local daily snapshots merged with PokéWallet history when available. */
 export async function getPriceHistory(cardId: string, variant?: string) {
-  const local = db
+  const local = await db
     .select()
     .from(schema.priceHistory)
     .where(and(eq(schema.priceHistory.cardId, cardId), variant ? eq(schema.priceHistory.variantType, variant) : sql`1=1`))
-    .orderBy(schema.priceHistory.date)
-    .all();
+    .orderBy(schema.priceHistory.date);
   const byDate = new Map<string, { date: string; tcgplayerMarket: number | null; cardmarketAvg: number | null }>();
   if (sourceOf(cardId) === "pw" && hasPokewalletKey()) {
     const remote = await cached(`pw:history:${cardId}`, 24 * 3600, () => pwPriceHistory(cardId.slice(3)));
@@ -354,37 +343,34 @@ export async function getPriceHistory(cardId: string, variant?: string) {
 }
 
 export async function listSets(tcg: Tcg | "all", lang: "eng" | "jap" | "all") {
-  const rows = db.select().from(schema.sets).all();
+  const rows = await db.select().from(schema.sets);
   if (!rows.length || (tcg === "pokemon" && !rows.some((r) => r.tcg === "pokemon"))) await syncSets();
   return db
     .select()
     .from(schema.sets)
     .where(and(tcg === "all" ? sql`1=1` : eq(schema.sets.tcg, tcg), lang === "all" ? sql`1=1` : eq(schema.sets.language, lang)))
-    .orderBy(sql`release_date desc`)
-    .all();
+    .orderBy(sql`release_date desc`);
 }
 
 export async function syncSets() {
   const jobs: Promise<void>[] = [];
   if (hasPokewalletKey()) {
     jobs.push(
-      cached("pw:sets", 7 * 86400, pwSets).then((list) => {
+      cached("pw:sets", 7 * 86400, pwSets).then(async (list) => {
         for (const s of list) {
-          db.insert(schema.sets)
+          await db.insert(schema.sets)
             .values({ id: `pokemon:${s.code}:${s.language}`, tcg: "pokemon", code: s.code, name: s.name, language: s.language, total: s.total, releaseDate: s.releaseDate, imageUrl: null })
-            .onConflictDoUpdate({ target: schema.sets.id, set: { name: s.name, total: s.total, releaseDate: s.releaseDate } })
-            .run();
+            .onConflictDoUpdate({ target: schema.sets.id, set: { name: s.name, total: s.total, releaseDate: s.releaseDate } });
         }
       }).catch(() => undefined),
     );
   }
   jobs.push(
-    cached("sf:sets", 7 * 86400, sfSets).then((list) => {
+    cached("sf:sets", 7 * 86400, sfSets).then(async (list) => {
       for (const s of list) {
-        db.insert(schema.sets)
+        await db.insert(schema.sets)
           .values({ id: `mtg:${s.code}:eng`, tcg: "mtg", code: s.code, name: s.name, language: "eng", total: s.total, releaseDate: s.releaseDate, imageUrl: s.imageUrl })
-          .onConflictDoUpdate({ target: schema.sets.id, set: { name: s.name, total: s.total, releaseDate: s.releaseDate } })
-          .run();
+          .onConflictDoUpdate({ target: schema.sets.id, set: { name: s.name, total: s.total, releaseDate: s.releaseDate } });
       }
     }).catch(() => undefined),
   );

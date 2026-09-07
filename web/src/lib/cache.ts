@@ -1,27 +1,27 @@
 import { eq, lt } from "drizzle-orm";
 import { db, schema } from "@/db";
 
-/** Read-through cache stored in SQLite. TTL in seconds. */
+/** Read-through cache stored in Postgres. TTL in seconds. */
 export async function cached<T>(key: string, ttlSeconds: number, fetcher: () => Promise<T>): Promise<T> {
   const now = Date.now();
-  const row = db.select().from(schema.apiCache).where(eq(schema.apiCache.key, key)).get();
+  const rows = await db.select().from(schema.apiCache).where(eq(schema.apiCache.key, key)).limit(1);
+  const row = rows[0];
   if (row && row.expiresAt > now) return JSON.parse(row.value) as T;
   const value = await fetcher();
-  db.insert(schema.apiCache)
+  await db.insert(schema.apiCache)
     .values({ key, value: JSON.stringify(value), expiresAt: now + ttlSeconds * 1000 })
-    .onConflictDoUpdate({ target: schema.apiCache.key, set: { value: JSON.stringify(value), expiresAt: now + ttlSeconds * 1000 } })
-    .run();
-  if (Math.random() < 0.02) db.delete(schema.apiCache).where(lt(schema.apiCache.expiresAt, now)).run();
+    .onConflictDoUpdate({ target: schema.apiCache.key, set: { value: JSON.stringify(value), expiresAt: now + ttlSeconds * 1000 } });
+  if (Math.random() < 0.02) await db.delete(schema.apiCache).where(lt(schema.apiCache.expiresAt, now));
   return value;
 }
 
-export function getSetting(key: string, fallback: string): string {
-  const row = db.select().from(schema.settings).where(eq(schema.settings.key, key)).get();
-  return row?.value ?? fallback;
+export async function getSetting(key: string, fallback: string): Promise<string> {
+  const rows = await db.select().from(schema.settings).where(eq(schema.settings.key, key)).limit(1);
+  return rows[0]?.value ?? fallback;
 }
 
-export function setSetting(key: string, value: string) {
-  db.insert(schema.settings).values({ key, value }).onConflictDoUpdate({ target: schema.settings.key, set: { value } }).run();
+export async function setSetting(key: string, value: string) {
+  await db.insert(schema.settings).values({ key, value }).onConflictDoUpdate({ target: schema.settings.key, set: { value } });
 }
 
 /** In-process sliding-window rate limiter for outbound API calls. */

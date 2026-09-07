@@ -10,7 +10,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const parsed = ItemPatch.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
   const d = parsed.data;
-  const row = db
+  const result = await db
     .update(schema.portfolioItems)
     .set({
       ...(d.quantity !== undefined ? { quantity: d.quantity } : {}),
@@ -25,17 +25,16 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       ...(d.notes !== undefined ? { notes: d.notes } : {}),
     })
     .where(eq(schema.portfolioItems.id, id))
-    .returning()
-    .get();
-  if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    .returning();
+  if (!result[0]) return NextResponse.json({ error: "Not found" }, { status: 404 });
   snapshotPortfolios().catch(() => undefined);
-  return NextResponse.json(row);
+  return NextResponse.json(result[0]);
 }
 
 export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const id = Number((await ctx.params).id);
   if (!Number.isInteger(id)) return NextResponse.json({ error: "Bad id" }, { status: 400 });
-  db.delete(schema.portfolioItems).where(eq(schema.portfolioItems.id, id)).run();
+  await db.delete(schema.portfolioItems).where(eq(schema.portfolioItems.id, id));
   snapshotPortfolios().catch(() => undefined);
   return NextResponse.json({ ok: true });
 }

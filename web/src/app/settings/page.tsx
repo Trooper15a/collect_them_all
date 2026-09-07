@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button, Field, Section, Skeleton, inputCls } from "@/components/ui";
 import { OfflineStatus } from "@/components/OfflineStatus";
+import { UserMenu } from "@/components/UserMenu";
 import { CURRENCIES } from "@/lib/types";
 
 interface Settings {
@@ -164,6 +165,12 @@ export default function SettingsPage() {
 
       <Section title="Offline mode">
         <OfflineStatus />
+      </Section>
+
+      <Section title="Account">
+        <div className="card-surface rounded-2xl p-4">
+          <UserMenu />
+        </div>
       </Section>
     </div>
   );

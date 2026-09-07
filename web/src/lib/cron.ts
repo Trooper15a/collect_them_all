@@ -1,10 +1,10 @@
 import cron from "node-cron";
 import { refreshOwnedPrices, snapshotPortfolios } from "./portfolio";
 import { importTcgcsv } from "./tcgcsv";
+import { checkWishlistTargets } from "./wishlist";
 
 const globalForCron = globalThis as unknown as { __collectrCron?: boolean };
 
-/** Daily price refresh at 03:30 local time + a snapshot at startup so charts always have today. */
 export function startCron() {
   if (globalForCron.__collectrCron) return;
   globalForCron.__collectrCron = true;
@@ -23,6 +23,13 @@ export function startCron() {
       console.log(`[cron] done: refreshed ${r.refreshed}, failed ${r.failed}, skipped ${r.skipped} of ${r.total}`);
     } catch (err) {
       console.error("[cron] refresh failed", err);
+    }
+    console.log("[cron] checking wishlist targets...");
+    try {
+      const w = await checkWishlistTargets();
+      console.log(`[cron] wishlist: ${w.triggered} items below target`);
+    } catch (err) {
+      console.error("[cron] wishlist check failed", err);
     }
   });
   setTimeout(() => snapshotPortfolios().catch((e) => console.error("[cron] snapshot failed", e)), 5000);

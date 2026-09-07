@@ -40,6 +40,8 @@ interface Stats {
   portfolioCount: number;
   closestSet: { name: string; owned: number; total: number; pct: number; missing: number } | null;
   cheapestMissing: { id: string; name: string; setName: string | null; price: number } | null;
+  overallPct: number;
+  setsStarted: number;
 }
 
 interface Dashboard {
@@ -141,6 +143,17 @@ export default function HomePage() {
 
       {!empty && data.stats && (
         <div className="card-surface rounded-3xl p-4 mt-3">
+          {data.stats.setsStarted > 0 && (
+            <div className="mb-4">
+              <div className="flex items-baseline justify-between">
+                <div className="text-xs font-medium">Overall collection</div>
+                <div className="text-xs text-muted tabular">{data.stats.overallPct}% across {data.stats.setsStarted} sets</div>
+              </div>
+              <div className="mt-2 h-2 rounded-full bg-white/[0.06] overflow-hidden">
+                <div className="h-full bg-accent" style={{ width: `${data.stats.overallPct}%` }} />
+              </div>
+            </div>
+          )}
           {data.stats.closestSet && (
             <div className="mt-4">
               <div className="flex items-baseline justify-between">
@@ -170,7 +183,7 @@ export default function HomePage() {
       )}
 
       <Section title="Discover">
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <Link href="/sets" className="card-surface rounded-2xl p-4 text-center hover:bg-white/[0.03] border border-line">
             <div className="w-10 h-10 mx-auto rounded-full bg-accent/10 flex items-center justify-center">
               <svg viewBox="0 0 24 24" className="w-5 h-5 text-accent" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -181,6 +194,14 @@ export default function HomePage() {
               </svg>
             </div>
             <div className="text-xs font-medium mt-2">Browse Sets</div>
+          </Link>
+          <Link href="/wishlist" className="card-surface rounded-2xl p-4 text-center hover:bg-white/[0.03] border border-line">
+            <div className="w-10 h-10 mx-auto rounded-full bg-down/10 flex items-center justify-center">
+              <svg viewBox="0 0 24 24" className="w-5 h-5 text-down" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+              </svg>
+            </div>
+            <div className="text-xs font-medium mt-2">Wishlist</div>
           </Link>
           <Link href="/opens" className="card-surface rounded-2xl p-4 text-center hover:bg-white/[0.03] border border-line">
             <div className="w-10 h-10 mx-auto rounded-full bg-accent/10 flex items-center justify-center">

@@ -6,20 +6,17 @@ import { rowToCard } from "@/lib/cards";
 import { convert, getRates } from "@/lib/currency";
 import { bestPrice } from "@/lib/types";
 
-/**
- * GET /api/sets/<setId>  where setId is `${tcg}:${code}:${language}` (as in the sets table).
- * Returns the set's singles (sealed excluded), what you own, and the cost to complete it.
- */
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const id = decodeURIComponent((await ctx.params).id);
-  const set = db.select().from(schema.sets).where(eq(schema.sets.id, id)).get();
+  const sets = await db.select().from(schema.sets).where(eq(schema.sets.id, id)).limit(1);
+  const set = sets[0];
   if (!set) return NextResponse.json({ error: "Set not found" }, { status: 404 });
-  const currency = req.nextUrl.searchParams.get("currency") ?? getSetting("currency", "USD");
+  const currency = req.nextUrl.searchParams.get("currency") ?? await getSetting("currency", "USD");
   const fx = await getRates();
 
-  // TCGCSV cards carry the group id in set_id; other sources match on set_code.
-  const group = db.select({ setId: schema.cards.setId }).from(schema.cards).where(and(eq(schema.cards.tcg, set.tcg), eq(schema.cards.setCode, set.code), eq(schema.cards.language, set.language), sql`id like 'tp:%'`)).limit(1).get();
-  const rows = db
+  const groupRows = await db.select({ setId: schema.cards.setId }).from(schema.cards).where(and(eq(schema.cards.tcg, set.tcg), eq(schema.cards.setCode, set.code), eq(schema.cards.language, set.language), sql`id like 'tp:%'`)).limit(1);
+  const group = groupRows[0];
+  const rows = await db
     .select()
     .from(schema.cards)
     .where(
@@ -29,9 +26,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
         group?.setId ? or(eq(schema.cards.setId, group.setId), eq(schema.cards.setCode, set.code)) : eq(schema.cards.setCode, set.code),
         sql`card_number is not null`,
       ),
-    )
-    .all();
-  // Prefer one row per card number (TCGCSV first), so PokéWallet duplicates don't double-count.
+    );
   const byNumber = new Map<string, ReturnType<typeof rowToCard>>();
   for (const r of rows.sort((a, b) => Number(b.id.startsWith("tp:")) - Number(a.id.startsWith("tp:")))) {
     const key = (r.cardNumber ?? "").split("/")[0].trim().replace(/^0+(?=\d)/, "").toLowerCase() || r.id;
@@ -41,12 +36,11 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   const ids = cards.map((c) => c.id);
   const owned = new Map<string, number>();
   if (ids.length) {
-    const items = db.select({ cardId: schema.portfolioItems.cardId, qty: schema.portfolioItems.quantity }).from(schema.portfolioItems).all();
+    const items = await db.select({ cardId: schema.portfolioItems.cardId, qty: schema.portfolioItems.quantity }).from(schema.portfolioItems);
     for (const it of items) owned.set(it.cardId, (owned.get(it.cardId) ?? 0) + it.qty);
   }
-  // Ownership of the same card via a different source id (pw: vs tp:) counts too: match by number.
   const ownedNumbers = new Set<string>();
-  const allOwnedCards = db.select({ card: schema.cards }).from(schema.portfolioItems).innerJoin(schema.cards, eq(schema.portfolioItems.cardId, schema.cards.id)).where(and(eq(schema.cards.tcg, set.tcg), eq(schema.cards.language, set.language), eq(schema.cards.setCode, set.code))).all();
+  const allOwnedCards = await db.select({ card: schema.cards }).from(schema.portfolioItems).innerJoin(schema.cards, eq(schema.portfolioItems.cardId, schema.cards.id)).where(and(eq(schema.cards.tcg, set.tcg), eq(schema.cards.language, set.language), eq(schema.cards.setCode, set.code)));
   for (const { card } of allOwnedCards) ownedNumbers.add((card.cardNumber ?? "").split("/")[0].trim().replace(/^0+(?=\d)/, "").toLowerCase());
 
   let missingCost = 0;

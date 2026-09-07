@@ -7,6 +7,7 @@ import { AddToPortfolioSheet, type AddSheetCard } from "@/components/AddToPortfo
 import { SetLogo } from "@/components/SetLogo";
 import { CardImage, Empty, Money, Segmented, Skeleton } from "@/components/ui";
 import { langLabel } from "@/lib/format";
+import { tcgplayerSearchUrl } from "@/lib/marketplace";
 
 interface SetCard {
   id: string;
@@ -153,6 +154,11 @@ export default function SetPage() {
               <button onClick={() => setAdding({ id: card.id, name: card.name, setName: set.name })} className="mt-1 w-full text-[10px] font-semibold text-accent bg-accent/10 rounded-md py-0.5">
                 {card.owned > 0 ? "+ More" : "+ Add"}
               </button>
+              {card.owned === 0 && (
+                <a href={tcgplayerSearchUrl(card.name)} target="_blank" rel="noreferrer" className="mt-0.5 block w-full text-center text-[10px] text-muted hover:text-accent">
+                  Buy ↗
+                </a>
+              )}
             </div>
           </div>
         ))}

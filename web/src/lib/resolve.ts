@@ -7,17 +7,12 @@ import { isScanIndexId } from "./scanner/matcher";
 import { hasPokewalletKey, pwSearch } from "./pokewallet";
 import type { NormalizedCard } from "./types";
 
-/**
- * Resolve a scanner id to a priced app card.
- *  - pw:/sf:/ygo: ids are already app cards.
- *  - tcgdex:<lang>:<setId>-<localId> ids are matched to PokéWallet by set code + number,
- *    then name + number, then name. The result (or a miss) is remembered in card_links.
- */
 export async function resolveScanId(scanId: string): Promise<{ card: NormalizedCard | null; method: string }> {
   if (!isScanIndexId(scanId)) {
     return { card: await getCard(scanId), method: "direct" };
   }
-  const link = db.select().from(schema.cardLinks).where(eq(schema.cardLinks.scanId, scanId)).get();
+  const links = await db.select().from(schema.cardLinks).where(eq(schema.cardLinks.scanId, scanId)).limit(1);
+  const link = links[0];
   if (link) {
     if (!link.cardId) return { card: null, method: link.method };
     const card = await getCard(link.cardId);
@@ -31,9 +26,6 @@ export async function resolveScanId(scanId: string): Promise<{ card: NormalizedC
   const num = (idx.num ?? "").trim();
   const name = (idx.name ?? "").trim();
 
-  // 1) Local TCGCSV products: free and instant.
-  // English: match by name + number. Japanese: match by set code + number only
-  // (TCGCSV stores Japanese cards with English names, so name matching won't work for JP scans).
   if (num) {
     const numNorm = num.replace(/^0+(?=\d)/, "");
     const numFilter = or(like(schema.cards.cardNumber, `${num}%`), like(schema.cards.cardNumber, `${numNorm}%`));
@@ -43,15 +35,14 @@ export async function resolveScanId(scanId: string): Promise<{ card: NormalizedC
     } else if (setCode) {
       conditions.push(eq(schema.cards.setCode, setCode));
     }
-    const rows = db
+    const rows = await db
       .select()
       .from(schema.cards)
       .where(and(...conditions))
-      .limit(10)
-      .all();
+      .limit(10);
     const local = pickMatch(rows.map(rowToCard), { setCode, num, name, lang });
     if (local) {
-      remember(scanId, local.id, "tcgcsv-local");
+      await remember(scanId, local.id, "tcgcsv-local");
       return { card: local, method: "tcgcsv-local" };
     }
   }
@@ -71,17 +62,16 @@ export async function resolveScanId(scanId: string): Promise<{ card: NormalizedC
     }
     const hit = pickMatch(results, { setCode, num, name, lang });
     if (hit) {
-      upsertCard(hit);
-      remember(scanId, hit.id, a.method);
+      await upsertCard(hit);
+      await remember(scanId, hit.id, a.method);
       return { card: hit, method: a.method };
     }
   }
-  remember(scanId, null, "none");
+  await remember(scanId, null, "none");
   return { card: null, method: "none" };
 }
 
 function normNum(n: string | null | undefined) {
-  // "054/214" -> "54", "SM-P 086" -> "86", "TG12" -> "tg12"
   const first = (n ?? "").split("/")[0].trim().toLowerCase();
   return first.replace(/^0+(?=\d)/, "");
 }
@@ -104,14 +94,12 @@ function pickMatch(results: NormalizedCard[], want: { setCode: string; num: stri
   return scored[0]?.c ?? null;
 }
 
-function remember(scanId: string, cardId: string | null, method: string) {
-  db.insert(schema.cardLinks)
+async function remember(scanId: string, cardId: string | null, method: string) {
+  await db.insert(schema.cardLinks)
     .values({ scanId, cardId, method, createdAt: nowIso() })
-    .onConflictDoUpdate({ target: schema.cardLinks.scanId, set: { cardId, method, createdAt: nowIso() } })
-    .run();
+    .onConflictDoUpdate({ target: schema.cardLinks.scanId, set: { cardId, method, createdAt: nowIso() } });
 }
 
-/** Manually link a scanner id to an app card (used when the user picks a card from search after a miss). */
-export function linkManually(scanId: string, cardId: string) {
-  remember(scanId, cardId, "manual");
+export async function linkManually(scanId: string, cardId: string) {
+  await remember(scanId, cardId, "manual");
 }
