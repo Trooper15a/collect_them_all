@@ -16,10 +16,12 @@ RUN mkdir -p public/ort && \
       [ -f "$f" ] && cp "$f" public/ort/; \
     done
 # Download scanner model from GitHub Release (files are .gitignored)
-RUN mkdir -p public/model && \
-    wget -q -O public/model/card_embedder.onnx https://github.com/Trooper15a/collect_them_all/releases/download/model-v1/card_embedder.onnx && \
-    wget -q -O public/model/embeddings.bin https://github.com/Trooper15a/collect_them_all/releases/download/model-v1/embeddings.bin && \
-    wget -q -O public/model/index.json https://github.com/Trooper15a/collect_them_all/releases/download/model-v1/index.json
+# Install curl for redirect-following downloads, BusyBox wget can fail on GitHub redirects
+RUN apk add --no-cache curl && mkdir -p public/model && \
+    curl -fsSL -o public/model/card_embedder.onnx "https://github.com/Trooper15a/collect_them_all/releases/download/model-v1/card_embedder.onnx" && \
+    curl -fsSL -o public/model/embeddings.bin "https://github.com/Trooper15a/collect_them_all/releases/download/model-v1/embeddings.bin" && \
+    curl -fsSL -o public/model/index.json "https://github.com/Trooper15a/collect_them_all/releases/download/model-v1/index.json" && \
+    ls -lh public/model/
 RUN npm run build
 
 # ── Stage 3: Production ──
