@@ -75,7 +75,7 @@ export function Segmented<T extends string>({ value, options, onChange, size = "
 export function Button({ children, variant = "primary", className = "", ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" | "danger" | "rainbow" }) {
   const base = "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:opacity-50 disabled:pointer-events-none";
   const v = {
-    primary: "bg-accent text-black hover:brightness-110 active:scale-[0.98]",
+    primary: "btn-rainbow",
     ghost: "bg-elev border border-line text-fg hover:bg-white/5 active:scale-[0.98]",
     danger: "bg-down/15 text-down border border-down/30 hover:bg-down/25 active:scale-[0.98]",
     rainbow: "btn-rainbow",

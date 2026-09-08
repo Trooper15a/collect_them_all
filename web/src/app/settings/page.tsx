@@ -41,6 +41,26 @@ export default function SettingsPage() {
     }
   }
 
+  function setBgColor(bg: string) {
+    document.documentElement.setAttribute("data-bg", bg);
+    try {
+      localStorage.setItem("bgColor", bg);
+    } catch {}
+    setBgState(bg);
+  }
+
+  const [bgState, setBgState] = useState("blue");
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("bgColor");
+      if (saved) {
+        setBgState(saved);
+        document.documentElement.setAttribute("data-bg", saved);
+      }
+    } catch {}
+  }, []);
+
   async function refreshNow() {
     setBusy(true);
     setRefreshMsg(null);
@@ -84,6 +104,24 @@ export default function SettingsPage() {
               <option value="dark">Dark</option>
               <option value="light">Light</option>
             </select>
+          </Field>
+          <Field label="Background">
+            <div className="flex gap-2 mt-1">
+              {[
+                { id: "black", label: "Black", color: "#000000" },
+                { id: "blue", label: "Blue", color: "#0a0e1a" },
+                { id: "white", label: "White", color: "#f5f5f5" },
+              ].map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => setBgColor(opt.id)}
+                  className={`flex-1 h-10 rounded-xl border-2 transition-all ${bgState === opt.id ? "border-accent scale-105 shadow-lg shadow-accent/20" : "border-line hover:border-muted"}`}
+                  style={{ background: opt.color }}
+                  aria-label={opt.label}
+                  title={opt.label}
+                />
+              ))}
+            </div>
           </Field>
           <div className="col-span-2 text-xs text-muted">FX rates from the European Central Bank as of {s.fxDate}. Japanese cards (CardMarket EUR) convert at this rate.</div>
         </div>

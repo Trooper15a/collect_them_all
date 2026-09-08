@@ -21,6 +21,31 @@
   --glass: rgba(255, 255, 255, 0.72);
 }
 
+/* Background color themes */
+:root[data-bg="black"] {
+  --bg: #000000;
+  --bg-elev: #0a0a0a;
+  --line: rgba(255, 255, 255, 0.08);
+  --glass: rgba(0, 0, 0, 0.75);
+}
+:root[data-bg="blue"] {
+  --bg: #0a0e1a;
+  --bg-elev: #111827;
+  --line: rgba(255, 255, 255, 0.07);
+  --glass: rgba(17, 24, 39, 0.65);
+}
+:root[data-bg="white"] {
+  --bg: #f5f5f5;
+  --bg-elev: #ffffff;
+  --fg: #111827;
+  --muted: #5b6478;
+  --line: rgba(0, 0, 0, 0.08);
+  --glass: rgba(255, 255, 255, 0.72);
+}
+:root[data-bg="white"] {
+  color-scheme: light;
+}
+
 @theme inline {
   --color-bg: var(--bg);
   --color-elev: var(--bg-elev);
