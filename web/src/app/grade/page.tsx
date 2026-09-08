@@ -135,6 +135,8 @@ export default function GradeEstimatorPage() {
 
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [centering, setCentering] = useState<CenteringResult | null>(null);
+  const [priceLoading, setPriceLoading] = useState(false);
+  const [confirmingChange, setConfirmingChange] = useState(false);
   const [surface, setSurface] = useState(8.5);
   const [edges, setEdges] = useState(8.5);
   const [corners, setCorners] = useState(8.5);
@@ -162,6 +164,8 @@ export default function GradeEstimatorPage() {
     setCard(c);
     setSearchResults(null);
     setSearchQ("");
+    setConfirmingChange(false);
+    setPriceLoading(true);
     try {
       const r = await fetch(`/api/cards/${encodeURIComponent(c.id)}`);
       const d = await r.json();
@@ -171,10 +175,13 @@ export default function GradeEstimatorPage() {
         setCard({ ...c, price: { amount, currency: d.displayCurrency ?? "USD" } });
         setCardCurrency(d.displayCurrency ?? "USD");
       }
-    } catch { /* use search price */ }
+    } catch { /* use search price */ } finally {
+      setPriceLoading(false);
+    }
   }, []);
 
   function handlePhoto(file: File) {
+    if (photoUrl) URL.revokeObjectURL(photoUrl);
     const url = URL.createObjectURL(file);
     setPhotoUrl(url);
     const img = new Image();
@@ -192,12 +199,14 @@ export default function GradeEstimatorPage() {
   }
 
   function reset() {
+    if (photoUrl) URL.revokeObjectURL(photoUrl);
     setCard(null);
     setPhotoUrl(null);
     setCentering(null);
     setSurface(8.5);
     setEdges(8.5);
     setCorners(8.5);
+    setConfirmingChange(false);
   }
 
   const rawPrice = card?.price?.amount ?? 0;
@@ -258,13 +267,24 @@ export default function GradeEstimatorPage() {
             <div className="flex-1 min-w-0">
               <div className="font-semibold truncate">{card.name}</div>
               <div className="text-xs text-muted truncate">{card.setName} {card.cardNumber && `#${card.cardNumber}`}</div>
-              {rawPrice > 0 && (
+              {priceLoading ? (
+                <div className="text-xs text-muted mt-0.5 flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-full border-2 border-accent border-t-transparent animate-spin" /> Loading latest price…
+                </div>
+              ) : rawPrice > 0 ? (
                 <div className="text-sm mt-0.5">
                   Raw: <span className="font-semibold"><Money amount={rawPrice} currency={cardCurrency} /></span>
                 </div>
-              )}
+              ) : null}
             </div>
-            <button onClick={reset} className="text-xs text-muted px-2 py-1 rounded-lg bg-white/[0.05]">Change</button>
+            {confirmingChange ? (
+              <div className="flex gap-1.5 shrink-0">
+                <button onClick={reset} className="text-xs text-down px-2 py-1 rounded-lg bg-down/10 border border-down/30 min-h-8">Discard</button>
+                <button onClick={() => setConfirmingChange(false)} className="text-xs text-muted px-2 py-1 rounded-lg bg-white/[0.05] min-h-8">Keep</button>
+              </div>
+            ) : (
+              <button onClick={() => setConfirmingChange(true)} className="text-xs text-muted px-2 py-1 rounded-lg bg-white/[0.05] min-h-8 shrink-0">Change</button>
+            )}
           </div>
 
           <Section title="Step 1 — Photo">
@@ -304,7 +324,7 @@ export default function GradeEstimatorPage() {
                       <span className="text-xs text-muted ml-2">({centering.psaCentering})</span>
                     </div>
                   )}
-                  <button onClick={() => { setPhotoUrl(null); setCentering(null); }} className="mt-2 text-xs text-accent">Retake photo</button>
+                  <button onClick={() => { if (photoUrl) URL.revokeObjectURL(photoUrl); setPhotoUrl(null); setCentering(null); }} className="mt-2 text-xs text-accent">Retake photo</button>
                 </div>
               )}
             </div>

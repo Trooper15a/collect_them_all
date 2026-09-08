@@ -52,7 +52,7 @@ export function SwipeToDelete({ onDelete, children }: Props) {
   return (
     <div className="relative overflow-hidden">
       <div className="absolute inset-y-0 right-0 w-[120px] flex items-center justify-center bg-down/80 text-white text-xs font-semibold">
-        <button onClick={() => { onDelete(); setOffsetX(0); }} className="w-full h-full flex items-center justify-center">
+        <button onClick={() => { onDelete(); setOffsetX(0); }} className="w-full h-full min-h-8 flex items-center justify-center">
           Delete
         </button>
       </div>
@@ -67,6 +67,13 @@ export function SwipeToDelete({ onDelete, children }: Props) {
         onTouchEnd={onTouchEnd}
       >
         {children}
+        <span
+          aria-hidden
+          className="absolute inset-y-0 right-0 flex items-center pr-1 text-muted/50 text-xs pointer-events-none transition-opacity"
+          style={{ opacity: offsetX === 0 ? 1 : 0 }}
+        >
+          ‹
+        </span>
       </div>
     </div>
   );

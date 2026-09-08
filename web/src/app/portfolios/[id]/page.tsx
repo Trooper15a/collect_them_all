@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { BackLink } from "@/components/BackLink";
 import { PriceChart } from "@/components/PriceChart";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { SwipeToDelete } from "@/components/SwipeToDelete";
+import { showToast } from "@/components/Toast";
 import { Button, CardImage, Delta, Empty, Field, Money, Segmented, Skeleton, TcgBadge, inputCls } from "@/components/ui";
 import { RANGES, type Range, langLabel } from "@/lib/format";
 import { CONDITIONS, type NormalizedCard, variantLabel } from "@/lib/types";
@@ -50,8 +52,11 @@ export default function PortfolioPage() {
   const [langFilter, setLangFilter] = useState<"all" | "eng" | "jap">("all");
   const [editing, setEditing] = useState<Item | null>(null);
   const [renaming, setRenaming] = useState(false);
+  const [renameBusy, setRenameBusy] = useState(false);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [accentColor, setAccentColor] = useState<string | null>(null);
 
@@ -85,14 +90,77 @@ export default function PortfolioPage() {
   }, [data, sort, langFilter]);
 
   async function rename() {
-    await fetch(`/api/portfolios/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
-    setRenaming(false);
-    load();
+    if (renameBusy || !name.trim()) return;
+    setRenameBusy(true);
+    try {
+      const r = await fetch(`/api/portfolios/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+      if (!r.ok) {
+        showToast("Rename failed — try again", "down");
+        return;
+      }
+      setRenaming(false);
+      showToast("Renamed ✓", "up");
+      load();
+    } catch {
+      showToast("Rename failed — try again", "down");
+    } finally {
+      setRenameBusy(false);
+    }
   }
   async function remove() {
-    if (!confirm(`Delete "${data?.portfolio.name}" and all its cards?`)) return;
-    await fetch(`/api/portfolios/${id}`, { method: "DELETE" });
-    router.push("/portfolios");
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      const r = await fetch(`/api/portfolios/${id}`, { method: "DELETE" });
+      if (!r.ok) throw new Error("Delete failed");
+      showToast("Binder deleted", "info");
+      router.push("/portfolios");
+    } catch {
+      showToast("Delete failed — try again", "down");
+      setDeleting(false);
+      setConfirmingDelete(false);
+    }
+  }
+
+  async function restoreItem(item: Item) {
+    try {
+      const r = await fetch(`/api/portfolios/${id}/items`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cardId: item.card.id,
+          quantity: item.quantity,
+          variantType: item.variantType,
+          condition: item.condition,
+          isGraded: item.isGraded,
+          gradingCompany: item.gradingCompany,
+          grade: item.grade,
+          certNumber: item.certNumber,
+          costBasis: item.costBasis,
+          costCurrency: item.costCurrency,
+          notes: item.notes,
+        }),
+      });
+      if (!r.ok) throw new Error("Restore failed");
+      showToast("Restored ✓", "up");
+    } catch {
+      showToast("Undo failed — try again", "down");
+    } finally {
+      load();
+    }
+  }
+
+  async function deleteItem(item: Item) {
+    setData((d) => (d ? { ...d, items: d.items.filter((x) => x.id !== item.id) } : d));
+    try {
+      const r = await fetch(`/api/items/${item.id}`, { method: "DELETE" });
+      if (!r.ok) throw new Error("Delete failed");
+      showToast("Deleted", "info", { action: { label: "Undo", onClick: () => restoreItem(item) }, durationMs: 6000 });
+    } catch {
+      showToast("Delete failed — try again", "down");
+    } finally {
+      load();
+    }
   }
 
   if (error) return <Empty>{error}</Empty>;
@@ -110,25 +178,47 @@ export default function PortfolioPage() {
     <PullToRefresh onRefresh={load}>
     <div>
       <header className="pt-2 pb-3 flex items-center gap-3">
-        <Link href="/portfolios" className="text-muted text-sm">
-          ‹ Back
-        </Link>
+        <BackLink fallback="/portfolios" label="Binders" />
         {renaming ? (
           <div className="flex-1 flex gap-2">
-            <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-            <Button className="px-3" onClick={rename}>
-              Save
+            <input
+              className={inputCls}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") rename();
+                else if (e.key === "Escape") setRenaming(false);
+              }}
+              disabled={renameBusy}
+              autoFocus
+            />
+            <Button className="px-3" onClick={rename} disabled={renameBusy || !name.trim()}>
+              {renameBusy ? "Saving…" : "Save"}
             </Button>
           </div>
         ) : (
-          <h1 className="text-xl font-bold flex-1 truncate" onClick={() => setRenaming(true)}>
+          <button type="button" className="text-xl font-bold flex-1 truncate text-left" onClick={() => { setName(data.portfolio.name); setRenaming(true); }}>
             {data.portfolio.name} <span className="text-muted text-sm">✎</span>
-          </h1>
+          </button>
         )}
-        <button onClick={remove} className="text-xs text-down">
+        <button onClick={() => setConfirmingDelete(true)} className="text-xs text-down min-h-8 px-1">
           Delete
         </button>
       </header>
+
+      {confirmingDelete && (
+        <div className="card-surface rounded-2xl p-4 mb-3 border border-down/30">
+          <div className="text-sm">Delete &quot;{data.portfolio.name}&quot; and all its cards? This can&apos;t be undone.</div>
+          <div className="mt-3 flex gap-2">
+            <Button variant="danger" onClick={remove} disabled={deleting}>
+              {deleting ? "Deleting…" : "Delete binder"}
+            </Button>
+            <Button variant="ghost" onClick={() => setConfirmingDelete(false)} disabled={deleting}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center gap-2 mb-3">
         <span className="text-xs text-muted">Color</span>
@@ -137,7 +227,11 @@ export default function PortfolioPage() {
             key={c}
             onClick={async () => {
               setAccentColor(c);
-              await fetch(`/api/portfolios/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accentColor: c }) });
+              const r = await fetch(`/api/portfolios/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accentColor: c }) });
+              if (!r.ok) {
+                showToast("Save failed — try again", "down");
+                load();
+              }
             }}
             className="w-6 h-6 rounded-full border-2 transition-transform"
             style={{ background: c, borderColor: accentColor === c ? "white" : "transparent", transform: accentColor === c ? "scale(1.2)" : undefined }}
@@ -147,7 +241,11 @@ export default function PortfolioPage() {
           <button
             onClick={async () => {
               setAccentColor(null);
-              await fetch(`/api/portfolios/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accentColor: null }) });
+              const r = await fetch(`/api/portfolios/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accentColor: null }) });
+              if (!r.ok) {
+                showToast("Save failed — try again", "down");
+                load();
+              }
             }}
             className="text-[10px] text-muted ml-1"
           >
@@ -214,12 +312,12 @@ export default function PortfolioPage() {
       ) : (
         <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3 stagger-children">
           {items.map((i) => (
-            <SwipeToDelete key={i.id} onDelete={async () => { await fetch(`/api/items/${i.id}`, { method: "DELETE" }); load(); }}>
+            <SwipeToDelete key={i.id} onDelete={() => deleteItem(i)}>
             <div className="card-surface rounded-2xl overflow-hidden flex flex-col tap-scale hover-lift">
               <Link href={`/cards/${encodeURIComponent(i.card.id)}`}>
                 <CardImage id={i.card.id} className="w-full" alt="" />
               </Link>
-              <div className="p-2.5 flex-1 flex flex-col gap-0.5" onClick={() => setEditing(i)}>
+              <button type="button" className="p-2.5 flex-1 flex flex-col gap-0.5 text-left" onClick={() => setEditing(i)}>
                 <div className="font-medium text-sm leading-tight line-clamp-2">{i.card.name}</div>
                 <div className="text-[11px] text-muted truncate">
                   {i.card.setName} {i.card.cardNumber && `#${i.card.cardNumber}`}
@@ -233,7 +331,7 @@ export default function PortfolioPage() {
                     <Delta pct={i.change24hPct} />
                   </span>
                 </div>
-              </div>
+              </button>
             </div>
             </SwipeToDelete>
           ))}
@@ -248,6 +346,10 @@ export default function PortfolioPage() {
             setEditing(null);
             load();
           }}
+          onRemove={() => {
+            setEditing(null);
+            deleteItem(editing);
+          }}
         />
       )}
     </div>
@@ -255,7 +357,7 @@ export default function PortfolioPage() {
   );
 }
 
-function EditItemSheet({ item, onClose, onSaved }: { item: Item; onClose: () => void; onSaved: () => void }) {
+function EditItemSheet({ item, onClose, onSaved, onRemove }: { item: Item; onClose: () => void; onSaved: () => void; onRemove: () => void }) {
   const { id: currentPortfolioId } = useParams<{ id: string }>();
   const [quantity, setQuantity] = useState(item.quantity);
   const [condition, setCondition] = useState(item.condition);
@@ -282,30 +384,36 @@ function EditItemSheet({ item, onClose, onSaved }: { item: Item; onClose: () => 
   }, [currentPortfolioId]);
 
   async function save() {
+    if (busy) return;
     setBusy(true);
-    await fetch(`/api/items/${item.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        quantity,
-        variantType: variant,
-        condition,
-        isGraded: graded,
-        gradingCompany: graded ? company : null,
-        grade: graded ? grade : null,
-        certNumber: graded ? cert || null : null,
-        costBasis: cost === "" ? null : Number(cost),
-        costCurrency,
-        notes: notes || null,
-      }),
-    });
-    setBusy(false);
-    onSaved();
-  }
-  async function remove() {
-    if (!confirm("Remove this card from the portfolio?")) return;
-    await fetch(`/api/items/${item.id}`, { method: "DELETE" });
-    onSaved();
+    try {
+      const r = await fetch(`/api/items/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          quantity,
+          variantType: variant,
+          condition,
+          isGraded: graded,
+          gradingCompany: graded ? company : null,
+          grade: graded ? grade : null,
+          certNumber: graded ? cert || null : null,
+          costBasis: cost === "" ? null : Number(cost),
+          costCurrency,
+          notes: notes || null,
+        }),
+      });
+      if (!r.ok) {
+        showToast("Save failed — try again", "down");
+        return;
+      }
+      showToast("Saved ✓", "up");
+      onSaved();
+    } catch {
+      showToast("Save failed — try again", "down");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -396,7 +504,7 @@ function EditItemSheet({ item, onClose, onSaved }: { item: Item; onClose: () => 
           </div>
         )}
         <div className="mt-4 flex gap-2">
-          <Button variant="danger" onClick={remove}>
+          <Button variant="danger" onClick={onRemove}>
             Remove
           </Button>
           <Button variant="ghost" className="flex-1" onClick={onClose}>

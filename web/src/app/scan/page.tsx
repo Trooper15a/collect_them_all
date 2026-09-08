@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AddToPortfolioSheet, type AddSheetCard } from "@/components/AddToPortfolioSheet";
 import { Scanner } from "@/components/Scanner";
+import { showToast } from "@/components/Toast";
 import { Button, CardImage, Empty, Money, Segmented, Skeleton, TcgBadge, inputCls } from "@/components/ui";
 import { haptic } from "@/lib/haptics";
 import { isScanIndexId, type Match } from "@/lib/scanner/matcher";
@@ -23,10 +24,13 @@ export default function ScanPage() {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
-  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkMode, setBulkMode] = useState(() => {
+    try { return localStorage.getItem("bulkMode") === "1"; } catch { return false; }
+  });
   const [bulkQueue, setBulkQueue] = useState<AddSheetCard[]>(() => {
     try { const s = localStorage.getItem("bulkQueue"); return s ? JSON.parse(s) : []; } catch { return []; }
   });
+  const [confirmingClear, setConfirmingClear] = useState(false);
   const [matches, setMatches] = useState<Match[] | null>(null);
   const [adding, setAdding] = useState<AddSheetCard | null>(null);
   const [resolveError, setResolveError] = useState<string | null>(null);
@@ -34,23 +38,38 @@ export default function ScanPage() {
   const [bulkAdding, setBulkAdding] = useState(false);
   const [bulkProgress, setBulkProgress] = useState(0);
   const [portfolios, setPortfolios] = useState<{ id: number; name: string }[]>([]);
+  const [portfoliosError, setPortfoliosError] = useState<string | null>(null);
   const [bulkPortfolioId, setBulkPortfolioId] = useState<number | null>(null);
-  const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
+  const [recentScans, setRecentScans] = useState<RecentScan[]>(() => {
+    try { const s = localStorage.getItem("recentScans"); return s ? JSON.parse(s) : []; } catch { return []; }
+  });
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
 
   useEffect(() => {
-    try { const s = localStorage.getItem("recentScans"); if (s) setRecentScans(JSON.parse(s)); } catch {}
-  }, []);
+    try { localStorage.setItem("recentScans", JSON.stringify(recentScans)); } catch {}
+  }, [recentScans]);
 
-  useEffect(() => {
-    fetch("/api/portfolios").then((r) => r.json()).then((d) => {
-      const list = (d.portfolios ?? []).map((p: { id: number; name: string }) => ({ id: p.id, name: p.name }));
-      setPortfolios(list);
-      if (list.length) setBulkPortfolioId(list[0].id);
-    }).catch(() => undefined);
+  const loadPortfolios = useCallback(() => {
+    fetch("/api/portfolios")
+      .then(async (r) => {
+        if (!r.ok) throw new Error("Failed");
+        return r.json();
+      })
+      .then((d) => {
+        const list = (d.portfolios ?? []).map((p: { id: number; name: string }) => ({ id: p.id, name: p.name }));
+        setPortfolios(list);
+        setPortfoliosError(null);
+        if (list.length) setBulkPortfolioId((cur) => cur ?? list[0].id);
+      })
+      .catch(() => setPortfoliosError("Couldn't load your binders."));
   }, []);
+  useEffect(() => { loadPortfolios(); }, [loadPortfolios]);
   useEffect(() => {
     try { localStorage.setItem("bulkQueue", JSON.stringify(bulkQueue)); } catch {}
   }, [bulkQueue]);
+  useEffect(() => {
+    try { localStorage.setItem("bulkMode", bulkMode ? "1" : "0"); } catch {}
+  }, [bulkMode]);
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abort = useRef<AbortController | null>(null);
@@ -98,18 +117,25 @@ export default function ScanPage() {
     return null;
   }
 
+  function clearSearch() {
+    setQ("");
+    abort.current?.abort();
+    setResults(null);
+    setLoading(false);
+  }
+
   async function chooseMatch(m: Match) {
+    if (resolvingId) return;
     haptic("medium");
+    setResolvingId(m.card.id);
+    const card = await resolveMatch(m);
+    setResolvingId(null);
     setMatches(null);
     if (!bulkMode) setScanning(false);
-    const card = await resolveMatch(m);
     if (card) {
+      // eslint-disable-next-line react-hooks/purity -- event handler (tap on a match row), not render; rule false-positives through the .map() callback
       const scan: RecentScan = { id: card.id, name: card.name, setName: card.setName ?? null, ts: Date.now() };
-      setRecentScans((prev) => {
-        const next = [scan, ...prev.filter((s) => s.id !== card.id)].slice(0, 10);
-        try { localStorage.setItem("recentScans", JSON.stringify(next)); } catch {}
-        return next;
-      });
+      setRecentScans((prev) => [scan, ...prev.filter((s) => s.id !== card.id)].slice(0, 10));
       if (bulkMode) {
         setBulkQueue((prev) => [...prev, card]);
         setScanning(true);
@@ -129,22 +155,35 @@ export default function ScanPage() {
       </header>
 
       <div className="flex gap-2">
-        <input
-          className={inputCls}
-          placeholder="Card name, number, or set code…"
-          value={q}
-          onChange={(e) => {
-            setQ(e.target.value);
-            if (!e.target.value.trim()) {
-              abort.current?.abort();
-              setResults(null);
-              setLoading(false);
-            }
-          }}
-          autoCapitalize="off"
-          autoCorrect="off"
-          enterKeyHint="search"
-        />
+        <div className="relative flex-1">
+          <input
+            className={`${inputCls} pr-9`}
+            placeholder="Card name, number, or set code…"
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              if (!e.target.value.trim()) {
+                abort.current?.abort();
+                setResults(null);
+                setLoading(false);
+              }
+            }}
+            autoFocus
+            autoCapitalize="off"
+            autoCorrect="off"
+            enterKeyHint="search"
+          />
+          {q && (
+            <button
+              type="button"
+              onClick={clearSearch}
+              aria-label="Clear search"
+              className="absolute right-1 top-1/2 -translate-y-1/2 min-w-8 min-h-8 flex items-center justify-center text-muted hover:text-fg"
+            >
+              ✕
+            </button>
+          )}
+        </div>
         <Button onClick={() => setScanning(true)} aria-label="Open camera scanner" className="px-3">
           <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" />
@@ -220,7 +259,7 @@ export default function ScanPage() {
             ))}
           </div>
         )}
-        {sortedResults && sortedResults.length === 0 && !loading && <Empty>No cards found for "{q}".</Empty>}
+        {sortedResults && sortedResults.length === 0 && !loading && <Empty>No cards found for &quot;{q}&quot;.</Empty>}
         {sortedResults && sortedResults.length > 0 && (
           <>
           <div className="flex items-center justify-between mb-3">
@@ -282,7 +321,7 @@ export default function ScanPage() {
             <ul className="divide-y divide-line stagger-children">
               {matches.map((m, i) => (
                 <li key={m.card.id}>
-                  <button onClick={() => chooseMatch(m)} className="w-full flex items-center gap-3 py-2.5 text-left">
+                  <button onClick={() => chooseMatch(m)} disabled={resolvingId !== null} className="w-full flex items-center gap-3 py-2.5 text-left disabled:opacity-50">
                     <CardImage id={m.card.id} className="w-12 rounded-md" alt="" />
                     <div className="flex-1 min-w-0">
                       <div className={`font-medium truncate ${i === 0 ? "text-up" : ""}`}>{m.card.name}</div>
@@ -290,7 +329,11 @@ export default function ScanPage() {
                         {m.card.setName ?? m.card.set} #{m.card.num} · {m.card.lang?.toUpperCase()}
                       </div>
                     </div>
-                    <div className="text-xs tabular text-muted">{(m.score * 100).toFixed(0)}%</div>
+                    {resolvingId === m.card.id ? (
+                      <span className="w-4 h-4 rounded-full border-2 border-accent border-t-transparent animate-spin" aria-label="Resolving" />
+                    ) : (
+                      <div className="text-xs tabular text-muted">{(m.score * 100).toFixed(0)}%</div>
+                    )}
                   </button>
                 </li>
               ))}
@@ -306,10 +349,23 @@ export default function ScanPage() {
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold">Scanned cards ({bulkQueue.length})</h3>
             <div className="flex gap-2">
-              <Button variant="ghost" className="text-xs !py-1.5 !px-3" onClick={() => setBulkQueue([])}>Clear</Button>
+              {confirmingClear ? (
+                <>
+                  <Button variant="danger" className="text-xs !py-1.5 !px-3" onClick={() => { setBulkQueue([]); setConfirmingClear(false); showToast("Queue cleared", "info"); }}>Confirm clear</Button>
+                  <Button variant="ghost" className="text-xs !py-1.5 !px-3" onClick={() => setConfirmingClear(false)}>Keep</Button>
+                </>
+              ) : (
+                <Button variant="ghost" className="text-xs !py-1.5 !px-3" onClick={() => setConfirmingClear(true)}>Clear</Button>
+              )}
               <Button className="text-xs !py-1.5 !px-3" onClick={() => { setAdding(bulkQueue[0]); }}>Add next</Button>
             </div>
           </div>
+          {portfoliosError && (
+            <div className="text-xs text-down mb-3 flex items-center gap-2">
+              <span>{portfoliosError}</span>
+              <button type="button" className="underline font-semibold" onClick={loadPortfolios}>Retry</button>
+            </div>
+          )}
           <div className="flex gap-2 mb-3">
             <select className={`${inputCls} flex-1`} value={bulkPortfolioId ?? ""} onChange={(e) => setBulkPortfolioId(Number(e.target.value))}>
               {portfolios.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -318,26 +374,41 @@ export default function ScanPage() {
               variant="rainbow"
               disabled={bulkAdding || !bulkPortfolioId}
               onClick={async () => {
-                if (!bulkPortfolioId) return;
+                if (!bulkPortfolioId || bulkAdding) return;
                 setBulkAdding(true);
                 setBulkProgress(0);
+                const failed: AddSheetCard[] = [];
+                let added = 0;
                 try {
-                  const settingsRes = await fetch("/api/settings");
-                  const settings = await settingsRes.json();
-                  const condition = settings.bulkCondition ?? "NM";
-                  const costCurrency = settings.bulkCurrency ?? "CAD";
+                  let condition = "NM";
+                  let costCurrency = "CAD";
+                  try {
+                    const settingsRes = await fetch("/api/settings");
+                    const settings = settingsRes.ok ? await settingsRes.json() : {};
+                    condition = settings.bulkCondition ?? "NM";
+                    costCurrency = settings.bulkCurrency ?? "CAD";
+                  } catch { /* fall back to defaults */ }
 
-                  for (let i = 0; i < bulkQueue.length; i++) {
-                    const card = bulkQueue[i];
-                    await fetch(`/api/portfolios/${bulkPortfolioId}/items`, {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ cardId: card.id, quantity: 1, variantType: "normal", condition, costCurrency }),
-                    });
+                  const queue = [...bulkQueue];
+                  for (let i = 0; i < queue.length; i++) {
+                    const card = queue[i];
+                    try {
+                      const r = await fetch(`/api/portfolios/${bulkPortfolioId}/items`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ cardId: card.id, quantity: 1, variantType: "normal", condition, costCurrency }),
+                      });
+                      if (r.ok) added++;
+                      else failed.push(card);
+                    } catch {
+                      failed.push(card);
+                    }
                     setBulkProgress(i + 1);
                   }
-                  setBulkQueue([]);
-                } catch {} finally {
+                  setBulkQueue(failed);
+                  if (failed.length === 0) showToast(`Added ${added} card${added === 1 ? "" : "s"}`, "up");
+                  else showToast(`${added} added, ${failed.length} failed — kept in queue`, "down", { durationMs: 6000 });
+                } finally {
                   setBulkAdding(false);
                 }
               }}
