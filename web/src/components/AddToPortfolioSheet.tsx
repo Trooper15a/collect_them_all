@@ -16,6 +16,8 @@ export interface AddSheetCard {
   name: string;
   setName?: string | null;
   prices?: CardPrices;
+  /** Sealed product (booster box, ETB, tin…) — no grading, variant defaults to "sealed". */
+  sealed?: boolean;
 }
 
 export function AddToPortfolioSheet(props: { card: AddSheetCard | null; onClose: () => void; onAdded?: () => void }) {
@@ -25,11 +27,12 @@ export function AddToPortfolioSheet(props: { card: AddSheetCard | null; onClose:
 }
 
 function Sheet({ card, onClose, onAdded }: { card: AddSheetCard; onClose: () => void; onAdded?: () => void }) {
+  const sealed = !!card.sealed;
   const [portfolios, setPortfolios] = useState<PortfolioLite[]>([]);
   const [portfolioId, setPortfolioId] = useState<number | "new">("new");
   const [newName, setNewName] = useState("My Collection");
   const [quantity, setQuantity] = useState(1);
-  const [variant, setVariant] = useState(() => bestPrice(card.prices)?.variant ?? "normal");
+  const [variant, setVariant] = useState(() => bestPrice(card.prices)?.variant ?? (sealed ? "sealed" : "normal"));
   const [condition, setCondition] = useState<(typeof CONDITIONS)[number]>("NM");
   const [graded, setGraded] = useState(false);
   const [company, setCompany] = useState<string>("PSA");
@@ -93,7 +96,7 @@ function Sheet({ card, onClose, onAdded }: { card: AddSheetCard; onClose: () => 
           quantity,
           variantType: variant,
           condition,
-          isGraded: graded,
+          isGraded: sealed ? false : graded,
           gradingCompany: graded ? company : null,
           grade: graded ? grade : null,
           certNumber: graded ? cert || null : null,
@@ -119,7 +122,12 @@ function Sheet({ card, onClose, onAdded }: { card: AddSheetCard; onClose: () => 
       <div className="relative glass w-full max-w-lg rounded-t-3xl p-5 pb-[max(env(safe-area-inset-bottom),20px)] max-h-[88vh] overflow-y-auto anim-widget d1" style={{ animationName: "slide-up-sheet" }}>
         <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-4" />
         <div className="mb-4 flex items-start gap-3">
-          <CardImage id={card.id} className="w-20 rounded-lg flex-shrink-0" alt="" />
+          {sealed ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={`/api/images/${encodeURIComponent(card.id)}?size=low`} alt="" className="w-20 h-20 object-contain rounded-lg bg-elev flex-shrink-0" />
+          ) : (
+            <CardImage id={card.id} className="w-20 rounded-lg flex-shrink-0" alt="" />
+          )}
           <div className="min-w-0">
             <div className="text-xs text-muted">Add to portfolio</div>
             <div className="font-semibold text-lg leading-tight">{card.name}</div>
@@ -154,7 +162,7 @@ function Sheet({ card, onClose, onAdded }: { card: AddSheetCard; onClose: () => 
           )}
           <Field label="Variant">
             <select className={inputCls} value={variant} onChange={(e) => setVariant(e.target.value)}>
-              {(variants.length ? variants : ["normal"]).map((v) => (
+              {(variants.length ? variants : [sealed ? "sealed" : "normal"]).map((v) => (
                 <option key={v} value={v}>
                   {variantLabel(v)}
                 </option>
@@ -170,11 +178,13 @@ function Sheet({ card, onClose, onAdded }: { card: AddSheetCard; onClose: () => 
               ))}
             </select>
           </Field>
-          <label className="col-span-2 flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={graded} onChange={(e) => setGraded(e.target.checked)} className="accent-accent w-4 h-4" />
-            Graded card
-          </label>
-          {graded && (
+          {!sealed && (
+            <label className="col-span-2 flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={graded} onChange={(e) => setGraded(e.target.checked)} className="accent-accent w-4 h-4" />
+              Graded card
+            </label>
+          )}
+          {!sealed && graded && (
             <>
               <Field label="Company">
                 <select className={inputCls} value={company} onChange={(e) => setCompany(e.target.value)}>
@@ -191,7 +201,7 @@ function Sheet({ card, onClose, onAdded }: { card: AddSheetCard; onClose: () => 
               </Field>
             </>
           )}
-          <Field label="Cost basis (per card)">
+          <Field label={sealed ? "Cost basis (per item)" : "Cost basis (per card)"}>
             <input className={inputCls} type="number" min={0} step="0.01" inputMode="decimal" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="What you paid" />
           </Field>
           <Field label="Cost currency">
@@ -222,7 +232,7 @@ function Sheet({ card, onClose, onAdded }: { card: AddSheetCard; onClose: () => 
             Cancel
           </Button>
           <Button className="flex-1" onClick={submit} disabled={busy || done}>
-            {done ? "Added ✓" : busy ? "Adding…" : "Add card"}
+            {done ? "Added ✓" : busy ? "Adding…" : sealed ? "Add product" : "Add card"}
           </Button>
         </div>
       </div>

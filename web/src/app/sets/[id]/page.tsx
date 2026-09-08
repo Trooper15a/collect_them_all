@@ -18,10 +18,17 @@ interface SetCard {
   price: number | null;
   owned: number;
 }
+interface SealedProduct {
+  id: string;
+  name: string;
+  price: number | null;
+  owned: number;
+}
 interface Data {
   set: { id: string; code: string; name: string; language: string; tcg: string; releaseDate: string | null };
   currency: string;
   cards: SetCard[];
+  sealed?: SealedProduct[];
   completion: { owned: number; total: number; pct: number; missingCost: number; totalValue: number };
 }
 
@@ -67,6 +74,7 @@ export default function SetPage() {
       </div>
     );
   const { set, completion: c, currency } = data;
+  const sealed = data.sealed ?? [];
 
   return (
     <div>
@@ -161,6 +169,38 @@ export default function SetPage() {
           </div>
         ))}
       </div>
+      {sealed.length > 0 && (
+        <>
+          <h2 className="mt-5 text-xs font-semibold text-muted uppercase tracking-wider">Sealed products · {sealed.length}</h2>
+          <div className="mt-2 grid grid-cols-3 sm:grid-cols-4 gap-2">
+            {sealed.map((p) => (
+              <div key={p.id} className={`card-surface rounded-xl overflow-hidden relative ${p.owned ? "" : "opacity-70"}`}>
+                <Link href={`/cards/${encodeURIComponent(p.id)}`}>
+                  {/* sealed product shots aren't card-shaped — keep natural aspect */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={`/api/images/${encodeURIComponent(p.id)}?size=low`} alt={p.name} loading="lazy" className="w-full aspect-square object-contain bg-elev" />
+                </Link>
+                {p.owned > 0 && <div className="absolute top-1 right-1 rounded-full bg-up text-black text-[10px] font-bold px-1.5">×{p.owned}</div>}
+                <div className="p-1.5">
+                  <div className="text-[11px] font-medium leading-tight line-clamp-2">{p.name}</div>
+                  <div className="flex items-center justify-between text-[10px] text-muted">
+                    <span>Sealed</span>
+                    <span className="tabular">{p.price != null ? <Money amount={p.price} currency={currency} /> : "—"}</span>
+                  </div>
+                  <button onClick={() => setAdding({ id: p.id, name: p.name, setName: set.name, sealed: true })} className="mt-1 w-full min-h-8 text-[11px] font-semibold text-accent bg-accent/10 rounded-md py-1">
+                    {p.owned > 0 ? "+ More" : "+ Add"}
+                  </button>
+                  {p.owned === 0 && (
+                    <a href={tcgplayerSearchUrl(p.name)} target="_blank" rel="noreferrer" className="mt-0.5 flex w-full min-h-8 items-center justify-center text-center text-[11px] text-muted hover:text-accent">
+                      Buy ↗
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
       <AddToPortfolioSheet
         card={adding}
         onClose={() => setAdding(null)}
