@@ -29,7 +29,7 @@ function LoginInner() {
 
           <button
             onClick={() => signIn("google", { callbackUrl })}
-            className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-white text-black font-semibold shadow-lg hover:shadow-xl transition-shadow"
+            className="btn-rainbow flex items-center gap-3 px-6 py-3 rounded-2xl font-semibold shadow-lg shadow-[rgba(167,139,250,0.3)] hover:shadow-xl transition-shadow"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path

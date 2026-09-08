@@ -29,7 +29,28 @@ export default function SetsPage() {
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const loading = loadedKey !== `${tcg}/${lang}`;
 
+  useEffect(() => {
+    const ac = new AbortController();
+    setSets(null);
+    setOwned({});
+    fetch(`/api/sets?tcg=${tcg}&lang=${lang}`, { signal: ac.signal })
+      .then(async (r) => {
+        if (!r.ok) throw new Error("Failed to load sets");
+        return r.json();
+      })
+      .then((d) => {
+        setSets(d.sets ?? []);
+        setOwned(d.owned ?? {});
+        setError(null);
+        setLoadedKey(`${tcg}/${lang}`);
+      })
+      .catch((e) => { if ((e as Error).name !== "AbortError") setError(e.message); });
+    return () => ac.abort();
+  }, [tcg, lang]);
+
   const load = useCallback(() => {
+    setSets(null);
+    setOwned({});
     fetch(`/api/sets?tcg=${tcg}&lang=${lang}`)
       .then(async (r) => {
         if (!r.ok) throw new Error("Failed to load sets");
@@ -43,7 +64,6 @@ export default function SetsPage() {
       })
       .catch((e) => setError(e.message));
   }, [tcg, lang]);
-  useEffect(load, [load]);
 
   const list = useMemo(() => {
     if (!sets) return [];
