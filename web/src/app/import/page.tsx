@@ -132,7 +132,7 @@ export default function ImportPage() {
           <button
             onClick={() => fileRef.current?.click()}
             disabled={loading}
-            className="rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:bg-accent/80 transition-colors disabled:opacity-50"
+            className="btn-rainbow rounded-xl px-5 py-2.5 text-sm font-semibold disabled:opacity-50"
           >
             {loading ? "Processing..." : "Choose file"}
           </button>
@@ -197,7 +197,7 @@ export default function ImportPage() {
             <button
               onClick={commit}
               disabled={loading || summary.matched + summary.ambiguous === 0}
-              className="flex-1 rounded-xl bg-accent py-2.5 text-sm font-semibold text-white hover:bg-accent/80 transition-colors disabled:opacity-50"
+              className="btn-rainbow flex-1 rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50"
             >
               {loading ? "Importing..." : `Import ${summary.matched + summary.ambiguous} cards`}
             </button>
@@ -218,7 +218,7 @@ export default function ImportPage() {
             {result.skipped.length > 0 && ` ${result.skipped.length} rows skipped.`}
           </p>
           <div className="flex gap-3 justify-center pt-2">
-            <Link href="/portfolios" className="rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:bg-accent/80 transition-colors">
+            <Link href="/portfolios" className="btn-rainbow rounded-xl px-5 py-2.5 text-sm font-semibold">
               View binders
             </Link>
             <button

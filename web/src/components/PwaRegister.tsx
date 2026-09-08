@@ -131,7 +131,7 @@ export function PwaRegister() {
         <button onClick={dismiss} className="text-muted hover:text-foreground text-lg px-1" aria-label="Dismiss">
           &times;
         </button>
-        <button onClick={install} className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent/80 transition-colors">
+        <button onClick={install} className="btn-rainbow shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold">
           Install
         </button>
       </div>

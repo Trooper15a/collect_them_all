@@ -90,7 +90,7 @@ export default function LandingPage() {
           <h1 className="text-5xl sm:text-6xl font-extrabold tracking-tight leading-[1.1]">
             Track your cards.
             <br />
-            <span className="text-accent">Know their worth.</span>
+            <span className="text-rainbow">Know their worth.</span>
           </h1>
           <p className="mt-6 text-lg text-muted max-w-lg mx-auto leading-relaxed">
             The free, open-source TCG portfolio tracker with AI card scanning, daily prices across 14 games, and offline support.

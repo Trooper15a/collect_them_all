@@ -254,7 +254,7 @@ export default function ScanPage() {
         {!q.trim() && (
           <div className="card-surface rounded-3xl p-6 text-center">
             <div className="flex justify-center gap-4">
-              <button onClick={() => setScanning(true)} className="w-20 h-20 rounded-full bg-accent text-black flex items-center justify-center shadow-[0_0_40px_rgba(250,204,21,0.35)] active:scale-95 transition">
+              <button onClick={() => setScanning(true)} className="btn-rainbow w-20 h-20 rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(167,139,250,0.35)] active:scale-95 transition">
                 <svg viewBox="0 0 24 24" className="w-9 h-9" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                   <path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" />
                   <rect x="8" y="7" width="8" height="10" rx="1" />

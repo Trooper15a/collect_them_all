@@ -176,6 +176,65 @@ html.no-tabbar .pwa-banner {
   transform: scale(0.97);
 }
 
+/* Rainbow text — also applied to .text-accent so all accent text is rainbow */
+.text-rainbow,
+.text-accent {
+  background: linear-gradient(135deg, #f472b6, #a78bfa, #60a5fa, #34d399, #fbbf24, #fb923c, #f472b6) !important;
+  background-size: 300% 300% !important;
+  animation: rainbow-shift 4s ease infinite !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  color: transparent !important;
+}
+
+/* Rainbow border */
+.border-rainbow {
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  position: relative;
+}
+.border-rainbow::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, #f472b6, #a78bfa, #60a5fa, #34d399, #fbbf24, #fb923c, #f472b6);
+  background-size: 300% 300%;
+  animation: rainbow-shift 4s ease infinite;
+  z-index: -1;
+}
+
+/* Rainbow chip (small pill) */
+.chip-rainbow {
+  background: linear-gradient(135deg, #f472b6, #a78bfa, #60a5fa, #34d399, #fbbf24, #fb923c, #f472b6);
+  background-size: 300% 300%;
+  animation: rainbow-shift 4s ease infinite;
+  color: #000;
+  font-weight: 600;
+  border: none;
+}
+
+/* Rainbow toggle track */
+.toggle-rainbow {
+  background: linear-gradient(135deg, #f472b6, #a78bfa, #60a5fa, #34d399, #fbbf24, #fb923c, #f472b6);
+  background-size: 300% 300%;
+  animation: rainbow-shift 4s ease infinite;
+  border-color: transparent;
+}
+
+/* Make bg-accent elements rainbow */
+.bg-accent {
+  background: linear-gradient(135deg, #f472b6, #a78bfa, #60a5fa, #34d399, #fbbf24, #fb923c, #f472b6) !important;
+  background-size: 300% 300% !important;
+  animation: rainbow-shift 4s ease infinite !important;
+}
+
+/* Border-accent → rainbow border */
+.border-accent {
+  border-image: linear-gradient(135deg, #f472b6, #a78bfa, #60a5fa, #34d399, #fbbf24, #fb923c, #f472b6) 1 !important;
+}
+
 /* Binder card with open animation */
 @keyframes binder-open {
   0% { transform: perspective(800px) rotateY(0deg); }

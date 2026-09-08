@@ -185,7 +185,7 @@ export default function SettingsPage() {
                       key={opt.id}
                       onClick={() => selectAppearance(opt.id)}
                       aria-pressed={appearance === opt.id}
-                      className={`rounded-xl border-2 p-2 text-left transition-all ${appearance === opt.id ? "border-[#a78bfa] shadow-lg shadow-[#a78bfa]/20" : "border-line hover:border-muted"}`}
+                      className={`rounded-xl border-2 p-2 text-left transition-all ${appearance === opt.id ? "border-rainbow shadow-lg shadow-[#a78bfa]/20" : "border-line hover:border-muted"}`}
                     >
                       <span className="block h-8 rounded-lg border border-line" style={{ background: opt.swatch }} />
                       <span className="mt-1.5 block text-xs font-semibold">{opt.label}</span>
@@ -283,7 +283,7 @@ function HidePricesToggle() {
           setHidePrices(!hidden);
           showToast(hidden ? "Prices visible" : "Prices hidden ✓", hidden ? "down" : "up");
         }}
-        className={`relative shrink-0 h-7 w-12 rounded-full border transition-colors ${hidden ? "bg-[#a78bfa] border-[#a78bfa]" : "bg-elev border-line"}`}
+        className={`relative shrink-0 h-7 w-12 rounded-full border transition-colors ${hidden ? "toggle-rainbow" : "bg-elev border-line"}`}
       >
         <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-fg transition-all ${hidden ? "left-6" : "left-1"}`} />
       </button>
@@ -340,7 +340,7 @@ function TcgcsvPanel() {
         {cats.map((c) => {
           const on = selected.includes(c.id);
           return (
-            <button key={c.id} onClick={() => setSelected(on ? selected.filter((x) => x !== c.id) : [...selected, c.id])} className={`rounded-full px-2.5 py-1 text-xs border transition-colors ${on ? "bg-[#a78bfa] text-black border-[#a78bfa] font-semibold" : "border-line text-muted hover:border-muted"}`}>
+            <button key={c.id} onClick={() => setSelected(on ? selected.filter((x) => x !== c.id) : [...selected, c.id])} className={`rounded-full px-2.5 py-1 text-xs border transition-colors ${on ? "chip-rainbow" : "border-line text-muted hover:border-muted"}`}>
               {c.label}
             </button>
           );

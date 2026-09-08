@@ -52,7 +52,7 @@ export function TabBar() {
               key={t.href}
               href={t.href}
               aria-current={active ? "page" : undefined}
-              className={`relative flex flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors ${active ? "text-accent" : "text-muted hover:text-fg"}`}
+              className={`relative flex flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors ${active ? "text-rainbow" : "text-muted hover:text-fg"}`}
             >
               <div className="relative">
                 <t.icon className="w-6 h-6" />

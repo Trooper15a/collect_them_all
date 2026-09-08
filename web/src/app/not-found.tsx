@@ -12,7 +12,7 @@ export default function NotFound() {
       <div className="mt-8 flex flex-col sm:flex-row gap-3">
         <Link
           href="/"
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-6 py-3 text-base font-semibold text-white shadow-lg hover:brightness-110 transition"
+          className="btn-rainbow inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-base font-semibold shadow-lg hover:brightness-110 transition"
         >
           Go to dashboard
         </Link>
