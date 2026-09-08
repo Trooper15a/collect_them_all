@@ -333,7 +333,7 @@ export default function CardPage() {
           <button onClick={toggleWishlist} className={`pointer-events-auto w-12 h-12 rounded-full border flex items-center justify-center text-lg shadow-lg ${wishlisted ? "bg-down/20 border-down/40 text-down" : "bg-elev border-line text-muted"}`} aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}>
             {wishlisted ? "♥" : "♡"}
           </button>
-          <Button className="pointer-events-auto shadow-[0_10px_30px_rgba(250,204,21,0.35)]" onClick={() => setAdding(true)}>
+          <Button variant="rainbow" className="pointer-events-auto shadow-[0_10px_30px_rgba(167,139,250,0.3)]" onClick={() => setAdding(true)}>
             + Add to portfolio
           </Button>
         </div>

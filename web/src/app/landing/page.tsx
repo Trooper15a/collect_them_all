@@ -78,7 +78,7 @@ export default function LandingPage() {
           <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
             <Link
               href="/login"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-6 py-3 text-base font-semibold text-white hover:bg-accent/80 transition-colors shadow-lg shadow-accent/25"
+              className="btn-rainbow inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-base font-semibold shadow-lg shadow-purple-500/25"
             >
               Get started free
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -158,7 +158,7 @@ export default function LandingPage() {
         <p className="text-muted mb-8 max-w-md mx-auto">No credit card. No subscription. Sign in with Google and start adding cards in seconds.</p>
         <Link
           href="/login"
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-8 py-3.5 text-base font-semibold text-white hover:bg-accent/80 transition-colors shadow-lg shadow-accent/25"
+          className="btn-rainbow inline-flex items-center justify-center gap-2 rounded-xl px-8 py-3.5 text-base font-semibold shadow-lg shadow-purple-500/25"
         >
           Get started free
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">

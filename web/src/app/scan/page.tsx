@@ -300,6 +300,7 @@ export default function ScanPage() {
               {portfolios.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
             <Button
+              variant="rainbow"
               disabled={bulkAdding || !bulkPortfolioId}
               onClick={async () => {
                 if (!bulkPortfolioId) return;
