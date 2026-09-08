@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
   reactStrictMode: true,
-  serverExternalPackages: ["node-cron"],
+  serverExternalPackages: ["node-cron", "onnxruntime-node", "sharp"],
   async headers() {
     return [
       {
