@@ -28,6 +28,7 @@ export const TCGCSV_CATEGORIES: TcgcsvCategory[] = [
   { id: 16, tcg: "vanguard", language: "eng", label: "Cardfight!! Vanguard" },
   { id: 20, tcg: "weiss", language: "eng", label: "Weiss Schwarz" },
   { id: 24, tcg: "finalfantasy", language: "eng", label: "Final Fantasy" },
+  { id: 81, tcg: "unionarena", language: "eng", label: "Union Arena" },
 ];
 
 export function defaultCategoryIds(): number[] {
@@ -39,7 +40,23 @@ export function defaultCategoryIds(): number[] {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type J = any;
 
+// TCGCSV guideline: keep under ~10k requests/24h or risk a ban. Space requests
+// ~100ms apart so a full import stays polite even for large categories.
+const REQUEST_GAP_MS = 100;
+let lastRequestAt = 0;
+let requestChain: Promise<void> = Promise.resolve();
+
+function throttle(): Promise<void> {
+  requestChain = requestChain.then(async () => {
+    const wait = REQUEST_GAP_MS - (Date.now() - lastRequestAt);
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    lastRequestAt = Date.now();
+  });
+  return requestChain;
+}
+
 async function getJson(url: string): Promise<J> {
+  await throttle();
   const res = await fetch(url, { headers: { "User-Agent": "ripnpull/0.1" }, signal: AbortSignal.timeout(60_000) });
   if (!res.ok) throw new Error(`TCGCSV ${res.status} ${url}`);
   return res.json();

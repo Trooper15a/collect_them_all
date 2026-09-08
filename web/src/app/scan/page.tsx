@@ -8,17 +8,17 @@ import { showToast } from "@/components/Toast";
 import { Button, CardImage, Empty, Money, Segmented, Skeleton, TcgBadge, inputCls } from "@/components/ui";
 import { haptic } from "@/lib/haptics";
 import { isScanIndexId, type Match } from "@/lib/scanner/matcher";
-import type { CardSummary } from "@/lib/types";
+import { TCGS, type CardSummary } from "@/lib/types";
+import { useActiveTcg } from "@/lib/ui-prefs";
 
 interface RecentScan { id: string; name: string; setName: string | null; ts: number; }
 
-type TcgFilter = "all" | "pokemon" | "mtg" | "yugioh";
 type LangFilter = "all" | "eng" | "jap";
 type SearchSort = "relevance" | "price-desc" | "price-asc" | "name";
 
 export default function ScanPage() {
   const [q, setQ] = useState("");
-  const [tcg, setTcg] = useState<TcgFilter>("all");
+  const tcg = useActiveTcg();
   const [lang, setLang] = useState<LangFilter>("all");
   const [results, setResults] = useState<CardSummary[] | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -38,6 +38,7 @@ export default function ScanPage() {
   const [bulkPortfolioId, setBulkPortfolioId] = useState<number | null>(null);
   const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [showAllGames, setShowAllGames] = useState(false);
 
   // Load persisted state after mount (SSR-safe defaults above avoid hydration mismatch).
   useEffect(() => {
@@ -121,6 +122,15 @@ export default function ScanPage() {
     else if (searchSort === "name") sorted.sort((a, b) => a.name.localeCompare(b.name));
     return sorted;
   }, [results, searchSort]);
+
+  // Scanner matches follow the global game picker: filter hard to the active
+  // game, with a fallback to all games when nothing matches it.
+  const activeTcgLabel = tcg === "all" ? null : TCGS.find((t) => t.id === tcg)?.label ?? tcg;
+  const gameMatches = useMemo(
+    () => (matches && tcg !== "all" ? matches.filter((m) => m.card.tcg === tcg) : null),
+    [matches, tcg],
+  );
+  const visibleMatches = gameMatches && gameMatches.length > 0 && !showAllGames ? gameMatches : matches;
 
   async function resolveMatch(m: Match): Promise<AddSheetCard | null> {
     const url = isScanIndexId(m.card.id) ? `/api/resolve?id=${encodeURIComponent(m.card.id)}` : `/api/cards/${encodeURIComponent(m.card.id)}`;
@@ -210,18 +220,10 @@ export default function ScanPage() {
         </Button>
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Segmented
-          value={tcg}
-          onChange={setTcg}
-          size="xs"
-          options={[
-            { value: "all", label: "All" },
-            { value: "pokemon", label: "Pokémon" },
-            { value: "mtg", label: "Magic" },
-            { value: "yugioh", label: "Yu-Gi-Oh!" },
-          ]}
-        />
+      <div className="mt-3 flex flex-wrap gap-2 items-center">
+        {activeTcgLabel && (
+          <span className="text-[11px] text-muted">Game: <span className="font-semibold text-fg">{activeTcgLabel}</span></span>
+        )}
         <Segmented
           value={lang}
           onChange={setLang}
@@ -330,14 +332,30 @@ export default function ScanPage() {
         )}
       </div>
 
-      {scanning && !matches && <Scanner onClose={() => { setScanning(false); setBulkMode(false); }} onMatches={(m) => { haptic("heavy"); setMatches(m); }} bulkMode={bulkMode} bulkCount={bulkQueue.length} />}
+      {scanning && !matches && <Scanner onClose={() => { setScanning(false); setBulkMode(false); }} onMatches={(m) => { haptic("heavy"); setShowAllGames(false); setMatches(m); }} bulkMode={bulkMode} bulkCount={bulkQueue.length} />}
       {matches && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
           <button className="absolute inset-0 bg-black/70" onClick={() => setMatches(null)} aria-label="Close" />
           <div className="relative glass w-full max-w-lg rounded-t-3xl p-5 pb-[max(env(safe-area-inset-bottom),20px)] anim-widget d1" style={{ animationName: "slide-up-sheet" }}>
             <div className="text-xs text-muted mb-3">Is it one of these? Tap to add.</div>
+            {activeTcgLabel && gameMatches && (
+              <div className="text-[11px] text-muted mb-2 flex items-center justify-between gap-2">
+                <span>
+                  {gameMatches.length > 0
+                    ? showAllGames
+                      ? "Showing matches from all games"
+                      : `Showing ${activeTcgLabel} matches`
+                    : `No ${activeTcgLabel} matches — showing all games`}
+                </span>
+                {gameMatches.length > 0 && (
+                  <button type="button" className="text-accent font-semibold" onClick={() => setShowAllGames((v) => !v)}>
+                    {showAllGames ? `${activeTcgLabel} only` : "Show all games"}
+                  </button>
+                )}
+              </div>
+            )}
             <ul className="divide-y divide-line stagger-children">
-              {matches.map((m, i) => (
+              {(visibleMatches ?? []).map((m, i) => (
                 <li key={m.card.id}>
                   <button onClick={() => chooseMatch(m)} disabled={resolvingId !== null} className="w-full flex items-center gap-3 py-2.5 text-left disabled:opacity-50">
                     <CardImage id={m.card.id} className="w-12 rounded-md" alt="" />

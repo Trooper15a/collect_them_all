@@ -43,6 +43,11 @@ interface Data {
 
 type Sort = "value" | "name" | "set" | "gain" | "added" | "lang";
 
+/** Sealed products (booster boxes, ETBs, tins) are stored as cards with rarity "Sealed". */
+function isSealedCard(card: NormalizedCard): boolean {
+  return card.rarity === "Sealed" || card.meta?.sealed === true;
+}
+
 export default function PortfolioPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -312,16 +317,25 @@ export default function PortfolioPage() {
         </div>
       ) : (
         <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3 stagger-children">
-          {items.map((i) => (
+          {items.map((i) => {
+            const sealed = isSealedCard(i.card);
+            return (
             <SwipeToDelete key={i.id} onDelete={() => deleteItem(i)}>
-            <div className="card-surface rounded-2xl overflow-hidden flex flex-col tap-scale hover-lift">
+            <div className="card-surface rounded-2xl overflow-hidden flex flex-col tap-scale hover-lift relative">
               <Link href={`/cards/${encodeURIComponent(i.card.id)}`}>
-                <CardImage id={i.card.id} className="w-full" alt="" />
+                {sealed ? (
+                  // sealed product shots aren't card-shaped — keep natural aspect
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={`/api/images/${encodeURIComponent(i.card.id)}?size=low`} alt="" loading="lazy" className="w-full aspect-square object-contain bg-elev" />
+                ) : (
+                  <CardImage id={i.card.id} className="w-full" alt="" />
+                )}
               </Link>
+              {i.quantity > 1 && <div className="absolute top-1.5 right-1.5 rounded-full bg-up text-black text-[10px] font-bold px-1.5">×{i.quantity}</div>}
               <button type="button" className="p-2.5 flex-1 flex flex-col gap-0.5 text-left" onClick={() => setEditing(i)}>
                 <div className="font-medium text-sm leading-tight line-clamp-2">{i.card.name}</div>
                 <div className="text-[11px] text-muted truncate">
-                  {i.card.setName} {i.card.cardNumber && `#${i.card.cardNumber}`}
+                  {i.card.setName} {i.card.cardNumber ? `#${i.card.cardNumber}` : sealed ? "· Sealed" : ""}
                 </div>
                 <TcgBadge tcg={i.card.tcg} lang={i.card.language} />
                 <div className="mt-auto pt-1 flex items-center justify-between">
@@ -335,7 +349,8 @@ export default function PortfolioPage() {
               </button>
             </div>
             </SwipeToDelete>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -360,6 +375,7 @@ export default function PortfolioPage() {
 
 function EditItemSheet({ item, onClose, onSaved, onRemove }: { item: Item; onClose: () => void; onSaved: () => void; onRemove: () => void }) {
   const { id: currentPortfolioId } = useParams<{ id: string }>();
+  const sealed = isSealedCard(item.card);
   const [quantity, setQuantity] = useState(item.quantity);
   const [condition, setCondition] = useState(item.condition);
   const [graded, setGraded] = useState(item.isGraded);
@@ -395,7 +411,7 @@ function EditItemSheet({ item, onClose, onSaved, onRemove }: { item: Item; onClo
           quantity,
           variantType: variant,
           condition,
-          isGraded: graded,
+          isGraded: sealed ? false : graded,
           gradingCompany: graded ? company : null,
           grade: graded ? grade : null,
           certNumber: graded ? cert || null : null,
@@ -445,10 +461,12 @@ function EditItemSheet({ item, onClose, onSaved, onRemove }: { item: Item; onClo
               ))}
             </select>
           </Field>
-          <label className="flex items-end gap-2 text-sm pb-2">
-            <input type="checkbox" checked={graded} onChange={(e) => setGraded(e.target.checked)} className="accent-accent w-4 h-4" /> Graded
-          </label>
-          {graded && (
+          {!sealed && (
+            <label className="flex items-end gap-2 text-sm pb-2">
+              <input type="checkbox" checked={graded} onChange={(e) => setGraded(e.target.checked)} className="accent-accent w-4 h-4" /> Graded
+            </label>
+          )}
+          {!sealed && graded && (
             <>
               <Field label="Company">
                 <input className={inputCls} value={company} onChange={(e) => setCompany(e.target.value)} />
@@ -463,7 +481,7 @@ function EditItemSheet({ item, onClose, onSaved, onRemove }: { item: Item; onClo
               </div>
             </>
           )}
-          <Field label="Cost basis (per card)">
+          <Field label={sealed ? "Cost basis (per item)" : "Cost basis (per card)"}>
             <input className={inputCls} type="number" step="0.01" inputMode="decimal" value={cost} onChange={(e) => setCost(e.target.value)} />
           </Field>
           <Field label="Currency">

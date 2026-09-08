@@ -13,7 +13,7 @@ const FEATURES = [
   },
   {
     title: "Up-to-Date Prices",
-    desc: "Prices from TCGPlayer across 13 TCGs updated daily. Track market value, low, mid, and high for every variant.",
+    desc: "Prices from TCGPlayer across 14 TCGs updated daily. Track market value, low, mid, and high for every variant.",
     icon: (
       <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18 9 11.25l4.306 4.306a11.95 11.95 0 0 1 5.814-5.518l2.74-1.22m0 0-5.94-2.281m5.94 2.28-2.28 5.941" />
@@ -21,8 +21,8 @@ const FEATURES = [
     ),
   },
   {
-    title: "13 TCGs Supported",
-    desc: "Pokémon, Magic, Yu-Gi-Oh!, One Piece, Lorcana, Digimon, Dragon Ball, Flesh and Blood, Star Wars, and more.",
+    title: "14 TCGs Supported",
+    desc: "Pokémon, Magic, Yu-Gi-Oh!, One Piece, Lorcana, Digimon, Dragon Ball, Flesh and Blood, Star Wars, Union Arena, and more.",
     icon: (
       <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M6 6.878V6a2.25 2.25 0 0 1 2.25-2.25h7.5A2.25 2.25 0 0 1 18 6v.878m-12 0c.235-.083.487-.128.75-.128h10.5c.263 0 .515.045.75.128m-12 0A2.25 2.25 0 0 0 4.5 9v.878m13.5-3A2.25 2.25 0 0 1 19.5 9v.878m-13.5-3c.235-.083.487-.128.75-.128h10.5c.263 0 .515.045.75.128m-12 0A2.25 2.25 0 0 0 3 12M18 9.878a2.25 2.25 0 0 1 1.5 2.122M3 12v6a2.25 2.25 0 0 0 2.25 2.25h13.5A2.25 2.25 0 0 0 21 18v-6m-18 0h18" />
@@ -58,7 +58,7 @@ const FEATURES = [
   },
 ];
 
-const TCGS = ["Pokémon", "Magic", "Yu-Gi-Oh!", "One Piece", "Lorcana", "Digimon", "Dragon Ball Super", "DB Fusion World", "Flesh and Blood", "Star Wars Unlimited", "Vanguard", "Weiß Schwarz", "Final Fantasy"];
+const TCGS = ["Pokémon", "Magic", "Yu-Gi-Oh!", "One Piece", "Lorcana", "Digimon", "Dragon Ball Super", "DB Fusion World", "Flesh and Blood", "Star Wars Unlimited", "Vanguard", "Weiß Schwarz", "Final Fantasy", "Union Arena"];
 
 export default function LandingPage() {
   return (
@@ -93,7 +93,7 @@ export default function LandingPage() {
             <span className="text-accent">Know their worth.</span>
           </h1>
           <p className="mt-6 text-lg text-muted max-w-lg mx-auto leading-relaxed">
-            The free, open-source TCG portfolio tracker with AI card scanning, daily prices across 13 games, and offline support.
+            The free, open-source TCG portfolio tracker with AI card scanning, daily prices across 14 games, and offline support.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
             <Link
@@ -167,7 +167,7 @@ export default function LandingPage() {
                 <li className="text-up">PSA + BGS + CGC grading links</li>
                 <li className="text-up">Open source (MIT)</li>
                 <li className="text-up">Full offline mode</li>
-                <li className="text-up">13 TCGs supported</li>
+                <li className="text-up">14 TCGs supported</li>
               </ul>
             </div>
           </div>

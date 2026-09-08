@@ -3,20 +3,24 @@
 import { useState } from "react";
 import { fmtMoney, fmtPct, fmtSigned, langLabel } from "@/lib/format";
 import { TCGS } from "@/lib/types";
+import { useHidePrices } from "@/lib/ui-prefs";
 
 export function Money({ amount, currency = "USD", className = "" }: { amount: number | null | undefined; currency?: string; className?: string }) {
-  return <span className={`tabular ${className}`}>{fmtMoney(amount, currency)}</span>;
+  const hidden = useHidePrices();
+  return <span className={`tabular ${hidden ? "text-muted" : ""} ${className}`}>{hidden ? "•••" : fmtMoney(amount, currency)}</span>;
 }
 
 export function Delta({ amount, pct, currency = "USD", className = "" }: { amount?: number | null; pct?: number | null; currency?: string; className?: string }) {
+  const hidden = useHidePrices();
   const v = amount ?? pct ?? 0;
-  const color = v > 0 ? "text-up" : v < 0 ? "text-down" : "text-muted";
+  const color = hidden ? "text-muted" : v > 0 ? "text-up" : v < 0 ? "text-down" : "text-muted";
   return (
     <span className={`tabular ${color} ${className}`}>
-      {amount != null && fmtSigned(amount, currency)}
-      {amount != null && pct != null && " "}
-      {pct != null && `(${fmtPct(pct)})`}
-      {amount == null && pct == null && "—"}
+      {hidden && "•••"}
+      {!hidden && amount != null && fmtSigned(amount, currency)}
+      {!hidden && amount != null && pct != null && " "}
+      {!hidden && pct != null && `(${fmtPct(pct)})`}
+      {!hidden && amount == null && pct == null && "—"}
     </span>
   );
 }

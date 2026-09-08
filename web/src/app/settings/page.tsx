@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Button, Field, Section, Skeleton, inputCls } from "@/components/ui";
+import { Button, Field, Skeleton, inputCls } from "@/components/ui";
 import { OfflineStatus } from "@/components/OfflineStatus";
 import { showToast } from "@/components/Toast";
 import { UserMenu } from "@/components/UserMenu";
 import { CURRENCIES } from "@/lib/types";
+import { setHidePrices, useHidePrices } from "@/lib/ui-prefs";
 
 interface Settings {
   currency: string;
@@ -16,6 +17,50 @@ interface Settings {
   pokewalletConfigured: boolean;
   pokewalletBudget: { hour: number; day: number };
   fxDate: string;
+}
+
+type Appearance = "midnight" | "black" | "light";
+
+const APPEARANCES: { id: Appearance; label: string; hint: string; swatch: string }[] = [
+  { id: "midnight", label: "Midnight", hint: "Dark, navy tint", swatch: "#0a0e1a" },
+  { id: "black", label: "Pure Black", hint: "Dark, true black", swatch: "#000000" },
+  { id: "light", label: "Light", hint: "Light background", swatch: "#f0f2f7" },
+];
+
+/** Sets/removes data-theme and data-bg coherently and persists both keys. */
+function applyAppearance(a: Appearance) {
+  const el = document.documentElement;
+  try {
+    if (a === "light") {
+      el.setAttribute("data-theme", "light");
+      el.removeAttribute("data-bg");
+      localStorage.setItem("theme", "light");
+      localStorage.removeItem("bgColor");
+    } else {
+      el.removeAttribute("data-theme");
+      el.setAttribute("data-bg", a === "black" ? "black" : "blue");
+      localStorage.setItem("theme", "dark");
+      localStorage.setItem("bgColor", a === "black" ? "black" : "blue");
+    }
+  } catch {}
+}
+
+function readAppearance(): Appearance {
+  try {
+    if (localStorage.getItem("theme") === "light") return "light";
+    if (localStorage.getItem("bgColor") === "black") return "black";
+  } catch {}
+  return "midnight";
+}
+
+/** Every settings section is its own box with the heading inside. */
+function Box({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="card-surface rounded-3xl p-5">
+      <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">{title}</h2>
+      {children}
+    </section>
+  );
 }
 
 export default function SettingsPage() {
@@ -41,46 +86,47 @@ export default function SettingsPage() {
       if (!r.ok) throw new Error("Failed");
       const d = await r.json();
       setS(d);
-      if (p.theme) {
-        document.documentElement.setAttribute("data-theme", p.theme);
-        try {
-          localStorage.setItem("theme", p.theme);
-        } catch {}
-      }
       showToast("Saved ✓", "up");
     } catch {
-      if (prev) {
-        setS(prev);
-        if (p.theme) {
-          document.documentElement.setAttribute("data-theme", prev.theme);
-          try {
-            localStorage.setItem("theme", prev.theme);
-          } catch {}
-        }
-      }
+      if (prev) setS(prev);
       showToast("Save failed — try again", "down");
     }
   }
 
-  function setBgColor(bg: string) {
-    document.documentElement.setAttribute("data-bg", bg);
-    try {
-      localStorage.setItem("bgColor", bg);
-    } catch {}
-    setBgState(bg);
-  }
-
-  const [bgState, setBgState] = useState("blue");
+  const [appearance, setAppearance] = useState<Appearance>("midnight");
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("bgColor");
-      if (saved) {
-        setBgState(saved);
-        document.documentElement.setAttribute("data-bg", saved);
-      }
-    } catch {}
+    // start "midnight" so SSR/CSR markup matches; sync from localStorage after mount
+    const sync = () => {
+      const cur = readAppearance();
+      setAppearance(cur);
+      applyAppearance(cur); // sanitize any stale incompatible attribute/key combo
+    };
+    sync();
+    window.addEventListener("storage", sync);
+    return () => window.removeEventListener("storage", sync);
   }, []);
+
+  async function selectAppearance(a: Appearance) {
+    const prev = appearance;
+    setAppearance(a);
+    applyAppearance(a);
+    try {
+      const r = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ theme: a === "light" ? "light" : "dark" }),
+      });
+      if (!r.ok) throw new Error("Failed");
+      const d = await r.json();
+      setS(d);
+      showToast("Saved ✓", "up");
+    } catch {
+      setAppearance(prev);
+      applyAppearance(prev);
+      showToast("Save failed — try again", "down");
+    }
+  }
 
   async function refreshNow() {
     setBusy(true);
@@ -120,127 +166,129 @@ export default function SettingsPage() {
         <h1 className="text-xl font-bold uppercase tracking-wider">Settings</h1>
       </header>
 
-      <Section title="Display">
-        <div className="card-surface rounded-2xl p-4 grid grid-cols-2 gap-3">
-          <Field label="Display currency">
-            <select className={inputCls} value={s.currency} onChange={(e) => patch({ currency: e.target.value })}>
-              {CURRENCIES.map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Theme">
-            <select className={inputCls} value={s.theme} onChange={(e) => patch({ theme: e.target.value as "dark" | "light" })}>
-              <option value="dark">Dark</option>
-              <option value="light">Light</option>
-            </select>
-          </Field>
-          <Field label="Background">
-            <div className="flex gap-2 mt-1">
-              {[
-                { id: "black", label: "Black", color: "#000000" },
-                { id: "blue", label: "Blue", color: "#0a0e1a" },
-                { id: "white", label: "White", color: "#f5f5f5" },
-              ].map((opt) => (
-                <button
-                  key={opt.id}
-                  onClick={() => setBgColor(opt.id)}
-                  className={`flex-1 h-10 rounded-xl border-2 transition-all ${bgState === opt.id ? "border-accent scale-105 shadow-lg shadow-accent/20" : "border-line hover:border-muted"}`}
-                  style={{ background: opt.color }}
-                  aria-label={opt.label}
-                  title={opt.label}
-                />
-              ))}
+      <div className="space-y-4">
+        <Box title="Display">
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Display currency">
+              <select className={inputCls} value={s.currency} onChange={(e) => patch({ currency: e.target.value })}>
+                {CURRENCIES.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </Field>
+            <div className="col-span-2">
+              <Field label="Appearance">
+                <div className="grid grid-cols-3 gap-2 mt-1">
+                  {APPEARANCES.map((opt) => (
+                    <button
+                      key={opt.id}
+                      onClick={() => selectAppearance(opt.id)}
+                      aria-pressed={appearance === opt.id}
+                      className={`rounded-xl border-2 p-2 text-left transition-all ${appearance === opt.id ? "border-accent shadow-lg shadow-accent/20" : "border-line hover:border-muted"}`}
+                    >
+                      <span className="block h-8 rounded-lg border border-line" style={{ background: opt.swatch }} />
+                      <span className="mt-1.5 block text-xs font-semibold">{opt.label}</span>
+                      <span className="block text-[10px] text-muted">{opt.hint}</span>
+                    </button>
+                  ))}
+                </div>
+              </Field>
             </div>
-          </Field>
-          <div className="col-span-2 text-xs text-muted">FX rates from the European Central Bank as of {s.fxDate}. Japanese cards (CardMarket EUR) convert at this rate.</div>
-        </div>
-      </Section>
-
-      <Section title="Bulk scan defaults">
-        <div className="card-surface rounded-2xl p-4 grid grid-cols-2 gap-3">
-          <Field label="Condition">
-            <select className={inputCls} value={s.bulkCondition} onChange={(e) => patch({ bulkCondition: e.target.value } as Partial<Settings>)}>
-              <option value="NM">Near Mint</option>
-              <option value="LP">Lightly Played</option>
-              <option value="MP">Moderately Played</option>
-              <option value="HP">Heavily Played</option>
-              <option value="DMG">Damaged</option>
-            </select>
-          </Field>
-          <Field label="Currency">
-            <select className={inputCls} value={s.bulkCurrency} onChange={(e) => patch({ bulkCurrency: e.target.value } as Partial<Settings>)}>
-              {CURRENCIES.map((c) => <option key={c}>{c}</option>)}
-            </select>
-          </Field>
-          <div className="col-span-2 text-xs text-muted">Used when you tap &quot;Add All&quot; in bulk scan mode. Quantity defaults to 1.</div>
-        </div>
-      </Section>
-
-      <Section title="Data sources">
-        <div className="card-surface rounded-2xl p-4 text-sm space-y-2">
-          <div className="flex justify-between">
-            <span>PokéWallet API key</span>
-            <span className={s.pokewalletConfigured ? "text-up" : "text-down"}>{s.pokewalletConfigured ? "Configured" : "Missing"}</span>
+            <div className="col-span-2">
+              <HidePricesToggle />
+            </div>
+            <div className="col-span-2 text-xs text-muted">FX rates from the European Central Bank as of {s.fxDate}. Japanese cards (CardMarket EUR) convert at this rate.</div>
           </div>
-          <div className="flex justify-between text-muted">
-            <span>Requests left</span>
-            <span className="tabular">
-              {s.pokewalletBudget?.hour ?? "—"}/hr · {s.pokewalletBudget?.day ?? "—"}/day
-            </span>
+        </Box>
+
+        <Box title="Bulk scan defaults">
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Condition">
+              <select className={inputCls} value={s.bulkCondition} onChange={(e) => patch({ bulkCondition: e.target.value } as Partial<Settings>)}>
+                <option value="NM">Near Mint</option>
+                <option value="LP">Lightly Played</option>
+                <option value="MP">Moderately Played</option>
+                <option value="HP">Heavily Played</option>
+                <option value="DMG">Damaged</option>
+              </select>
+            </Field>
+            <Field label="Currency">
+              <select className={inputCls} value={s.bulkCurrency} onChange={(e) => patch({ bulkCurrency: e.target.value } as Partial<Settings>)}>
+                {CURRENCIES.map((c) => <option key={c}>{c}</option>)}
+              </select>
+            </Field>
+            <div className="col-span-2 text-xs text-muted">Used when you tap &quot;Add All&quot; in bulk scan mode. Quantity defaults to 1.</div>
           </div>
-          {!s.pokewalletConfigured && <div className="text-xs text-muted">Add POKEWALLET_API_KEY to web/.env.local and restart the server to enable Pokémon search and images.</div>}
-          <div className="flex justify-between text-muted">
-            <span>Scryfall (Magic) · YGOProDeck (Yu-Gi-Oh!)</span>
-            <span className="text-up">Free, no key</span>
+        </Box>
+
+        <Box title="Prices">
+          <div className="space-y-3">
+            <div className="text-sm text-muted">Owned cards refresh automatically every night at 03:30. Run it now if you just added cards.</div>
+            <Button variant="ghost" onClick={refreshNow} disabled={busy}>
+              {busy ? "Refreshing…" : "Refresh prices now"}
+            </Button>
+            {refreshMsg && <div className="text-xs text-muted">{refreshMsg}</div>}
           </div>
-        </div>
-      </Section>
+        </Box>
 
-      <Section title="Prices">
-        <div className="card-surface rounded-2xl p-4 space-y-3">
-          <div className="text-sm text-muted">Owned cards refresh automatically every night at 03:30. Run it now if you just added cards.</div>
-          <Button variant="ghost" onClick={refreshNow} disabled={busy}>
-            {busy ? "Refreshing…" : "Refresh prices now"}
-          </Button>
-          {refreshMsg && <div className="text-xs text-muted">{refreshMsg}</div>}
-        </div>
-      </Section>
+        <Box title="TCGPlayer price database">
+          <TcgcsvPanel />
+        </Box>
 
-      <Section title="TCGPlayer price database">
-        <TcgcsvPanel />
-      </Section>
+        <Box title="Import from CSV">
+          <ImportPanel />
+        </Box>
 
-      <Section title="Import from CSV">
-        <ImportPanel />
-      </Section>
+        <Box title="Export">
+          <div className="space-y-3">
+            <div className="text-sm text-muted">Download your whole collection as CSV: name, set, language, condition, grade, cost basis, current value (USD + EUR), gain/loss, date added.</div>
+            <a href={`/api/export?currency=${s.currency}`} className="inline-flex items-center justify-center rounded-xl bg-elev border border-line px-4 py-2.5 text-sm font-semibold">
+              Download CSV
+            </a>
+          </div>
+        </Box>
 
-      <Section title="Export">
-        <div className="card-surface rounded-2xl p-4 space-y-3">
-          <div className="text-sm text-muted">Download your whole collection as CSV: name, set, language, condition, grade, cost basis, current value (USD + EUR), gain/loss, date added.</div>
-          <a href={`/api/export?currency=${s.currency}`} className="inline-flex items-center justify-center rounded-xl bg-elev border border-line px-4 py-2.5 text-sm font-semibold">
-            Download CSV
-          </a>
-        </div>
-      </Section>
+        <Box title="Scanner">
+          <UpdateIndexPanel />
+        </Box>
 
-      <Section title="Scanner">
-        <UpdateIndexPanel />
-      </Section>
+        <section>
+          <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-2">Offline mode</h2>
+          <OfflineStatus />
+        </section>
 
-      <Section title="Offline mode">
-        <OfflineStatus />
-      </Section>
-
-      <Section title="Account">
-        <div className="card-surface rounded-2xl p-4">
+        <Box title="Account">
           <UserMenu />
-        </div>
-      </Section>
+        </Box>
+      </div>
     </div>
   );
 }
 
+
+function HidePricesToggle() {
+  const hidden = useHidePrices();
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl bg-elev border border-line px-3 py-2.5">
+      <div>
+        <div className="text-sm font-semibold">Hide prices</div>
+        <div className="text-xs text-muted">Show your binders at events without flashing values — amounts display as •••. Stored on this device only.</div>
+      </div>
+      <button
+        role="switch"
+        aria-checked={hidden}
+        aria-label="Hide prices"
+        onClick={() => {
+          setHidePrices(!hidden);
+          showToast(hidden ? "Prices visible" : "Prices hidden ✓", hidden ? "down" : "up");
+        }}
+        className={`relative shrink-0 h-7 w-12 rounded-full border transition-colors ${hidden ? "bg-accent border-accent" : "bg-elev border-line"}`}
+      >
+        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-fg transition-all ${hidden ? "left-6" : "left-1"}`} />
+      </button>
+    </div>
+  );
+}
 
 interface TcgcsvStatus {
   running: boolean;
@@ -283,7 +331,7 @@ function TcgcsvPanel() {
 
   const last = status?.last;
   return (
-    <div className="card-surface rounded-2xl p-4 space-y-3 text-sm">
+    <div className="space-y-3 text-sm">
       <div className="text-muted">
         Daily TCGPlayer prices for every card and sealed product, from tcgcsv.com (free, no key). Imported automatically every night; run it now for the first time.
       </div>
@@ -368,7 +416,7 @@ function ImportPanel() {
   }
 
   return (
-    <div className="card-surface rounded-2xl p-4 space-y-3 text-sm">
+    <div className="space-y-3 text-sm">
       <div className="text-muted">
         Bulk-load a spreadsheet. Columns are matched by name: <span className="font-mono text-fg">name</span> (required), <span className="font-mono text-fg">number</span>, <span className="font-mono text-fg">set</span>,{" "}
         <span className="font-mono text-fg">language</span> (EN/JP), <span className="font-mono text-fg">quantity</span>, <span className="font-mono text-fg">condition</span>, <span className="font-mono text-fg">cost</span>,{" "}
@@ -460,7 +508,7 @@ function UpdateIndexPanel() {
   }
 
   return (
-    <div className="card-surface rounded-2xl p-4 space-y-3 text-sm">
+    <div className="space-y-3 text-sm">
       <div className="text-muted">
         The card recognition model runs on-device (~20 MB, cached). Check for new card sets from PokéWallet, download images, compute embeddings with the existing model, and update the scanner index — no retraining needed.
       </div>

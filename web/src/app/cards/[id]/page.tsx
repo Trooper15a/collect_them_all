@@ -8,6 +8,7 @@ import { PriceChart } from "@/components/PriceChart";
 import { showToast } from "@/components/Toast";
 import { Button, CardImage, Empty, Money, Section, Segmented, Skeleton, TcgBadge } from "@/components/ui";
 import { RANGES, type Range, fmtMoney, rangeToDays } from "@/lib/format";
+import { useHidePrices } from "@/lib/ui-prefs";
 import { convert, type Rates } from "@/lib/fx";
 import { marketplaceLinks } from "@/lib/marketplace";
 import { type MarketPrices, type NormalizedCard, variantLabel } from "@/lib/types";
@@ -21,6 +22,8 @@ interface HistoryPoint {
 const GRADE_MULT: Record<string, number> = { "PSA 10": 3.0, "PSA 9": 1.4, "PSA 8": 1.0, "BGS 10": 4.5, "BGS 9.5": 2.5, "BGS 9": 1.3, "CGC 10": 2.8, "CGC 9.5": 1.6 };
 
 export default function CardPage() {
+  const hidePrices = useHidePrices();
+  const fm = (n: number | null | undefined, c?: string | null) => (hidePrices ? "•••" : fmtMoney(n, c ?? undefined));
   const { id } = useParams<{ id: string }>();
   const [card, setCard] = useState<NormalizedCard | null>(null);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
@@ -154,6 +157,7 @@ export default function CardPage() {
   const currency = active?.currency ?? "USD";
   const headline = active ? firstMarket(active) : null;
   const meta = (card.meta ?? {}) as Record<string, unknown>;
+  const isSealed = card.rarity === "Sealed" || meta.sealed === true;
   const displayCurrency = fx?.currency ?? currency;
   const toDisplay = (amount: number) => (fx ? convert(amount, currency, fx.currency, fx.rates) : amount);
 
@@ -190,7 +194,13 @@ export default function CardPage() {
         className="block w-[68%] mx-auto rounded-2xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
         aria-label="Zoom card image"
       >
-        <CardImage id={card.id} size="high" className="w-full" alt={card.name} />
+        {isSealed ? (
+          // sealed product shots aren't card-shaped — keep natural aspect
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={`/api/images/${encodeURIComponent(card.id)}?size=high`} alt={card.name} className="w-full object-contain bg-elev" />
+        ) : (
+          <CardImage id={card.id} size="high" className="w-full" alt={card.name} />
+        )}
       </button>
       <div className="text-center text-[10px] text-muted mt-1.5">Double-tap to zoom</div>
 
@@ -213,17 +223,19 @@ export default function CardPage() {
               { value: "cardmarket", label: `CardMarket${cm ? "" : " (n/a)"}` },
             ]}
           />
-          <Segmented
-            value={mode}
-            onChange={setMode}
-            size="xs"
-            options={[
-              { value: "raw", label: "Raw" },
-              { value: "graded", label: "Graded" },
-            ]}
-          />
+          {!isSealed && (
+            <Segmented
+              value={mode}
+              onChange={setMode}
+              size="xs"
+              options={[
+                { value: "raw", label: "Raw" },
+                { value: "graded", label: "Graded" },
+              ]}
+            />
+          )}
         </div>
-        <div className="mt-3 text-3xl font-bold tabular">{headline ? <Money amount={toDisplay(headline.amount)} currency={displayCurrency} /> : <span className="text-muted text-lg">No {market} pricing for this card</span>}</div>
+        <div className="mt-3 text-3xl font-bold tabular">{headline ? <Money amount={toDisplay(headline.amount)} currency={displayCurrency} /> : <span className="text-muted text-lg">No {market} pricing for this {isSealed ? "product" : "card"}</span>}</div>
         {headline && (
           <div className="text-xs text-muted">
             {variantLabel(headline.variant)} · market
@@ -270,18 +282,18 @@ export default function CardPage() {
                   <td className="py-1.5">{variantLabel(k)}</td>
                   {market === "tcgplayer" ? (
                     <>
-                      <td className="text-right text-muted">{fmtMoney(v.low, currency)}</td>
-                      <td className="text-right text-muted">{fmtMoney(v.mid, currency)}</td>
-                      <td className="text-right font-semibold">{fmtMoney(v.market, currency)}</td>
-                      <td className="text-right text-muted">{fmtMoney(v.high, currency)}</td>
+                      <td className="text-right text-muted">{fm(v.low, currency)}</td>
+                      <td className="text-right text-muted">{fm(v.mid, currency)}</td>
+                      <td className="text-right font-semibold">{fm(v.market, currency)}</td>
+                      <td className="text-right text-muted">{fm(v.high, currency)}</td>
                     </>
                   ) : (
                     <>
-                      <td className="text-right text-muted">{fmtMoney(v.low, currency)}</td>
-                      <td className="text-right font-semibold">{fmtMoney(v.trend ?? v.market, currency)}</td>
-                      <td className="text-right text-muted">{fmtMoney(v.market ?? v.avg1, currency)}</td>
+                      <td className="text-right text-muted">{fm(v.low, currency)}</td>
+                      <td className="text-right font-semibold">{fm(v.trend ?? v.market, currency)}</td>
+                      <td className="text-right text-muted">{fm(v.market ?? v.avg1, currency)}</td>
                       <td className="text-right text-muted">
-                        {fmtMoney(v.avg7, currency)} / {fmtMoney(v.avg30, currency)}
+                        {fm(v.avg7, currency)} / {fm(v.avg30, currency)}
                       </td>
                     </>
                   )}
@@ -298,7 +310,7 @@ export default function CardPage() {
               {Object.entries(GRADE_MULT).map(([g, m]) => (
                 <div key={g} className="flex justify-between rounded-xl bg-white/[0.03] border border-line px-3 py-2">
                   <span className="text-muted">{g}</span>
-                  <span className="font-semibold">{headline ? fmtMoney(toDisplay(headline.amount * m), displayCurrency) : "—"}</span>
+                  <span className="font-semibold">{headline ? fm(toDisplay(headline.amount * m), displayCurrency) : "—"}</span>
                 </div>
               ))}
             </div>
@@ -336,7 +348,7 @@ export default function CardPage() {
       <Section title="Sold listings">
         <div className="card-surface rounded-2xl p-4 space-y-2 text-sm">
           <a href={ebaySoldUrl(card)} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-xl bg-white/[0.03] border border-line px-3 py-2.5 hover:bg-white/[0.06]">
-            <span>eBay sold listings (raw)</span>
+            <span>eBay sold listings{isSealed ? "" : " (raw)"}</span>
             <span className="text-accent">↗</span>
           </a>
           {"tcgplayerUrl" in meta && typeof meta.tcgplayerUrl === "string" && (
@@ -345,6 +357,8 @@ export default function CardPage() {
               <span className="text-accent">↗</span>
             </a>
           )}
+          {!isSealed && (
+            <>
           <div className="mt-3 mb-1 text-xs font-semibold text-muted uppercase tracking-wider">PSA graded sold</div>
           <div className="grid grid-cols-5 gap-1.5">
             {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map((g) => (
@@ -369,6 +383,8 @@ export default function CardPage() {
               </a>
             ))}
           </div>
+            </>
+          )}
           <div className="text-xs text-muted mt-2">Opens eBay pre-filtered to sold and completed items, newest first.</div>
         </div>
       </Section>
@@ -419,10 +435,15 @@ export default function CardPage() {
       )}
       {zoom && (
         <button className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4" onClick={() => setZoom(false)}>
-          <CardImage id={card.id} size="high" className="max-h-full w-auto rounded-2xl" alt={card.name} />
+          {isSealed ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={`/api/images/${encodeURIComponent(card.id)}?size=high`} alt={card.name} className="max-h-full w-auto rounded-2xl" />
+          ) : (
+            <CardImage id={card.id} size="high" className="max-h-full w-auto rounded-2xl" alt={card.name} />
+          )}
         </button>
       )}
-      <AddToPortfolioSheet card={adding ? { id: card.id, name: card.name, setName: card.setName, prices: card.prices } : null} onClose={() => setAdding(false)} />
+      <AddToPortfolioSheet card={adding ? { id: card.id, name: card.name, setName: card.setName, prices: card.prices, sealed: isSealed } : null} onClose={() => setAdding(false)} />
     </div>
   );
 }
