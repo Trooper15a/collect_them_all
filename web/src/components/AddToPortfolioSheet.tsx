@@ -88,8 +88,9 @@ function Sheet({ card, onClose, onAdded }: { card: AddSheetCard; onClose: () => 
       let pid = portfolioId;
       if (pid === "new") {
         const r = await fetch("/api/portfolios", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: newName || "My Collection" }) });
-        if (!r.ok) throw new Error((await r.json()).error ?? "Could not create portfolio");
-        pid = (await r.json()).id as number;
+        const body = await r.json();
+        if (!r.ok) throw new Error(body.error ?? "Could not create portfolio");
+        pid = body.id as number;
       }
       const r = await fetch(`/api/portfolios/${pid}/items`, {
         method: "POST",

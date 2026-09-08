@@ -1,15 +1,17 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
+import { requireUserId } from "@/lib/auth";
 import { getCard } from "@/lib/cards";
 import { nowIso } from "@/lib/format";
 import { snapshotPortfolios } from "@/lib/portfolio";
 import { ItemBody } from "@/lib/validation";
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const userId = await requireUserId();
   const portfolioId = Number((await ctx.params).id);
   if (!Number.isInteger(portfolioId)) return NextResponse.json({ error: "Bad id" }, { status: 400 });
-  const portfolios = await db.select().from(schema.portfolios).where(eq(schema.portfolios.id, portfolioId)).limit(1);
+  const portfolios = await db.select().from(schema.portfolios).where(and(eq(schema.portfolios.id, portfolioId), eq(schema.portfolios.userId, userId))).limit(1);
   if (!portfolios[0]) return NextResponse.json({ error: "Portfolio not found" }, { status: 404 });
   const parsed = ItemBody.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
