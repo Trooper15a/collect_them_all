@@ -230,6 +230,19 @@ html.no-tabbar .pwa-banner {
   animation: rainbow-shift 4s ease infinite !important;
 }
 
+/* Rainbow color cycling for SVG icons (stroke="currentColor" can't use background-clip) */
+@keyframes icon-rainbow-cycle {
+  0%, 100% { color: #f472b6; }
+  16% { color: #a78bfa; }
+  33% { color: #60a5fa; }
+  50% { color: #34d399; }
+  66% { color: #fbbf24; }
+  83% { color: #fb923c; }
+}
+.icon-rainbow {
+  animation: icon-rainbow-cycle 4s ease infinite;
+}
+
 /* Border-accent → rainbow border */
 .border-accent {
   border-image: linear-gradient(135deg, #f472b6, #a78bfa, #60a5fa, #34d399, #fbbf24, #fb923c, #f472b6) 1 !important;

@@ -52,17 +52,17 @@ export function TabBar() {
               key={t.href}
               href={t.href}
               aria-current={active ? "page" : undefined}
-              className={`relative flex flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors ${active ? "text-rainbow" : "text-muted hover:text-fg"}`}
+              className={`relative flex flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors ${active ? "" : "text-muted hover:text-fg"}`}
             >
               <div className="relative">
-                <t.icon className="w-6 h-6" />
+                <t.icon className={`w-6 h-6 ${active ? "icon-rainbow" : ""}`} />
                 {badge > 0 && (
                   <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-down text-white text-[9px] font-bold px-1 anim-pop">
                     {badge}
                   </span>
                 )}
               </div>
-              {t.label}
+              <span className={active ? "text-rainbow" : ""}>{t.label}</span>
             </Link>
           );
         })}

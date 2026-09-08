@@ -163,34 +163,34 @@ export default function HomePage() {
       <div className="card-surface rounded-3xl p-4 mt-3 anim-widget d4">
         <div className="text-xs text-muted font-medium mb-3">Quick Actions</div>
         <div className="grid grid-cols-4 gap-2 stagger-children">
-          <ActionBtn href="/scan" label="Scan" color="accent">
+          <ActionBtn href="/scan" label="Scan">
             <path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" />
             <rect x="8" y="7" width="8" height="10" rx="1" />
           </ActionBtn>
-          <ActionBtn href="/portfolios" label="Binders" color="accent">
+          <ActionBtn href="/portfolios" label="Binders">
             <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
           </ActionBtn>
-          <ActionBtn href="/sets" label="Sets" color="accent">
+          <ActionBtn href="/sets" label="Sets">
             <rect x="4" y="4" width="7" height="7" rx="1.5" />
             <rect x="13" y="4" width="7" height="7" rx="1.5" />
             <rect x="4" y="13" width="7" height="7" rx="1.5" />
             <rect x="13" y="13" width="7" height="7" rx="1.5" />
           </ActionBtn>
-          <ActionBtn href="/shop" label="Shop" color="accent">
+          <ActionBtn href="/shop" label="Shop">
             <path d="M3 3h2l.4 2M7 13h10l4-8H5.4" />
             <circle cx="7.5" cy="19.5" r="1.5" />
             <circle cx="17.5" cy="19.5" r="1.5" />
           </ActionBtn>
         </div>
         <div className="grid grid-cols-3 gap-2 mt-2 stagger-children">
-          <ActionBtn href="/grade" label="Grader" color="accent">
+          <ActionBtn href="/grade" label="Grader">
             <circle cx="11" cy="11" r="8" />
             <path d="m21 21-4.35-4.35" />
           </ActionBtn>
-          <ActionBtn href="/wishlist" label="Wishlist" color="down">
+          <ActionBtn href="/wishlist" label="Wishlist">
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
           </ActionBtn>
-          <ActionBtn href="/opens" label="Box Opens" color="accent">
+          <ActionBtn href="/opens" label="Box Opens">
             <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
             <path d="m3.3 7 8.7 5 8.7-5M12 22V12" />
           </ActionBtn>
@@ -419,11 +419,11 @@ function StatWidget({ label, value }: { label: string; value: number }) {
   );
 }
 
-function ActionBtn({ href, label, color, children }: { href: string; label: string; color: string; children: React.ReactNode }) {
+function ActionBtn({ href, label, children }: { href: string; label: string; children: React.ReactNode }) {
   return (
     <Link href={href} className="flex flex-col items-center gap-1.5 tap-scale">
-      <div className={`w-12 h-12 rounded-2xl bg-${color}/10 border border-${color}/20 flex items-center justify-center`}>
-        <svg viewBox="0 0 24 24" className={`w-5 h-5 text-${color}`} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <div className="w-12 h-12 rounded-2xl bg-accent flex items-center justify-center">
+        <svg viewBox="0 0 24 24" className="w-5 h-5 text-black" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           {children}
         </svg>
       </div>
