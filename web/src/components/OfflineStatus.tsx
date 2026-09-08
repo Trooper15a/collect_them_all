@@ -95,7 +95,7 @@ export function OfflineBanner() {
   return (
     <div className="bg-accent/10 border border-accent/20 rounded-xl px-3 py-2 mb-3 flex items-center gap-2">
       <span className="inline-block w-2 h-2 rounded-full bg-down" />
-      <span className="text-xs text-fg">You're offline — using cached data</span>
+      <span className="text-xs text-fg">You&rsquo;re offline — using cached data</span>
     </div>
   );
 }
