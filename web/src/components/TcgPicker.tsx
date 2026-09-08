@@ -42,12 +42,12 @@ export function TcgPicker() {
         onClick={() => setOpen(true)}
         aria-label={`Change game — currently ${activeLabel}`}
         aria-haspopup="dialog"
-        className="fixed z-40 left-[max(env(safe-area-inset-left),12px)] top-[calc(max(env(safe-area-inset-top),12px)+56px)] w-10 h-10 rounded-xl glass shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex items-center justify-center text-fg tap-scale"
+        className="fixed z-40 left-[max(env(safe-area-inset-left),12px)] top-[calc(max(env(safe-area-inset-top),12px)+56px)] w-10 h-10 rounded-xl bg-white shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex items-center justify-center text-black tap-scale"
       >
         <CardsIcon className="w-5 h-5" />
         <span
           aria-hidden
-          className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#0a0e1a]"
+          className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white"
           style={{ background: activeAccent ?? ALL_ACCENT }}
         />
       </button>
@@ -102,7 +102,7 @@ function TcgRow({ label, accent, selected, onSelect }: { label: string; accent: 
         <span aria-hidden className="w-3.5 h-3.5 rounded-full flex-shrink-0" style={{ background: accent }} />
         <span className={`flex-1 min-w-0 truncate ${selected ? "font-semibold" : ""}`}>{label}</span>
         {selected && (
-          <svg viewBox="0 0 24 24" className="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-label="Selected">
+          <svg viewBox="0 0 24 24" className="w-5 h-5 icon-rainbow flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-label="Selected">
             <path d="M5 13l4 4L19 7" />
           </svg>
         )}
@@ -115,7 +115,7 @@ function CardsIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <rect x="7" y="5" width="12" height="16" rx="2" transform="rotate(6 13 13)" />
-      <rect x="4" y="3" width="12" height="16" rx="2" className="text-accent" stroke="currentColor" fill="var(--color-elev, #141a2e)" />
+      <rect x="4" y="3" width="12" height="16" rx="2" stroke="currentColor" fill="white" />
       <path d="M8 9h4M8 12.5h4" />
     </svg>
   );
