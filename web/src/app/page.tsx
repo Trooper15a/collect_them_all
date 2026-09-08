@@ -6,6 +6,7 @@ import { PriceChart } from "@/components/PriceChart";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { CardImage, Delta, Empty, Money, Segmented, Skeleton, TcgBadge } from "@/components/ui";
 import { RANGES, type Range } from "@/lib/format";
+import { useHidePrices } from "@/lib/ui-prefs";
 
 interface SlimItem {
   id: number;
@@ -61,6 +62,7 @@ export default function HomePage() {
   const [range, setRange] = useState<Range>("1M");
   const [data, setData] = useState<Dashboard | null>(null);
   const [alerts, setAlerts] = useState<AlertRow[]>([]);
+  const hidePrices = useHidePrices();
   const loadAlerts = () =>
     fetch("/api/alerts")
       .then((r) => r.json())
@@ -122,8 +124,13 @@ export default function HomePage() {
             </div>
           </div>
           {s.change24h !== 0 && (
-            <div className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold anim-pop ${s.change24h >= 0 ? "bg-up/15 text-up" : "bg-down/15 text-down"}`}>
-              {s.change24h >= 0 ? "▲" : "▼"} <Money amount={Math.abs(s.change24h)} currency={c} />
+            <div
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold anim-pop ${
+                hidePrices ? "bg-white/[0.06] text-muted" : s.change24h >= 0 ? "bg-up/15 text-up" : "bg-down/15 text-down"
+              }`}
+            >
+              {/* hide-prices: no ▲/▼ — the arrow alone leaks trend direction */}
+              {!hidePrices && (s.change24h >= 0 ? "▲" : "▼")} <Money amount={Math.abs(s.change24h)} currency={c} />
             </div>
           )}
         </div>

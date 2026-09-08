@@ -17,9 +17,16 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       ...(d.variantType !== undefined ? { variantType: d.variantType } : {}),
       ...(d.condition !== undefined ? { condition: d.condition } : {}),
       ...(d.isGraded !== undefined ? { isGraded: d.isGraded } : {}),
-      ...(d.gradingCompany !== undefined ? { gradingCompany: d.gradingCompany } : {}),
-      ...(d.grade !== undefined ? { grade: d.grade } : {}),
-      ...(d.certNumber !== undefined ? { certNumber: d.certNumber } : {}),
+      // Grading fields are only meaningful when graded — when a patch un-grades an
+      // item (e.g. a legacy sealed product), clear them atomically so the DB never
+      // holds is_graded=false alongside grading_company/grade/cert_number.
+      ...(d.isGraded === false
+        ? { gradingCompany: null, grade: null, certNumber: null }
+        : {
+            ...(d.gradingCompany !== undefined ? { gradingCompany: d.gradingCompany } : {}),
+            ...(d.grade !== undefined ? { grade: d.grade } : {}),
+            ...(d.certNumber !== undefined ? { certNumber: d.certNumber } : {}),
+          }),
       ...(d.costBasis !== undefined ? { costBasis: d.costBasis } : {}),
       ...(d.costCurrency !== undefined ? { costCurrency: d.costCurrency } : {}),
       ...(d.notes !== undefined ? { notes: d.notes } : {}),

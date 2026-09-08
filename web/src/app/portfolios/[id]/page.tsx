@@ -404,6 +404,9 @@ function EditItemSheet({ item, onClose, onSaved, onRemove }: { item: Item; onClo
     if (busy) return;
     setBusy(true);
     try {
+      // Sealed products can never be graded — gate every grading field on the
+      // effective value so we never send isGraded:false with grading data attached.
+      const effectiveGraded = sealed ? false : graded;
       const r = await fetch(`/api/items/${item.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -411,10 +414,10 @@ function EditItemSheet({ item, onClose, onSaved, onRemove }: { item: Item; onClo
           quantity,
           variantType: variant,
           condition,
-          isGraded: sealed ? false : graded,
-          gradingCompany: graded ? company : null,
-          grade: graded ? grade : null,
-          certNumber: graded ? cert || null : null,
+          isGraded: effectiveGraded,
+          gradingCompany: effectiveGraded ? company : null,
+          grade: effectiveGraded ? grade : null,
+          certNumber: effectiveGraded ? cert || null : null,
           costBasis: cost === "" ? null : Number(cost),
           costCurrency,
           notes: notes || null,

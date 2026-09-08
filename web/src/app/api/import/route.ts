@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { commitImport, previewImport, type ImportRow } from "@/lib/import";
+import { requireUserId } from "@/lib/auth";
 import { snapshotPortfolios } from "@/lib/portfolio";
 
 const Commit = z.object({
@@ -40,10 +41,13 @@ export async function POST(req: NextRequest) {
 
 /** PUT /api/import { rows, defaultPortfolio } -> writes the matched rows */
 export async function PUT(req: NextRequest) {
+  // Resolve the signed-in user like the other user-scoped routes so the imported
+  // portfolio is immediately visible (no NULL userId waiting on claimOrphanData).
+  const userId = await requireUserId();
   const parsed = Commit.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Validation failed" }, { status: 400 });
   try {
-    const result = await commitImport(parsed.data.rows, parsed.data.defaultPortfolio);
+    const result = await commitImport(parsed.data.rows, parsed.data.defaultPortfolio, userId);
     snapshotPortfolios().catch(() => undefined);
     return NextResponse.json(result);
   } catch (e) {

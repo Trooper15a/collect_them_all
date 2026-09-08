@@ -9,6 +9,7 @@ import { SetLogo } from "@/components/SetLogo";
 import { CardImage, Empty, Money, Segmented, Skeleton } from "@/components/ui";
 import { langLabel } from "@/lib/format";
 import { tcgplayerSearchUrl } from "@/lib/marketplace";
+import type { CardPrices } from "@/lib/types";
 
 interface SetCard {
   id: string;
@@ -22,6 +23,7 @@ interface SealedProduct {
   id: string;
   name: string;
   price: number | null;
+  prices?: CardPrices;
   owned: number;
 }
 interface Data {
@@ -187,7 +189,7 @@ export default function SetPage() {
                     <span>Sealed</span>
                     <span className="tabular">{p.price != null ? <Money amount={p.price} currency={currency} /> : "—"}</span>
                   </div>
-                  <button onClick={() => setAdding({ id: p.id, name: p.name, setName: set.name, sealed: true })} className="mt-1 w-full min-h-8 text-[11px] font-semibold text-accent bg-accent/10 rounded-md py-1">
+                  <button onClick={() => setAdding({ id: p.id, name: p.name, setName: set.name, sealed: true, prices: p.prices })} className="mt-1 w-full min-h-8 text-[11px] font-semibold text-accent bg-accent/10 rounded-md py-1">
                     {p.owned > 0 ? "+ More" : "+ Add"}
                   </button>
                   {p.owned === 0 && (
