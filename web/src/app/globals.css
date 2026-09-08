@@ -147,11 +147,17 @@ html.no-tabbar .pwa-banner {
   animation: shimmer 1.4s infinite;
 }
 
-/* Primary button — brand blue gradient (class name kept for compatibility) */
+/* Primary button — animated rainbow / holographic pastel gradient */
+@keyframes rainbow-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
 .btn-rainbow {
-  background: linear-gradient(135deg, #3b82f6, #60a5fa);
-  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.35);
-  color: #fff;
+  background: linear-gradient(135deg, #f472b6, #a78bfa, #60a5fa, #34d399, #fbbf24, #fb923c, #f472b6);
+  background-size: 300% 300%;
+  animation: rainbow-shift 4s ease infinite;
+  color: #000;
   font-weight: 700;
   border: none;
   position: relative;
@@ -338,6 +344,9 @@ html.no-tabbar .pwa-banner {
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
+  .btn-rainbow {
+    animation: none !important;
+  }
   .animate-marquee, .marquee-track {
     animation: none !important;
   }
