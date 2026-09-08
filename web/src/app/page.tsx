@@ -77,7 +77,10 @@ export default function HomePage() {
         if (!r.ok) throw new Error((await r.json()).error ?? "Failed");
         return r.json();
       })
-      .then(setData)
+      .then((d) => {
+        if (!d || !d.summary || !Array.isArray(d.series)) throw new Error("Couldn't load your dashboard. Pull to retry.");
+        setData(d);
+      })
       .catch((e) => setError(e.message));
   }, [range]);
 
@@ -97,7 +100,7 @@ export default function HomePage() {
   const s = data.summary;
   const c = data.currency;
   const empty = s.uniqueCount === 0;
-  const movers = [...data.trending].slice(0, 5);
+  const movers = [...(data.trending ?? [])].slice(0, 5);
   const triggeredAlerts = alerts.filter((a) => a.triggered);
 
   return (
@@ -297,11 +300,11 @@ export default function HomePage() {
       )}
 
       {/* ── Widget: Most Valuable ── */}
-      {!empty && data.mostValuable.length > 0 && (
+      {!empty && (data.mostValuable ?? []).length > 0 && (
         <div className="card-surface rounded-3xl p-4 mt-3 anim-widget d7">
           <div className="text-xs text-muted font-medium mb-3">Most Valuable</div>
           <ul className="space-y-1 stagger-children">
-            {data.mostValuable.slice(0, 5).map((i) => (
+            {(data.mostValuable ?? []).slice(0, 5).map((i) => (
               <li key={i.id}>
                 <Link href={`/cards/${encodeURIComponent(i.cardId)}`} className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.03] tap-scale">
                   <CardImage id={i.cardId} className="w-9 rounded-md" alt="" />

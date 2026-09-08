@@ -20,13 +20,18 @@ interface Settings {
 
 export default function SettingsPage() {
   const [s, setS] = useState<Settings | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshMsg, setRefreshMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     fetch("/api/settings")
-      .then((r) => r.json())
-      .then(setS);
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed");
+        return r.json();
+      })
+      .then(setS)
+      .catch(() => setLoadError("Couldn't load settings. Check your connection and try again."));
   }, []);
 
   async function patch(p: Partial<Settings>) {
@@ -93,6 +98,13 @@ export default function SettingsPage() {
       setBusy(false);
     }
   }
+
+  if (loadError)
+    return (
+      <div className="pt-4">
+        <div className="card-surface rounded-2xl p-4 text-sm text-down">{loadError}</div>
+      </div>
+    );
 
   if (!s)
     return (
@@ -174,7 +186,7 @@ export default function SettingsPage() {
           <div className="flex justify-between text-muted">
             <span>Requests left</span>
             <span className="tabular">
-              {s.pokewalletBudget.hour}/hr · {s.pokewalletBudget.day}/day
+              {s.pokewalletBudget?.hour ?? "—"}/hr · {s.pokewalletBudget?.day ?? "—"}/day
             </span>
           </div>
           {!s.pokewalletConfigured && <div className="text-xs text-muted">Add POKEWALLET_API_KEY to web/.env.local and restart the server to enable Pokémon search and images.</div>}
@@ -247,8 +259,8 @@ function TcgcsvPanel() {
       .then((r) => r.json())
       .then((d) => {
         setStatus(d.status);
-        setCats(d.categories);
-        setSelected((cur) => (cur.length ? cur : d.defaults));
+        setCats(d.categories ?? []);
+        setSelected((cur) => (cur.length ? cur : (d.defaults ?? [])));
       })
       .catch(() => undefined);
 
