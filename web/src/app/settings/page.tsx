@@ -6,6 +6,7 @@ import { OfflineStatus } from "@/components/OfflineStatus";
 import { showToast } from "@/components/Toast";
 import { UserMenu } from "@/components/UserMenu";
 import { CURRENCIES } from "@/lib/types";
+import { setHidePrices, useHidePrices } from "@/lib/ui-prefs";
 
 interface Settings {
   currency: string;
@@ -153,6 +154,9 @@ export default function SettingsPage() {
               ))}
             </div>
           </Field>
+          <div className="col-span-2">
+            <HidePricesToggle />
+          </div>
           <div className="col-span-2 text-xs text-muted">FX rates from the European Central Bank as of {s.fxDate}. Japanese cards (CardMarket EUR) convert at this rate.</div>
         </div>
       </Section>
@@ -241,6 +245,30 @@ export default function SettingsPage() {
   );
 }
 
+
+function HidePricesToggle() {
+  const hidden = useHidePrices();
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl bg-elev border border-line px-3 py-2.5">
+      <div>
+        <div className="text-sm font-semibold">Hide prices</div>
+        <div className="text-xs text-muted">Show your binders at events without flashing values — amounts display as •••. Stored on this device only.</div>
+      </div>
+      <button
+        role="switch"
+        aria-checked={hidden}
+        aria-label="Hide prices"
+        onClick={() => {
+          setHidePrices(!hidden);
+          showToast(hidden ? "Prices visible" : "Prices hidden ✓", hidden ? "down" : "up");
+        }}
+        className={`relative shrink-0 h-7 w-12 rounded-full border transition-colors ${hidden ? "bg-accent border-accent" : "bg-elev border-line"}`}
+      >
+        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-fg transition-all ${hidden ? "left-6" : "left-1"}`} />
+      </button>
+    </div>
+  );
+}
 
 interface TcgcsvStatus {
   running: boolean;
