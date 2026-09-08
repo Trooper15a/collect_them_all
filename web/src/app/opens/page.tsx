@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { showToast } from "@/components/Toast";
 import { Button, Empty, Money, Skeleton, inputCls, Field } from "@/components/ui";
 
 const PRODUCT_TYPES = [
@@ -36,33 +37,59 @@ export default function OpensPage() {
   const [newCost, setNewCost] = useState("");
   const [newCurrency, setNewCurrency] = useState("CAD");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = () =>
     fetch("/api/opens")
-      .then((r) => r.json())
+      .then(async (r) => {
+        if (!r.ok) throw new Error("Failed to load box opens");
+        return r.json();
+      })
       .then((d) => {
         setOpens(d.opens);
         setCurrency(d.currency);
+        setError(null);
       })
-      .catch(() => undefined);
+      .catch((e) => setError(e.message));
 
   useEffect(() => { load(); }, []);
 
   async function create() {
-    if (!newName.trim() || !newCost) return;
+    if (busy || !newName.trim() || !newCost) return;
     setBusy(true);
-    await fetch("/api/opens", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newName.trim(), productType: newType, cost: Number(newCost), costCurrency: newCurrency }),
-    });
-    setBusy(false);
-    setShowNew(false);
-    setNewName("");
-    setNewCost("");
-    load();
+    try {
+      const r = await fetch("/api/opens", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName.trim(), productType: newType, cost: Number(newCost), costCurrency: newCurrency }),
+      });
+      if (!r.ok) {
+        showToast("Create failed — try again", "down");
+        return;
+      }
+      setShowNew(false);
+      setNewName("");
+      setNewCost("");
+      showToast("Open logged ✓", "up");
+      load();
+    } catch {
+      showToast("Create failed — try again", "down");
+    } finally {
+      setBusy(false);
+    }
   }
 
+  if (error && !opens)
+    return (
+      <div className="pt-4">
+        <Empty>
+          <div>{error}</div>
+          <Button variant="ghost" className="mt-3 px-3 py-1.5 text-xs" onClick={() => { setError(null); load(); }}>
+            Retry
+          </Button>
+        </Empty>
+      </div>
+    );
   if (!opens) return <div className="pt-4 space-y-3"><Skeleton className="h-28" /><Skeleton className="h-28" /></div>;
 
   const totals = opens.reduce((acc, o) => ({ cost: acc.cost + o.cost, value: acc.value + o.totalValue }), { cost: 0, value: 0 });
@@ -131,7 +158,7 @@ export default function OpensPage() {
 
       {opens.length === 0 ? (
         <Empty>
-          No box opens yet. Tap "+ New open" to log your first sealed product opening and track your pulls.
+          No box opens yet. Tap &quot;+ New open&quot; to log your first sealed product opening and track your pulls.
         </Empty>
       ) : (
         <ul className="space-y-3">

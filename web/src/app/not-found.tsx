@@ -20,7 +20,7 @@ export default function NotFound() {
           href="/landing"
           className="inline-flex items-center justify-center gap-2 rounded-xl border border-line px-6 py-3 text-base font-semibold hover:bg-white/[0.04] transition-colors"
         >
-          About RipnPull
+          Back to home
         </Link>
       </div>
     </div>

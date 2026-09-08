@@ -77,6 +77,12 @@ export function Scanner({ onMatches, onClose, bulkMode, bulkCount }: { onMatches
     }
   }
 
+  // Accepting the live match takes the same path as "Identify card".
+  function acceptLive() {
+    if (busy || live.length === 0) return;
+    onMatches(live);
+  }
+
   const top = live[0];
   const confident = top && top.score > 0.8;
 
@@ -95,8 +101,20 @@ export function Scanner({ onMatches, onClose, bulkMode, bulkCount }: { onMatches
           </div>
         </div>
         {top && (
-          <div className="absolute bottom-4 inset-x-4 glass rounded-2xl p-3">
-            <div className="text-[10px] uppercase tracking-wider text-muted">Live match · {(top.score * 100).toFixed(0)}%</div>
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={acceptLive}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                acceptLive();
+              }
+            }}
+            aria-label={`Accept match ${top.card.name}`}
+            className="absolute bottom-4 inset-x-4 glass rounded-2xl p-3 text-left cursor-pointer transition-colors hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-accent"
+          >
+            <div className="text-[10px] uppercase tracking-wider text-muted">Live match · {(top.score * 100).toFixed(0)}% · tap to accept</div>
             <div className={`font-semibold ${confident ? "text-up" : ""}`}>{top.card.name}</div>
             <div className="text-xs text-muted">
               {top.card.setName ?? top.card.set} #{top.card.num} · {top.card.lang?.toUpperCase()}

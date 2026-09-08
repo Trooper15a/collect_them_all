@@ -1,10 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AddToPortfolioSheet } from "@/components/AddToPortfolioSheet";
+import { BackLink } from "@/components/BackLink";
 import { PriceChart } from "@/components/PriceChart";
+import { showToast } from "@/components/Toast";
 import { Button, CardImage, Empty, Money, Section, Segmented, Skeleton, TcgBadge } from "@/components/ui";
 import { RANGES, type Range, fmtMoney, rangeToDays } from "@/lib/format";
 import { convert, type Rates } from "@/lib/fx";
@@ -36,6 +37,7 @@ export default function CardPage() {
   const [alertOpen, setAlertOpen] = useState(false);
   const [threshold, setThreshold] = useState("10");
   const [wishlisted, setWishlisted] = useState(false);
+  const [wishBusy, setWishBusy] = useState(false);
   const lastTap = useRef(0);
 
   const loadAlert = () =>
@@ -48,17 +50,32 @@ export default function CardPage() {
       })
       .catch(() => setAlert(null));
   async function saveAlert() {
-    await fetch("/api/alerts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cardId: id, thresholdPct: Number(threshold) || 10 }) });
-    setAlertOpen(false);
-    loadAlert();
+    const pct = Number(threshold);
+    if (!Number.isFinite(pct) || pct < 1 || pct > 95) return;
+    try {
+      const r = await fetch("/api/alerts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cardId: id, thresholdPct: pct }) });
+      if (!r.ok) throw new Error("Failed");
+      setAlertOpen(false);
+      showToast("Alert saved ✓", "up");
+      loadAlert();
+    } catch {
+      showToast("Save failed — try again", "down");
+    }
   }
   async function removeAlert() {
-    if (alert) await fetch(`/api/alerts/${alert.id}`, { method: "DELETE" });
-    setAlertOpen(false);
-    loadAlert();
+    if (!alert) return;
+    try {
+      const r = await fetch(`/api/alerts/${alert.id}`, { method: "DELETE" });
+      if (!r.ok) throw new Error("Failed");
+      setAlertOpen(false);
+      showToast("Alert removed", "info");
+      loadAlert();
+    } catch {
+      showToast("Delete failed — try again", "down");
+    }
   }
 
-  const load = (refresh = false) =>
+  const load = (refresh = false): Promise<boolean> =>
     fetch(`/api/cards/${encodeURIComponent(id)}${refresh ? "?refresh=1" : ""}`)
       .then(async (r) => {
         if (!r.ok) throw new Error((await r.json()).error ?? "Failed");
@@ -69,8 +86,12 @@ export default function CardPage() {
         setHistory(d.history ?? []);
         if (d.fx && d.displayCurrency) setFx({ rates: d.fx, currency: d.displayCurrency });
         if (!d.card.prices.tcgplayer && d.card.prices.cardmarket) setMarket("cardmarket");
+        return true;
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => {
+        if (!refresh) setError((e as Error).message);
+        return false;
+      });
 
   const loadWishlist = () =>
     fetch("/api/wishlist")
@@ -81,12 +102,24 @@ export default function CardPage() {
       })
       .catch(() => undefined);
   const toggleWishlist = async () => {
-    if (wishlisted) {
-      await fetch("/api/wishlist", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cardId: id }) });
-    } else {
-      await fetch("/api/wishlist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cardId: id }) });
+    if (wishBusy) return; // guard double-tap
+    setWishBusy(true);
+    const addingNow = !wishlisted;
+    setWishlisted((prev) => !prev); // optimistic
+    try {
+      const r = await fetch("/api/wishlist", {
+        method: addingNow ? "POST" : "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cardId: id }),
+      });
+      if (!r.ok) throw new Error("Failed");
+      showToast(addingNow ? "Added to wishlist ✓" : "Removed from wishlist", addingNow ? "up" : "info");
+    } catch {
+      setWishlisted((prev) => !prev); // revert
+      showToast("Save failed — try again", "down");
+    } finally {
+      setWishBusy(false);
     }
-    setWishlisted(!wishlisted);
   };
 
   useEffect(() => {
@@ -127,20 +160,22 @@ export default function CardPage() {
   return (
     <div>
       <header className="pt-2 pb-3 flex items-center gap-3">
-        <Link href="/scan" className="text-muted text-sm">
-          ‹ Back
-        </Link>
+        <BackLink fallback="/scan" label="Back" />
         <div className="flex-1" />
         <button onClick={() => setAlertOpen(true)} className={`text-xs mr-3 ${alert ? "text-accent" : "text-muted"}`} aria-label="Price alert">
           {alert ? `🔔 ±${alert.thresholdPct}%` : "🔕 Alert"}
         </button>
         <button
           onClick={async () => {
+            if (refreshing) return;
             setRefreshing(true);
-            await load(true);
+            const ok = await load(true);
             setRefreshing(false);
+            if (ok) showToast("Price updated", "up");
+            else showToast("Refresh failed — try again", "down");
           }}
           className="text-xs text-muted"
+          disabled={refreshing}
         >
           {refreshing ? "Refreshing…" : "Refresh price"}
         </button>
@@ -153,9 +188,11 @@ export default function CardPage() {
           lastTap.current = now;
         }}
         className="block w-[68%] mx-auto rounded-2xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
+        aria-label="Zoom card image"
       >
         <CardImage id={card.id} size="high" className="w-full" alt={card.name} />
       </button>
+      <div className="text-center text-[10px] text-muted mt-1.5">Double-tap to zoom</div>
 
       <div className="mt-4">
         <TcgBadge tcg={card.tcg} lang={card.language} />
@@ -338,7 +375,7 @@ export default function CardPage() {
 
       <div className="fixed bottom-[92px] inset-x-0 px-4 pointer-events-none">
         <div className="max-w-3xl mx-auto flex justify-end gap-2">
-          <button onClick={toggleWishlist} className={`pointer-events-auto w-12 h-12 rounded-full border flex items-center justify-center text-lg shadow-lg ${wishlisted ? "bg-down/20 border-down/40 text-down" : "bg-elev border-line text-muted"}`} aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}>
+          <button onClick={toggleWishlist} disabled={wishBusy} className={`pointer-events-auto w-12 h-12 rounded-full border flex items-center justify-center text-lg shadow-lg disabled:opacity-50 ${wishlisted ? "bg-down/20 border-down/40 text-down" : "bg-elev border-line text-muted"}`} aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}>
             {wishlisted ? "♥" : "♡"}
           </button>
           <Button variant="rainbow" className="pointer-events-auto shadow-[0_10px_30px_rgba(167,139,250,0.3)]" onClick={() => setAdding(true)}>
@@ -354,20 +391,29 @@ export default function CardPage() {
             <div className="font-semibold text-lg">Price alert</div>
             <div className="text-xs text-muted mb-3">Show a badge on the dashboard when this card moves more than this much from its price today.</div>
             <label className="block text-xs text-muted mb-1">Threshold (%)</label>
-            <input type="number" min={1} step={1} inputMode="numeric" value={threshold} onChange={(e) => setThreshold(e.target.value)} className="w-full rounded-xl bg-elev border border-line px-3 py-2.5 text-sm outline-none focus:border-accent/60" />
-            <div className="mt-4 flex gap-2">
-              {alert && (
-                <Button variant="danger" onClick={removeAlert}>
-                  Remove
-                </Button>
-              )}
-              <Button variant="ghost" className="flex-1" onClick={() => setAlertOpen(false)}>
-                Cancel
-              </Button>
-              <Button className="flex-1" onClick={saveAlert}>
-                Save alert
-              </Button>
-            </div>
+            <input type="number" min={1} max={95} step={1} inputMode="numeric" value={threshold} onChange={(e) => setThreshold(e.target.value)} autoFocus className="w-full rounded-xl bg-elev border border-line px-3 py-2.5 text-sm outline-none focus:border-accent/60" />
+            {(() => {
+              const pct = Number(threshold);
+              const valid = Number.isFinite(pct) && pct >= 1 && pct <= 95;
+              return (
+                <>
+                  {!valid && <div className="text-xs text-down mt-1">Enter a value between 1 and 95.</div>}
+                  <div className="mt-4 flex gap-2">
+                    {alert && (
+                      <Button variant="danger" onClick={removeAlert}>
+                        Remove
+                      </Button>
+                    )}
+                    <Button variant="ghost" className="flex-1" onClick={() => setAlertOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button className="flex-1" onClick={saveAlert} disabled={!valid}>
+                      Save alert
+                    </Button>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}

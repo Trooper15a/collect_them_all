@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { fmtMoney, fmtPct, fmtSigned, langLabel } from "@/lib/format";
 import { TCGS } from "@/lib/types";
 
@@ -21,8 +22,18 @@ export function Delta({ amount, pct, currency = "USD", className = "" }: { amoun
 }
 
 export function CardImage({ id, size = "low", className = "", alt = "" }: { id: string; size?: "low" | "high"; className?: string; alt?: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <div
+        aria-hidden
+        className={`bg-gradient-to-br from-[#1b2436] to-[#0b0f1a] border border-line ${className}`}
+        style={{ aspectRatio: "63/88" }}
+      />
+    );
+  }
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={`/api/images/${encodeURIComponent(id)}?size=${size}`} alt={alt} loading="lazy" className={`object-cover bg-elev ${className}`} style={{ aspectRatio: "63/88" }} />;
+  return <img src={`/api/images/${encodeURIComponent(id)}?size=${size}`} alt={alt} loading="lazy" onError={() => setFailed(true)} className={`object-cover bg-elev ${className}`} style={{ aspectRatio: "63/88" }} />;
 }
 
 export function TcgBadge({ tcg, lang }: { tcg: string; lang?: string | null }) {

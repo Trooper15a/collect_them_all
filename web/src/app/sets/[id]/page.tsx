@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { AddToPortfolioSheet, type AddSheetCard } from "@/components/AddToPortfolioSheet";
+import { BackLink } from "@/components/BackLink";
 import { SetLogo } from "@/components/SetLogo";
 import { CardImage, Empty, Money, Segmented, Skeleton } from "@/components/ui";
 import { langLabel } from "@/lib/format";
@@ -24,7 +25,7 @@ interface Data {
   completion: { owned: number; total: number; pct: number; missingCost: number; totalValue: number };
 }
 
-type Sort = "number" | "name" | "price-desc" | "price-asc" | "rarity";
+type Sort = "number" | "name" | "price-desc" | "price-asc";
 
 export default function SetPage() {
   const { id } = useParams<{ id: string }>();
@@ -54,7 +55,6 @@ export default function SetPage() {
     if (sort === "name") sorted.sort((a, b) => a.name.localeCompare(b.name));
     else if (sort === "price-desc") sorted.sort((a, b) => (b.price ?? 0) - (a.price ?? 0));
     else if (sort === "price-asc") sorted.sort((a, b) => (a.price ?? 0) - (b.price ?? 0));
-    else if (sort === "rarity") sorted.sort((a, b) => (b.price ?? 0) - (a.price ?? 0));
     return sorted;
   }, [data, filter, sort]);
 
@@ -71,9 +71,7 @@ export default function SetPage() {
   return (
     <div>
       <header className="pt-2 pb-3 flex items-center gap-3">
-        <Link href="/sets" className="text-muted text-sm">
-          ‹ Sets
-        </Link>
+        <BackLink fallback="/sets" label="Sets" />
       </header>
       <div className="card-surface rounded-3xl p-4 flex items-center gap-4">
         <SetLogo id={set.id} code={set.code} className="w-20 h-14" />
@@ -151,11 +149,11 @@ export default function SetPage() {
                 <span>#{card.cardNumber}</span>
                 <span className="tabular">{card.price != null ? <Money amount={card.price} currency={currency} /> : "—"}</span>
               </div>
-              <button onClick={() => setAdding({ id: card.id, name: card.name, setName: set.name })} className="mt-1 w-full text-[10px] font-semibold text-accent bg-accent/10 rounded-md py-0.5">
+              <button onClick={() => setAdding({ id: card.id, name: card.name, setName: set.name })} className="mt-1 w-full min-h-8 text-[11px] font-semibold text-accent bg-accent/10 rounded-md py-1">
                 {card.owned > 0 ? "+ More" : "+ Add"}
               </button>
               {card.owned === 0 && (
-                <a href={tcgplayerSearchUrl(card.name)} target="_blank" rel="noreferrer" className="mt-0.5 block w-full text-center text-[10px] text-muted hover:text-accent">
+                <a href={tcgplayerSearchUrl(card.name)} target="_blank" rel="noreferrer" className="mt-0.5 flex w-full min-h-8 items-center justify-center text-center text-[11px] text-muted hover:text-accent">
                   Buy ↗
                 </a>
               )}

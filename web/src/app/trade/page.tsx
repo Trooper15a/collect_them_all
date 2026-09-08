@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { CardImage, Money, Section } from "@/components/ui";
+
+const STORAGE_KEY = "rnp-trade";
 
 interface SearchResult {
   id: string;
@@ -18,9 +20,40 @@ interface TradeCard extends SearchResult {
   quantity: number;
 }
 
+function loadSaved(side: "giving" | "getting"): TradeCard[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const saved = JSON.parse(raw) as { giving?: TradeCard[]; getting?: TradeCard[] };
+      const list = saved[side];
+      if (Array.isArray(list)) return list;
+    }
+  } catch {
+    /* ignore corrupt state */
+  }
+  return [];
+}
+
 export default function TradePage() {
-  const [giving, setGiving] = useState<TradeCard[]>([]);
-  const [getting, setGetting] = useState<TradeCard[]>([]);
+  const [giving, setGiving] = useState<TradeCard[]>(() => loadSaved("giving"));
+  const [getting, setGetting] = useState<TradeCard[]>(() => loadSaved("getting"));
+
+  // Persist on change.
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ giving, getting }));
+    } catch {
+      /* storage full / unavailable */
+    }
+  }, [giving, getting]);
+
+  const reset = () => {
+    setGiving([]);
+    setGetting([]);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {}
+  };
 
   const giveTotal = giving.reduce((s, c) => s + (c.price?.amount ?? 0) * c.quantity, 0);
   const getTotal = getting.reduce((s, c) => s + (c.price?.amount ?? 0) * c.quantity, 0);
@@ -57,7 +90,14 @@ export default function TradePage() {
 
   return (
     <div className="py-6 space-y-6">
-      <h1 className="text-2xl font-bold">Trade Analyzer</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold">Trade Analyzer</h1>
+        {(giving.length > 0 || getting.length > 0) && (
+          <button onClick={reset} className="text-xs text-muted hover:text-down transition-colors px-2 py-1 rounded-lg">
+            Reset
+          </button>
+        )}
+      </div>
       <p className="text-sm text-muted">Compare card values to evaluate trade fairness. Search and add cards to each side.</p>
 
       {/* Verdict banner */}
@@ -122,14 +162,16 @@ function TradeSide({
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => onQty(c.id, c.quantity - 1)}
-                className="w-6 h-6 rounded-md bg-white/[0.05] text-xs font-bold hover:bg-white/[0.1] transition-colors"
+                aria-label={`Decrease quantity of ${c.name}`}
+                className="w-8 h-8 rounded-md bg-white/[0.05] text-sm font-bold hover:bg-white/[0.1] transition-colors"
               >
                 -
               </button>
               <span className="text-xs font-semibold tabular w-5 text-center">{c.quantity}</span>
               <button
                 onClick={() => onQty(c.id, c.quantity + 1)}
-                className="w-6 h-6 rounded-md bg-white/[0.05] text-xs font-bold hover:bg-white/[0.1] transition-colors"
+                aria-label={`Increase quantity of ${c.name}`}
+                className="w-8 h-8 rounded-md bg-white/[0.05] text-sm font-bold hover:bg-white/[0.1] transition-colors"
               >
                 +
               </button>
@@ -160,6 +202,7 @@ function CardSearch({ onSelect }: { onSelect: (c: SearchResult) => void }) {
   const [loading, setLoading] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const containerRef = useRef<HTMLDivElement>(null);
+  const listboxId = useId();
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -194,12 +237,25 @@ function CardSearch({ onSelect }: { onSelect: (c: SearchResult) => void }) {
         value={query}
         onChange={(e) => { setQuery(e.target.value); search(e.target.value); }}
         onFocus={() => results.length > 0 && setOpen(true)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") setOpen(false);
+          else if (e.key === "Enter" && open && results.length > 0) {
+            e.preventDefault();
+            onSelect(results[0]);
+            setQuery("");
+            setResults([]);
+            setOpen(false);
+          }
+        }}
+        aria-expanded={open && results.length > 0}
+        aria-controls={listboxId}
+        role="combobox"
         placeholder="Search cards..."
         className="w-full rounded-lg bg-white/[0.04] border border-line px-3 py-2 text-sm focus:outline-none focus:border-accent"
       />
       {loading && <div className="absolute right-3 top-2.5 text-xs text-muted">...</div>}
       {open && results.length > 0 && (
-        <div className="absolute z-20 top-full left-0 right-0 mt-1 rounded-xl bg-elev border border-line shadow-xl max-h-60 overflow-y-auto">
+        <div id={listboxId} role="listbox" className="absolute z-20 top-full left-0 right-0 mt-1 rounded-xl bg-elev border border-line shadow-xl max-h-60 overflow-y-auto">
           {results.map((r) => (
             <button
               key={r.id}

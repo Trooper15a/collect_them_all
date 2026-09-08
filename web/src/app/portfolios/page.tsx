@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { PullToRefresh } from "@/components/PullToRefresh";
+import { showToast } from "@/components/Toast";
 import { Button, Delta, Empty, Field, Money, Skeleton, inputCls } from "@/components/ui";
 import { TCGS } from "@/lib/types";
 
@@ -32,28 +33,61 @@ export default function PortfoliosPage() {
   const [tcgId, setTcgId] = useState<string>("");
   const [language, setLanguage] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const load = useCallback(() => {
     fetch("/api/portfolios")
-      .then((r) => r.json())
-      .then(setData)
+      .then(async (r) => {
+        if (!r.ok) throw new Error("Failed to load binders");
+        return r.json();
+      })
+      .then((d) => {
+        setData(d);
+        setError(null);
+      })
       .catch((e) => setError(e.message));
   }, []);
   useEffect(load, [load]);
 
   async function create() {
+    if (busy || !name.trim()) return;
+    setBusy(true);
     setError(null);
-    const r = await fetch("/api/portfolios", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, tcgId: tcgId || null, language: language || null }),
-    });
-    if (!r.ok) return setError((await r.json()).error ?? "Failed");
-    setName("");
-    setCreating(false);
-    load();
+    try {
+      const r = await fetch("/api/portfolios", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, tcgId: tcgId || null, language: language || null }),
+      });
+      if (!r.ok) {
+        const msg = (await r.json()).error ?? "Failed";
+        setError(msg);
+        showToast("Create failed — try again", "down");
+        return;
+      }
+      setName("");
+      setCreating(false);
+      showToast("Binder created ✓", "up");
+      load();
+    } catch {
+      setError("Network error — try again");
+      showToast("Create failed — try again", "down");
+    } finally {
+      setBusy(false);
+    }
   }
 
+  if (error && !data)
+    return (
+      <div className="pt-4">
+        <Empty>
+          <div>{error}</div>
+          <Button variant="ghost" className="mt-3 px-3 py-1.5 text-xs" onClick={() => { setError(null); load(); }}>
+            Retry
+          </Button>
+        </Empty>
+      </div>
+    );
   if (!data)
     return (
       <div className="space-y-3 pt-4">
@@ -83,7 +117,7 @@ export default function PortfoliosPage() {
         <div className="card-surface rounded-2xl p-4 mb-4 grid grid-cols-2 gap-3">
           <div className="col-span-2">
             <Field label="Name">
-              <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="Japanese Promos" autoFocus />
+              <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && create()} placeholder="Japanese Promos" autoFocus />
             </Field>
           </div>
           <Field label="TCG (optional)">
@@ -104,8 +138,8 @@ export default function PortfoliosPage() {
             </select>
           </Field>
           {error && <div className="col-span-2 text-sm text-down">{error}</div>}
-          <Button variant="rainbow" className="col-span-2" onClick={create} disabled={!name.trim()}>
-            Create portfolio
+          <Button variant="rainbow" className="col-span-2" onClick={create} disabled={busy || !name.trim()}>
+            {busy ? "Creating…" : "Create portfolio"}
           </Button>
         </div>
       )}

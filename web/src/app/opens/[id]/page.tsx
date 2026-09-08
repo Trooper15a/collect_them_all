@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { BackLink } from "@/components/BackLink";
 import { Scanner } from "@/components/Scanner";
+import { showToast } from "@/components/Toast";
 import { Button, CardImage, Empty, Money, Skeleton, inputCls } from "@/components/ui";
 import { isScanIndexId, type Match } from "@/lib/scanner/matcher";
 
@@ -55,17 +57,51 @@ export default function OpenDetailPage() {
   useEffect(load, [load]);
 
   async function addCard(cardId: string) {
-    await fetch(`/api/opens/${id}/items`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cardId }),
-    });
-    load();
+    try {
+      const r = await fetch(`/api/opens/${id}/items`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cardId }),
+      });
+      if (!r.ok) throw new Error("Failed");
+      showToast("Added to open ✓", "up");
+      load();
+    } catch {
+      showToast("Add failed — try again", "down");
+    }
   }
 
-  async function removeItem(itemId: number) {
-    await fetch(`/api/opens/${id}/items?itemId=${itemId}`, { method: "DELETE" });
-    load();
+  async function removeItem(item: PullItem) {
+    setData((d) => (d ? { ...d, items: d.items.filter((x) => x.id !== item.id) } : d));
+    try {
+      const r = await fetch(`/api/opens/${id}/items?itemId=${item.id}`, { method: "DELETE" });
+      if (!r.ok) throw new Error("Failed");
+      showToast("Deleted", "info", {
+        action: {
+          label: "Undo",
+          onClick: async () => {
+            try {
+              const rr = await fetch(`/api/opens/${id}/items`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ cardId: item.cardId, quantity: item.quantity, variantType: item.variantType }),
+              });
+              if (!rr.ok) throw new Error("Failed");
+              showToast("Restored ✓", "up");
+            } catch {
+              showToast("Undo failed — try again", "down");
+            } finally {
+              load();
+            }
+          },
+        },
+        durationMs: 6000,
+      });
+    } catch {
+      showToast("Delete failed — try again", "down");
+    } finally {
+      load();
+    }
   }
 
   async function resolveMatch(m: Match) {
@@ -99,6 +135,17 @@ export default function OpenDetailPage() {
     }
   }
 
+  if (error && !data)
+    return (
+      <div className="pt-4">
+        <Empty>
+          <div>{error}</div>
+          <Button variant="ghost" className="mt-3 px-3 py-1.5 text-xs" onClick={() => { setError(null); load(); }}>
+            Retry
+          </Button>
+        </Empty>
+      </div>
+    );
   if (error) return <Empty>{error}</Empty>;
   if (!data) return <div className="pt-4 space-y-3"><Skeleton className="h-28" /><Skeleton className="h-40" /></div>;
 
@@ -108,7 +155,7 @@ export default function OpenDetailPage() {
   return (
     <div className="pb-24">
       <header className="pt-2 pb-3 flex items-center gap-3">
-        <Link href="/opens" className="text-muted text-sm">&#8249; Opens</Link>
+        <BackLink fallback="/opens" label="Opens" />
       </header>
 
       <div className="card-surface rounded-3xl p-4">
@@ -161,7 +208,7 @@ export default function OpenDetailPage() {
       {resolveError && (
         <div className="mt-2 text-xs text-down flex justify-between">
           <span>{resolveError}</span>
-          <button onClick={() => setResolveError(null)}>X</button>
+          <button onClick={() => setResolveError(null)} aria-label="Dismiss" className="min-w-8 min-h-8 -my-2 flex items-center justify-center">✕</button>
         </div>
       )}
 
@@ -180,6 +227,12 @@ export default function OpenDetailPage() {
             </li>
           ))}
         </ul>
+      )}
+
+      {items.length === 0 && (
+        <div className="mt-5">
+          <Empty>No pulls yet — scan your first card.</Empty>
+        </div>
       )}
 
       {items.length > 0 && (
@@ -202,7 +255,7 @@ export default function OpenDetailPage() {
                   <div className="text-sm font-semibold"><Money amount={item.value} currency={c} /></div>
                   {item.quantity > 1 && <div className="text-[10px] text-muted">x{item.quantity}</div>}
                 </div>
-                <button onClick={() => removeItem(item.id)} className="text-xs text-muted px-1">X</button>
+                <button onClick={() => removeItem(item)} aria-label={`Remove ${item.name}`} className="text-xs text-muted min-w-8 min-h-8 flex items-center justify-center hover:text-down">✕</button>
               </li>
             ))}
           </ul>

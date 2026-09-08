@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { SetLogo } from "@/components/SetLogo";
 import { Empty, Segmented, Skeleton, inputCls } from "@/components/ui";
 import { langLabel } from "@/lib/format";
@@ -23,16 +23,25 @@ export default function SetsPage() {
   const [lang, setLang] = useState<"all" | "eng" | "jap">("all");
   const [q, setQ] = useState("");
   const [onlyOwned, setOnlyOwned] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const loading = loadedKey !== `${tcg}/${lang}`;
 
-  useEffect(() => {
+  const load = useCallback(() => {
     fetch(`/api/sets?tcg=${tcg}&lang=${lang}`)
-      .then((r) => r.json())
+      .then(async (r) => {
+        if (!r.ok) throw new Error("Failed to load sets");
+        return r.json();
+      })
       .then((d) => {
         setSets(d.sets ?? []);
         setOwned(d.owned ?? {});
+        setError(null);
+        setLoadedKey(`${tcg}/${lang}`);
       })
-      .catch(() => setSets([]));
+      .catch((e) => setError(e.message));
   }, [tcg, lang]);
+  useEffect(load, [load]);
 
   const list = useMemo(() => {
     if (!sets) return [];
@@ -49,10 +58,7 @@ export default function SetsPage() {
       <div className="mt-3 flex flex-wrap gap-2 items-center">
         <Segmented
           value={tcg}
-          onChange={(v) => {
-            setSets(null);
-            setTcg(v);
-          }}
+          onChange={setTcg}
           size="xs"
           options={[
             { value: "pokemon", label: "Pokémon" },
@@ -63,10 +69,7 @@ export default function SetsPage() {
         />
         <Segmented
           value={lang}
-          onChange={(v) => {
-            setSets(null);
-            setLang(v);
-          }}
+          onChange={setLang}
           size="xs"
           options={[
             { value: "all", label: "EN + JP" },
@@ -79,20 +82,35 @@ export default function SetsPage() {
         </label>
       </div>
 
-      {!sets && (
+      {error && !sets && (
+        <div className="mt-4">
+          <Empty>
+            <div>{error}</div>
+            <button
+              type="button"
+              onClick={load}
+              className="mt-3 inline-flex items-center justify-center rounded-xl bg-elev border border-line px-3 py-1.5 text-xs font-semibold"
+            >
+              Retry
+            </button>
+          </Empty>
+        </div>
+      )}
+      {error && sets && <div className="mt-4 text-xs text-down">{error} — showing stale list.</div>}
+      {!sets && !error && (
         <div className="mt-4 space-y-2">
           <Skeleton className="h-16" />
           <Skeleton className="h-16" />
           <Skeleton className="h-16" />
         </div>
       )}
-      {sets && list.length === 0 && (
+      {sets && !error && list.length === 0 && (
         <div className="mt-4">
           <Empty>No sets here yet. Run the TCGPlayer price import in Settings to load them.</Empty>
         </div>
       )}
       {sets && list.length > 0 && (
-        <ul className="mt-4 card-surface rounded-2xl divide-y divide-line overflow-hidden">
+        <ul className={`mt-4 card-surface rounded-2xl divide-y divide-line overflow-hidden ${loading ? "opacity-60" : ""}`}>
           {list.map((s) => (
             <li key={s.id}>
               <Link href={`/sets/${encodeURIComponent(s.id)}`} className="flex items-center gap-3 p-3 hover:bg-white/[0.03]">
