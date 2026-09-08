@@ -6,7 +6,7 @@ import { nowIso, today } from "./format";
 import { hasPokewalletKey, pwCard, pwPriceHistory, pwSearch, pwSets } from "./pokewallet";
 import { sfCard, sfSearch, sfSets } from "./scryfall";
 import { bestPrice, type CardPrices, type CardSummary, type NormalizedCard, type Tcg } from "./types";
-import { hasTcgcsvData } from "./tcgcsv";
+import { hasTcgcsvData, TCGCSV_CATEGORIES } from "./tcgcsv";
 import { ygoCard, ygoSearch } from "./ygoprodeck";
 
 const PRICE_TTL_MS = 20 * 3600 * 1000; // refresh a card's price at most once a day
@@ -344,7 +344,8 @@ export async function getPriceHistory(cardId: string, variant?: string) {
 
 export async function listSets(tcg: Tcg | "all", lang: "eng" | "jap" | "all") {
   const rows = await db.select().from(schema.sets);
-  if (!rows.length || (tcg === "pokemon" && !rows.some((r) => r.tcg === "pokemon"))) await syncSets();
+  const hasTcg = tcg === "all" ? rows.length > 0 : rows.some((r) => r.tcg === tcg);
+  if (!hasTcg) await syncSets(tcg);
   return db
     .select()
     .from(schema.sets)
@@ -352,9 +353,9 @@ export async function listSets(tcg: Tcg | "all", lang: "eng" | "jap" | "all") {
     .orderBy(sql`release_date desc`);
 }
 
-export async function syncSets() {
+export async function syncSets(tcg: Tcg | "all" = "all") {
   const jobs: Promise<void>[] = [];
-  if (hasPokewalletKey()) {
+  if ((tcg === "all" || tcg === "pokemon") && hasPokewalletKey()) {
     jobs.push(
       cached("pw:sets", 7 * 86400, pwSets).then(async (list) => {
         for (const s of list) {
@@ -365,14 +366,41 @@ export async function syncSets() {
       }).catch(() => undefined),
     );
   }
-  jobs.push(
-    cached("sf:sets", 7 * 86400, sfSets).then(async (list) => {
-      for (const s of list) {
-        await db.insert(schema.sets)
-          .values({ id: `mtg:${s.code}:eng`, tcg: "mtg", code: s.code, name: s.name, language: "eng", total: s.total, releaseDate: s.releaseDate, imageUrl: s.imageUrl })
-          .onConflictDoUpdate({ target: schema.sets.id, set: { name: s.name, total: s.total, releaseDate: s.releaseDate } });
-      }
-    }).catch(() => undefined),
+  if (tcg === "all" || tcg === "mtg") {
+    jobs.push(
+      cached("sf:sets", 7 * 86400, sfSets).then(async (list) => {
+        for (const s of list) {
+          await db.insert(schema.sets)
+            .values({ id: `mtg:${s.code}:eng`, tcg: "mtg", code: s.code, name: s.name, language: "eng", total: s.total, releaseDate: s.releaseDate, imageUrl: s.imageUrl })
+            .onConflictDoUpdate({ target: schema.sets.id, set: { name: s.name, total: s.total, releaseDate: s.releaseDate } });
+        }
+      }).catch(() => undefined),
+    );
+  }
+  // Sync sets from TCGCSV for any TCG that doesn't have a dedicated API
+  const tcgcsvCats = TCGCSV_CATEGORIES.filter((c) =>
+    tcg === "all" ? !["pokemon", "mtg"].includes(c.tcg) : c.tcg === tcg && !["pokemon", "mtg"].includes(c.tcg),
   );
+  for (const cat of tcgcsvCats) {
+    jobs.push(
+      cached(`tcgcsv:sets:${cat.id}`, 7 * 86400, async () => {
+        const res = await fetch(`https://tcgcsv.com/tcgplayer/${cat.id}/groups`, {
+          headers: { "User-Agent": "ripnpull/0.1" },
+          signal: AbortSignal.timeout(30_000),
+        });
+        if (!res.ok) throw new Error(`TCGCSV ${res.status}`);
+        const data = await res.json();
+        return (data.results ?? []) as { groupId: number; name: string; abbreviation?: string; publishedOn?: string }[];
+      }).then(async (groups) => {
+        for (const g of groups) {
+          const code = String(g.abbreviation ?? g.groupId);
+          const id = `${cat.tcg}:${code}:${cat.language}`;
+          await db.insert(schema.sets)
+            .values({ id, tcg: cat.tcg, code, name: g.name, language: cat.language, total: null, releaseDate: g.publishedOn ? String(g.publishedOn).slice(0, 10) : null, imageUrl: null })
+            .onConflictDoUpdate({ target: schema.sets.id, set: { name: g.name, releaseDate: g.publishedOn ? String(g.publishedOn).slice(0, 10) : null } });
+        }
+      }).catch(() => undefined),
+    );
+  }
   await Promise.all(jobs);
 }
