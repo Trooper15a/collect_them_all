@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { TabBar } from "@/components/TabBar";
+import { TcgPicker } from "@/components/TcgPicker";
 import { PwaRegister } from "@/components/PwaRegister";
 import { ThemeScript } from "@/components/ThemeScript";
 import { OfflineBanner } from "@/components/OfflineStatus";
@@ -79,6 +80,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {children}
           </main>
           <TabBar />
+          <TcgPicker />
           <ToastContainer />
           <PwaRegister />
         </AuthProvider>
