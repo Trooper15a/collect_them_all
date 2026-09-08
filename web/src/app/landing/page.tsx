@@ -63,8 +63,28 @@ const TCGS = ["Pokémon", "Magic", "Yu-Gi-Oh!", "One Piece", "Lorcana", "Digimon
 export default function LandingPage() {
   return (
     <div className="min-h-screen flex flex-col -mx-4 -mt-[max(env(safe-area-inset-top),12px)]">
+      {/* Header */}
+      <header className="h-16 px-6 flex items-center justify-between border-b border-line">
+        <Link href="/landing" className="text-lg font-extrabold tracking-tight">
+          RipnPull
+        </Link>
+        <nav className="flex items-center gap-5 text-sm">
+          <a
+            href="https://github.com/Trooper15a/collect_them_all"
+            target="_blank"
+            rel="noreferrer"
+            className="text-muted font-medium hover:text-fg transition-colors"
+          >
+            GitHub
+          </a>
+          <Link href="/login" className="font-semibold hover:text-accent transition-colors">
+            Sign in
+          </Link>
+        </nav>
+      </header>
+
       {/* Hero */}
-      <section className="relative overflow-hidden px-6 pt-24 pb-20 text-center">
+      <section className="relative overflow-hidden px-6 pt-16 pb-20 text-center">
         <div className="absolute inset-0 bg-gradient-to-b from-accent/10 via-transparent to-transparent" />
         <div className="relative z-10 max-w-2xl mx-auto">
           <h1 className="text-5xl sm:text-6xl font-extrabold tracking-tight leading-[1.1]">
@@ -78,7 +98,7 @@ export default function LandingPage() {
           <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
             <Link
               href="/login"
-              className="btn-rainbow inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-base font-semibold shadow-lg shadow-purple-500/25"
+              className="inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-base font-semibold text-white bg-gradient-to-r from-[#3b82f6] to-[#60a5fa] shadow-lg shadow-[rgba(59,130,246,0.35)] hover:brightness-110 transition"
             >
               Get started free
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -99,7 +119,7 @@ export default function LandingPage() {
       </section>
 
       {/* TCG ticker */}
-      <section className="py-6 border-y border-line overflow-hidden">
+      <section className="py-6 border-y border-line overflow-hidden marquee-fade">
         <div className="flex gap-6 animate-marquee marquee-track whitespace-nowrap">
           {TCGS.map((t) => (
             <span key={t} className="text-sm font-medium text-muted">{t}</span>
@@ -160,7 +180,7 @@ export default function LandingPage() {
         <p className="text-muted mb-8 max-w-md mx-auto">No credit card. No subscription. Sign in with Google and start adding cards in seconds.</p>
         <Link
           href="/login"
-          className="btn-rainbow inline-flex items-center justify-center gap-2 rounded-xl px-8 py-3.5 text-base font-semibold shadow-lg shadow-purple-500/25"
+          className="inline-flex items-center justify-center gap-2 rounded-xl px-8 py-3.5 text-base font-semibold text-white bg-gradient-to-r from-[#3b82f6] to-[#60a5fa] shadow-lg shadow-[rgba(59,130,246,0.35)] hover:brightness-110 transition"
         >
           Get started free
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
