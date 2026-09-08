@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
@@ -39,6 +40,18 @@ function LoginInner() {
         </svg>
         Sign in with Google
       </button>
+
+      <p className="text-xs text-muted text-center max-w-xs leading-relaxed">
+        By signing in you agree to the{" "}
+        <Link href="/terms" className="underline hover:text-fg transition-colors">
+          Terms
+        </Link>{" "}
+        and{" "}
+        <Link href="/privacy" className="underline hover:text-fg transition-colors">
+          Privacy Policy
+        </Link>
+        .
+      </p>
     </div>
   );
 }

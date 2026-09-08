@@ -3,7 +3,7 @@ import Link from "next/link";
 const FEATURES = [
   {
     title: "AI Card Scanner",
-    desc: "Point your camera at any card and instantly identify it with ONNX-powered recognition. Works offline.",
+    desc: "Point your camera at any card and instantly identify it with on-device AI recognition. Works offline.",
     icon: (
       <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
@@ -12,8 +12,8 @@ const FEATURES = [
     ),
   },
   {
-    title: "Real-Time Prices",
-    desc: "Prices from TCGPlayer across 14 TCGs updated daily. Track market value, low, mid, and high for every variant.",
+    title: "Up-to-Date Prices",
+    desc: "Prices from TCGPlayer across 13 TCGs updated daily. Track market value, low, mid, and high for every variant.",
     icon: (
       <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18 9 11.25l4.306 4.306a11.95 11.95 0 0 1 5.814-5.518l2.74-1.22m0 0-5.94-2.281m5.94 2.28-2.28 5.941" />
@@ -21,8 +21,8 @@ const FEATURES = [
     ),
   },
   {
-    title: "14 TCGs Supported",
-    desc: "Pokemon, Magic, Yu-Gi-Oh!, One Piece, Lorcana, Digimon, Dragon Ball, Flesh and Blood, Star Wars, and more.",
+    title: "13 TCGs Supported",
+    desc: "Pokémon, Magic, Yu-Gi-Oh!, One Piece, Lorcana, Digimon, Dragon Ball, Flesh and Blood, Star Wars, and more.",
     icon: (
       <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M6 6.878V6a2.25 2.25 0 0 1 2.25-2.25h7.5A2.25 2.25 0 0 1 18 6v.878m-12 0c.235-.083.487-.128.75-.128h10.5c.263 0 .515.045.75.128m-12 0A2.25 2.25 0 0 0 4.5 9v.878m13.5-3A2.25 2.25 0 0 1 19.5 9v.878m-13.5-3c.235-.083.487-.128.75-.128h10.5c.263 0 .515.045.75.128m-12 0A2.25 2.25 0 0 0 3 12M18 9.878a2.25 2.25 0 0 1 1.5 2.122M3 12v6a2.25 2.25 0 0 0 2.25 2.25h13.5A2.25 2.25 0 0 0 21 18v-6m-18 0h18" />
@@ -58,7 +58,7 @@ const FEATURES = [
   },
 ];
 
-const TCGS = ["Pokemon", "Magic", "Yu-Gi-Oh!", "One Piece", "Lorcana", "Digimon", "Dragon Ball Super", "DB Fusion World", "Flesh and Blood", "Star Wars Unlimited", "Vanguard", "Weiss Schwarz", "Final Fantasy"];
+const TCGS = ["Pokémon", "Magic", "Yu-Gi-Oh!", "One Piece", "Lorcana", "Digimon", "Dragon Ball Super", "DB Fusion World", "Flesh and Blood", "Star Wars Unlimited", "Vanguard", "Weiß Schwarz", "Final Fantasy"];
 
 export default function LandingPage() {
   return (
@@ -73,7 +73,7 @@ export default function LandingPage() {
             <span className="text-accent">Know their worth.</span>
           </h1>
           <p className="mt-6 text-lg text-muted max-w-lg mx-auto leading-relaxed">
-            The free, open-source TCG portfolio tracker with AI card scanning, real-time prices across 14 games, and offline support.
+            The free, open-source TCG portfolio tracker with AI card scanning, daily prices across 13 games, and offline support.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
             <Link
@@ -100,9 +100,12 @@ export default function LandingPage() {
 
       {/* TCG ticker */}
       <section className="py-6 border-y border-line overflow-hidden">
-        <div className="flex gap-6 animate-marquee whitespace-nowrap">
-          {[...TCGS, ...TCGS].map((t, i) => (
-            <span key={i} className="text-sm font-medium text-muted/60">{t}</span>
+        <div className="flex gap-6 animate-marquee marquee-track whitespace-nowrap">
+          {TCGS.map((t) => (
+            <span key={t} className="text-sm font-medium text-muted">{t}</span>
+          ))}
+          {TCGS.map((t) => (
+            <span key={`${t}-duplicate`} aria-hidden="true" className="text-sm font-medium text-muted">{t}</span>
           ))}
         </div>
       </section>
@@ -126,26 +129,25 @@ export default function LandingPage() {
       {/* Comparison */}
       <section className="px-6 py-16 border-t border-line">
         <div className="max-w-2xl mx-auto text-center">
-          <h2 className="text-2xl font-bold mb-4">Why RipnPull over Collectr?</h2>
+          <h2 className="text-2xl font-bold mb-4">Why RipnPull over typical paid trackers?</h2>
           <div className="grid grid-cols-2 gap-4 text-sm mt-8">
             <div className="rounded-xl bg-elev border border-line p-4 text-left space-y-3">
-              <p className="font-semibold text-down">Collectr</p>
+              <p className="font-semibold text-down">Typical paid trackers</p>
               <ul className="space-y-2 text-muted">
-                <li>$5/mo for price data</li>
-                <li>Only PSA grading links</li>
-                <li>No offline mode</li>
+                <li>$5–10/mo subscriptions</li>
+                <li>Paywalled price history</li>
                 <li>Closed source</li>
-                <li>Limited TCG support</li>
+                <li>No offline mode</li>
               </ul>
             </div>
             <div className="rounded-xl bg-elev border border-accent/30 p-4 text-left space-y-3">
               <p className="font-semibold text-accent">RipnPull</p>
               <ul className="space-y-2 text-muted">
                 <li className="text-up">Free forever</li>
-                <li className="text-up">PSA + BGS + CGC links</li>
-                <li className="text-up">Full offline PWA</li>
-                <li className="text-up">Open source</li>
-                <li className="text-up">14 TCGs supported</li>
+                <li className="text-up">PSA + BGS + CGC grading links</li>
+                <li className="text-up">Open source (MIT)</li>
+                <li className="text-up">Full offline mode</li>
+                <li className="text-up">13 TCGs supported</li>
               </ul>
             </div>
           </div>
@@ -169,8 +171,11 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="border-t border-line px-6 py-8 text-center text-xs text-muted">
-        <p>RipnPull is open source. Built by collectors, for collectors.</p>
+        <p>RipnPull is open source.</p>
+        <p className="mt-1">MIT licensed · Built by collectors, for collectors.</p>
         <div className="mt-3 flex gap-4 justify-center">
+          <Link href="/privacy" className="hover:text-fg transition-colors">Privacy</Link>
+          <Link href="/terms" className="hover:text-fg transition-colors">Terms</Link>
           <a href="https://github.com/Trooper15a/collect_them_all" target="_blank" rel="noreferrer" className="hover:text-fg transition-colors">GitHub</a>
           <Link href="/login" className="hover:text-fg transition-colors">Sign in</Link>
         </div>

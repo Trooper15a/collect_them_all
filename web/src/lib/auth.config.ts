@@ -15,9 +15,24 @@ export default {
     authorized({ auth, request }) {
       const isLoggedIn = !!auth?.user;
       const { pathname } = request.nextUrl;
-      const isLoginPage = pathname.startsWith("/login");
-      const isLandingPage = pathname === "/landing";
-      if (isLoginPage || isLandingPage) return true;
+      // Public pages (defensive: these are outside the middleware matcher).
+      if (
+        pathname === "/login" ||
+        pathname === "/landing" ||
+        pathname === "/privacy" ||
+        pathname === "/terms"
+      ) {
+        return true;
+      }
+      // Public API endpoints (preserve existing public-API behavior).
+      if (
+        pathname.startsWith("/api/auth") ||
+        pathname.startsWith("/api/prices") ||
+        pathname.startsWith("/api/tcgcsv") ||
+        pathname.startsWith("/api/health")
+      ) {
+        return true;
+      }
       if (!isLoggedIn) {
         if (pathname === "/") {
           return Response.redirect(new URL("/landing", request.nextUrl.origin));
