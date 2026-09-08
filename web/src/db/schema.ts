@@ -114,6 +114,7 @@ export const portfolios = pgTable("portfolios", {
   name: text("name").notNull(),
   tcgId: text("tcg_id"),
   language: text("language"),
+  accentColor: text("accent_color"),
   createdAt: text("created_at").notNull(),
 });
 

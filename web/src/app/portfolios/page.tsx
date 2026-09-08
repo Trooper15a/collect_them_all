@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { Button, Delta, Empty, Field, Money, Skeleton, inputCls } from "@/components/ui";
 import { TCGS } from "@/lib/types";
 
@@ -20,6 +21,7 @@ interface PortfolioRow {
   name: string;
   tcgId: string | null;
   language: string | null;
+  accentColor: string | null;
   summary: Summary;
 }
 
@@ -68,6 +70,7 @@ export default function PortfoliosPage() {
   }
 
   return (
+    <PullToRefresh onRefresh={load}>
     <div>
       <header className="pt-2 pb-3 flex items-center justify-between">
         <h1 className="text-xl font-bold uppercase tracking-wider">My Binders</h1>
@@ -140,7 +143,7 @@ export default function PortfoliosPage() {
             <ul className="space-y-2">
               {list.map((p) => (
                 <li key={p.id}>
-                  <Link href={`/portfolios/${p.id}`} className="binder-card relative card-surface rounded-2xl p-4 flex items-center justify-between hover:bg-white/[0.03]">
+                  <Link href={`/portfolios/${p.id}`} className="binder-card relative card-surface rounded-2xl p-4 flex items-center justify-between hover:bg-white/[0.03]" style={p.accentColor ? { borderColor: `${p.accentColor}33`, borderLeftWidth: 3, borderLeftColor: p.accentColor } : undefined}>
                     <div>
                       <div className="font-semibold">{p.name}</div>
                       <div className="text-xs text-muted">
@@ -163,5 +166,6 @@ export default function PortfoliosPage() {
         );
       })}
     </div>
+    </PullToRefresh>
   );
 }

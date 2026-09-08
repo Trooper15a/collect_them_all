@@ -13,6 +13,7 @@ const Patch = z.object({
   name: z.string().trim().min(1).max(80).optional(),
   tcgId: z.enum(TCG_IDS).nullable().optional(),
   language: z.enum(["eng", "jap"]).nullable().optional(),
+  accentColor: z.string().max(20).nullable().optional(),
 });
 
 function parseId(id: string) {

@@ -5,8 +5,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AddToPortfolioSheet, type AddSheetCard } from "@/components/AddToPortfolioSheet";
 import { Scanner } from "@/components/Scanner";
 import { Button, CardImage, Empty, Money, Segmented, Skeleton, TcgBadge, inputCls } from "@/components/ui";
+import { haptic } from "@/lib/haptics";
 import { isScanIndexId, type Match } from "@/lib/scanner/matcher";
 import type { CardSummary } from "@/lib/types";
+
+interface RecentScan { id: string; name: string; setName: string | null; ts: number; }
 
 type TcgFilter = "all" | "pokemon" | "mtg" | "yugioh";
 type LangFilter = "all" | "eng" | "jap";
@@ -32,6 +35,11 @@ export default function ScanPage() {
   const [bulkProgress, setBulkProgress] = useState(0);
   const [portfolios, setPortfolios] = useState<{ id: number; name: string }[]>([]);
   const [bulkPortfolioId, setBulkPortfolioId] = useState<number | null>(null);
+  const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
+
+  useEffect(() => {
+    try { const s = localStorage.getItem("recentScans"); if (s) setRecentScans(JSON.parse(s)); } catch {}
+  }, []);
 
   useEffect(() => {
     fetch("/api/portfolios").then((r) => r.json()).then((d) => {
@@ -91,10 +99,17 @@ export default function ScanPage() {
   }
 
   async function chooseMatch(m: Match) {
+    haptic("medium");
     setMatches(null);
     if (!bulkMode) setScanning(false);
     const card = await resolveMatch(m);
     if (card) {
+      const scan: RecentScan = { id: card.id, name: card.name, setName: card.setName ?? null, ts: Date.now() };
+      setRecentScans((prev) => {
+        const next = [scan, ...prev.filter((s) => s.id !== card.id)].slice(0, 10);
+        try { localStorage.setItem("recentScans", JSON.stringify(next)); } catch {}
+        return next;
+      });
       if (bulkMode) {
         setBulkQueue((prev) => [...prev, card]);
         setScanning(true);
@@ -258,7 +273,7 @@ export default function ScanPage() {
         )}
       </div>
 
-      {scanning && !matches && <Scanner onClose={() => { setScanning(false); setBulkMode(false); }} onMatches={(m) => setMatches(m)} bulkMode={bulkMode} bulkCount={bulkQueue.length} />}
+      {scanning && !matches && <Scanner onClose={() => { setScanning(false); setBulkMode(false); }} onMatches={(m) => { haptic("heavy"); setMatches(m); }} bulkMode={bulkMode} bulkCount={bulkQueue.length} />}
       {matches && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
           <button className="absolute inset-0 bg-black/70" onClick={() => setMatches(null)} aria-label="Close" />
@@ -341,6 +356,34 @@ export default function ScanPage() {
                   <div className="text-xs text-muted truncate">{c.setName}</div>
                 </Link>
                 <button onClick={() => setBulkQueue((prev) => prev.filter((_, j) => j !== i))} className="text-xs text-muted px-2">✕</button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {recentScans.length > 0 && !q.trim() && !scanning && bulkQueue.length === 0 && (
+        <div className="mt-4">
+          <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">Recently scanned</div>
+          <ul className="card-surface rounded-2xl divide-y divide-line overflow-hidden">
+            {recentScans.slice(0, 5).map((s) => (
+              <li key={s.id}>
+                <Link href={`/cards/${encodeURIComponent(s.id)}`} className="flex items-center gap-3 p-3 hover:bg-white/[0.03]">
+                  <CardImage id={s.id} className="w-10 rounded-md" alt="" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm truncate">{s.name}</div>
+                    <div className="text-xs text-muted truncate">{s.setName}</div>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setAdding({ id: s.id, name: s.name, setName: s.setName, prices: {} });
+                    }}
+                    className="text-xs font-semibold text-accent px-2 py-1 rounded-lg bg-accent/10"
+                  >
+                    + Add
+                  </button>
+                </Link>
               </li>
             ))}
           </ul>

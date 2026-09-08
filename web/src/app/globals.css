@@ -187,3 +187,9 @@ body {
 .binder-card:hover::before {
   animation: holo-shimmer 1.2s ease;
 }
+
+/* Toast slide-in */
+@keyframes slideIn {
+  from { transform: translateY(-20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}

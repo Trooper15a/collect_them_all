@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { PriceChart } from "@/components/PriceChart";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { CardImage, Delta, Empty, Money, Section, Segmented, Skeleton, TcgBadge } from "@/components/ui";
 import { RANGES, type Range } from "@/lib/format";
 
@@ -97,6 +98,7 @@ export default function HomePage() {
   const empty = s.uniqueCount === 0;
 
   return (
+    <PullToRefresh onRefresh={async () => { await load(); await loadAlerts(); }}>
     <div>
       <header className="pt-2 pb-1 flex items-baseline justify-between">
         <h1 className="text-xl font-bold uppercase tracking-wider">My Binder</h1>
@@ -321,6 +323,7 @@ export default function HomePage() {
         </>
       )}
     </div>
+    </PullToRefresh>
   );
 }
 

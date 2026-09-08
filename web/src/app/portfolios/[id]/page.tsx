@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PriceChart } from "@/components/PriceChart";
+import { PullToRefresh } from "@/components/PullToRefresh";
+import { SwipeToDelete } from "@/components/SwipeToDelete";
 import { Button, CardImage, Delta, Empty, Field, Money, Segmented, Skeleton, TcgBadge, inputCls } from "@/components/ui";
 import { RANGES, type Range, langLabel } from "@/lib/format";
 import { CONDITIONS, type NormalizedCard, variantLabel } from "@/lib/types";
@@ -30,7 +32,7 @@ interface Item {
   change24hPct: number | null;
 }
 interface Data {
-  portfolio: { id: number; name: string; tcgId: string | null; language: string | null };
+  portfolio: { id: number; name: string; tcgId: string | null; language: string | null; accentColor: string | null };
   items: Item[];
   summary: { value: number; cost: number; gain: number; gainPct: number | null; itemCount: number; change24h: number; change24hPct: number | null };
   series: { date: string; value: number }[];
@@ -51,6 +53,8 @@ export default function PortfolioPage() {
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  const [accentColor, setAccentColor] = useState<string | null>(null);
+
   const load = useCallback(() => {
     fetch(`/api/portfolios/${id}?range=${range}`)
       .then(async (r) => {
@@ -60,6 +64,7 @@ export default function PortfolioPage() {
       .then((d: Data) => {
         setData(d);
         setName(d.portfolio.name);
+        setAccentColor(d.portfolio.accentColor ?? null);
       })
       .catch((e) => setError(e.message));
   }, [id, range]);
@@ -102,6 +107,7 @@ export default function PortfolioPage() {
   const s = data.summary;
 
   return (
+    <PullToRefresh onRefresh={load}>
     <div>
       <header className="pt-2 pb-3 flex items-center gap-3">
         <Link href="/portfolios" className="text-muted text-sm">
@@ -124,7 +130,33 @@ export default function PortfolioPage() {
         </button>
       </header>
 
-      <div className="card-surface rounded-3xl p-5">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-xs text-muted">Color</span>
+        {["#3b82f6", "#a78bfa", "#f472b6", "#34d399", "#fbbf24", "#fb923c", "#ef4444"].map((c) => (
+          <button
+            key={c}
+            onClick={async () => {
+              setAccentColor(c);
+              await fetch(`/api/portfolios/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accentColor: c }) });
+            }}
+            className="w-6 h-6 rounded-full border-2 transition-transform"
+            style={{ background: c, borderColor: accentColor === c ? "white" : "transparent", transform: accentColor === c ? "scale(1.2)" : undefined }}
+          />
+        ))}
+        {accentColor && (
+          <button
+            onClick={async () => {
+              setAccentColor(null);
+              await fetch(`/api/portfolios/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accentColor: null }) });
+            }}
+            className="text-[10px] text-muted ml-1"
+          >
+            Reset
+          </button>
+        )}
+      </div>
+
+      <div className="card-surface rounded-3xl p-5" style={accentColor ? { borderColor: `${accentColor}33`, borderWidth: 1 } : undefined}>
         <div className="text-xs text-muted">Value</div>
         <div className="text-3xl font-bold tabular mt-1">
           <Money amount={s.value} currency={c} />
@@ -182,7 +214,8 @@ export default function PortfolioPage() {
       ) : (
         <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
           {items.map((i) => (
-            <div key={i.id} className="card-surface rounded-2xl overflow-hidden flex flex-col">
+            <SwipeToDelete key={i.id} onDelete={async () => { await fetch(`/api/items/${i.id}`, { method: "DELETE" }); load(); }}>
+            <div className="card-surface rounded-2xl overflow-hidden flex flex-col">
               <Link href={`/cards/${encodeURIComponent(i.card.id)}`}>
                 <CardImage id={i.card.id} className="w-full" alt="" />
               </Link>
@@ -202,6 +235,7 @@ export default function PortfolioPage() {
                 </div>
               </div>
             </div>
+            </SwipeToDelete>
           ))}
         </div>
       )}
@@ -217,6 +251,7 @@ export default function PortfolioPage() {
         />
       )}
     </div>
+    </PullToRefresh>
   );
 }
 

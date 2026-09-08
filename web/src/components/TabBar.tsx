@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const tabs = [
   { href: "/", label: "Home", icon: HomeIcon },
-  { href: "/scan", label: "Scan", icon: ScanIcon },
+  { href: "/scan", label: "Scan", icon: ScanIcon, badge: true },
   { href: "/shop", label: "Shop", icon: ShopIcon },
   { href: "/portfolios", label: "Binders", icon: FolderIcon },
   { href: "/sets", label: "Sets", icon: GridIcon },
@@ -14,18 +15,41 @@ const tabs = [
 
 export function TabBar() {
   const pathname = usePathname();
+  const [scanBadge, setScanBadge] = useState(0);
+
+  useEffect(() => {
+    const update = () => {
+      try {
+        const q = localStorage.getItem("bulkQueue");
+        setScanBadge(q ? JSON.parse(q).length : 0);
+      } catch { setScanBadge(0); }
+    };
+    update();
+    window.addEventListener("storage", update);
+    const id = setInterval(update, 2000);
+    return () => { window.removeEventListener("storage", update); clearInterval(id); };
+  }, []);
+
   return (
     <nav className="fixed bottom-0 inset-x-0 z-40 px-3 pb-[max(env(safe-area-inset-bottom),10px)] pointer-events-none">
       <div className="glass pointer-events-auto mx-auto max-w-md rounded-2xl grid grid-cols-6 h-16 shadow-[0_8px_40px_rgba(0,0,0,0.45)]">
         {tabs.map((t) => {
           const active = t.href === "/" ? pathname === "/" : pathname.startsWith(t.href);
+          const badge = t.badge ? scanBadge : 0;
           return (
             <Link
               key={t.href}
               href={t.href}
-              className={`flex flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors ${active ? "text-accent" : "text-muted hover:text-fg"}`}
+              className={`relative flex flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors ${active ? "text-accent" : "text-muted hover:text-fg"}`}
             >
-              <t.icon className="w-6 h-6" />
+              <div className="relative">
+                <t.icon className="w-6 h-6" />
+                {badge > 0 && (
+                  <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-down text-white text-[9px] font-bold px-1">
+                    {badge}
+                  </span>
+                )}
+              </div>
               {t.label}
             </Link>
           );

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AddToPortfolioSheet } from "@/components/AddToPortfolioSheet";
 import { PriceChart } from "@/components/PriceChart";
 import { Button, CardImage, Empty, Money, Section, Segmented, Skeleton, TcgBadge } from "@/components/ui";
@@ -36,6 +36,7 @@ export default function CardPage() {
   const [alertOpen, setAlertOpen] = useState(false);
   const [threshold, setThreshold] = useState("10");
   const [wishlisted, setWishlisted] = useState(false);
+  const lastTap = useRef(0);
 
   const loadAlert = () =>
     fetch("/api/alerts")
@@ -145,7 +146,14 @@ export default function CardPage() {
         </button>
       </header>
 
-      <button onClick={() => setZoom(true)} className="block w-[68%] mx-auto rounded-2xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.6)]">
+      <button
+        onClick={() => {
+          const now = Date.now();
+          if (now - lastTap.current < 350) { setZoom(true); }
+          lastTap.current = now;
+        }}
+        className="block w-[68%] mx-auto rounded-2xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
+      >
         <CardImage id={card.id} size="high" className="w-full" alt={card.name} />
       </button>
 
