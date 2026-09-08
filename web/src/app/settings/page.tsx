@@ -22,8 +22,8 @@ interface Settings {
 type Appearance = "midnight" | "black" | "light";
 
 const APPEARANCES: { id: Appearance; label: string; hint: string; swatch: string }[] = [
+  { id: "black", label: "Pure Black", hint: "True black, OLED", swatch: "#000000" },
   { id: "midnight", label: "Midnight", hint: "Dark, navy tint", swatch: "#0a0e1a" },
-  { id: "black", label: "Pure Black", hint: "Dark, true black", swatch: "#000000" },
   { id: "light", label: "Light", hint: "Light background", swatch: "#f0f2f7" },
 ];
 
@@ -38,9 +38,9 @@ function applyAppearance(a: Appearance) {
       localStorage.removeItem("bgColor");
     } else {
       el.removeAttribute("data-theme");
-      el.setAttribute("data-bg", a === "black" ? "black" : "blue");
+      el.setAttribute("data-bg", a === "midnight" ? "midnight" : "black");
       localStorage.setItem("theme", "dark");
-      localStorage.setItem("bgColor", a === "black" ? "black" : "blue");
+      localStorage.setItem("bgColor", a === "midnight" ? "midnight" : "black");
     }
   } catch {}
 }
@@ -48,9 +48,10 @@ function applyAppearance(a: Appearance) {
 function readAppearance(): Appearance {
   try {
     if (localStorage.getItem("theme") === "light") return "light";
-    if (localStorage.getItem("bgColor") === "black") return "black";
+    const bg = localStorage.getItem("bgColor");
+    if (bg === "midnight" || bg === "blue") return "midnight";
   } catch {}
-  return "midnight";
+  return "black";
 }
 
 /** Every settings section is its own box with the heading inside. */
@@ -93,7 +94,7 @@ export default function SettingsPage() {
     }
   }
 
-  const [appearance, setAppearance] = useState<Appearance>("midnight");
+  const [appearance, setAppearance] = useState<Appearance>("black");
 
   useEffect(() => {
     // start "midnight" so SSR/CSR markup matches; sync from localStorage after mount
@@ -184,7 +185,7 @@ export default function SettingsPage() {
                       key={opt.id}
                       onClick={() => selectAppearance(opt.id)}
                       aria-pressed={appearance === opt.id}
-                      className={`rounded-xl border-2 p-2 text-left transition-all ${appearance === opt.id ? "border-accent shadow-lg shadow-accent/20" : "border-line hover:border-muted"}`}
+                      className={`rounded-xl border-2 p-2 text-left transition-all ${appearance === opt.id ? "border-[#a78bfa] shadow-lg shadow-[#a78bfa]/20" : "border-line hover:border-muted"}`}
                     >
                       <span className="block h-8 rounded-lg border border-line" style={{ background: opt.swatch }} />
                       <span className="mt-1.5 block text-xs font-semibold">{opt.label}</span>
@@ -224,7 +225,7 @@ export default function SettingsPage() {
         <Box title="Prices">
           <div className="space-y-3">
             <div className="text-sm text-muted">Owned cards refresh automatically every night at 03:30. Run it now if you just added cards.</div>
-            <Button variant="ghost" onClick={refreshNow} disabled={busy}>
+            <Button onClick={refreshNow} disabled={busy}>
               {busy ? "Refreshing…" : "Refresh prices now"}
             </Button>
             {refreshMsg && <div className="text-xs text-muted">{refreshMsg}</div>}
@@ -242,7 +243,7 @@ export default function SettingsPage() {
         <Box title="Export">
           <div className="space-y-3">
             <div className="text-sm text-muted">Download your whole collection as CSV: name, set, language, condition, grade, cost basis, current value (USD + EUR), gain/loss, date added.</div>
-            <a href={`/api/export?currency=${s.currency}`} className="inline-flex items-center justify-center rounded-xl bg-elev border border-line px-4 py-2.5 text-sm font-semibold">
+            <a href={`/api/export?currency=${s.currency}`} className="btn-rainbow inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold">
               Download CSV
             </a>
           </div>
@@ -282,7 +283,7 @@ function HidePricesToggle() {
           setHidePrices(!hidden);
           showToast(hidden ? "Prices visible" : "Prices hidden ✓", hidden ? "down" : "up");
         }}
-        className={`relative shrink-0 h-7 w-12 rounded-full border transition-colors ${hidden ? "bg-accent border-accent" : "bg-elev border-line"}`}
+        className={`relative shrink-0 h-7 w-12 rounded-full border transition-colors ${hidden ? "bg-[#a78bfa] border-[#a78bfa]" : "bg-elev border-line"}`}
       >
         <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-fg transition-all ${hidden ? "left-6" : "left-1"}`} />
       </button>
@@ -339,13 +340,13 @@ function TcgcsvPanel() {
         {cats.map((c) => {
           const on = selected.includes(c.id);
           return (
-            <button key={c.id} onClick={() => setSelected(on ? selected.filter((x) => x !== c.id) : [...selected, c.id])} className={`rounded-full px-2.5 py-1 text-xs border ${on ? "bg-accent text-black border-accent" : "border-line text-muted"}`}>
+            <button key={c.id} onClick={() => setSelected(on ? selected.filter((x) => x !== c.id) : [...selected, c.id])} className={`rounded-full px-2.5 py-1 text-xs border transition-colors ${on ? "bg-[#a78bfa] text-black border-[#a78bfa] font-semibold" : "border-line text-muted hover:border-muted"}`}>
               {c.label}
             </button>
           );
         })}
       </div>
-      <Button variant="ghost" onClick={start} disabled={!status || status.running || selected.length === 0}>
+      <Button onClick={start} disabled={!status || status.running || selected.length === 0}>
         {status?.running ? `Importing… category ${status.progress?.category} set ${status.progress?.group}/${status.progress?.of}` : "Import prices now"}
       </Button>
       {msg && <div className="text-xs text-down">{msg}</div>}
@@ -424,7 +425,7 @@ function ImportPanel() {
       </div>
       <div className="flex flex-wrap gap-2 items-center">
         <input ref={fileRef} type="file" accept=".csv,text/csv,.tsv,.txt" className="hidden" onChange={(e) => e.target.files?.[0] && preview(e.target.files[0])} />
-        <Button variant="ghost" onClick={() => fileRef.current?.click()} disabled={busy}>
+        <Button onClick={() => fileRef.current?.click()} disabled={busy}>
           {busy && !rows ? "Reading…" : "Choose CSV file"}
         </Button>
         {rows && (
@@ -512,7 +513,7 @@ function UpdateIndexPanel() {
       <div className="text-muted">
         The card recognition model runs on-device (~20 MB, cached). Check for new card sets from PokéWallet, download images, compute embeddings with the existing model, and update the scanner index — no retraining needed.
       </div>
-      <Button variant="ghost" onClick={start} disabled={running}>
+      <Button onClick={start} disabled={running}>
         {running ? "Updating… (this may take a few minutes)" : "Check for new cards"}
       </Button>
       {msg && <div className="text-xs text-down">{msg}</div>}
