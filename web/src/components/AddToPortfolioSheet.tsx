@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { fmtMoney } from "@/lib/format";
+import { useHidePrices } from "@/lib/ui-prefs";
 import { bestPrice, CONDITION_LABELS, CONDITIONS, CURRENCIES, GRADING_COMPANIES, type CardPrices, variantLabel } from "@/lib/types";
 import { convert, type Rates } from "@/lib/fx";
 import { Button, CardImage, Field, inputCls } from "./ui";
@@ -21,6 +22,8 @@ export interface AddSheetCard {
 }
 
 export function AddToPortfolioSheet(props: { card: AddSheetCard | null; onClose: () => void; onAdded?: () => void }) {
+  const hidePrices = useHidePrices();
+  const fm = (n: number, c: string) => (hidePrices ? "•••" : fmtMoney(n, c));
   // Keyed on the card id so every open starts with fresh form state.
   if (!props.card) return null;
   return <Sheet key={props.card.id} {...props} card={props.card} />;
@@ -221,8 +224,8 @@ function Sheet({ card, onClose, onAdded }: { card: AddSheetCard; onClose: () => 
           <span className="tabular font-semibold">
             {unit
               ? fx
-                ? `${fmtMoney(convert(unit.amount, unit.currency, costCurrency, fx.rates), costCurrency)} × ${quantity}`
-                : `${fmtMoney(unit.amount, unit.currency)} × ${quantity}`
+                ? `${fm(convert(unit.amount, unit.currency, costCurrency, fx.rates), costCurrency)} × ${quantity}`
+                : `${fm(unit.amount, unit.currency)} × ${quantity}`
               : "No price yet"}
           </span>
         </div>

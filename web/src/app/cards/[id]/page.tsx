@@ -8,6 +8,7 @@ import { PriceChart } from "@/components/PriceChart";
 import { showToast } from "@/components/Toast";
 import { Button, CardImage, Empty, Money, Section, Segmented, Skeleton, TcgBadge } from "@/components/ui";
 import { RANGES, type Range, fmtMoney, rangeToDays } from "@/lib/format";
+import { useHidePrices } from "@/lib/ui-prefs";
 import { convert, type Rates } from "@/lib/fx";
 import { marketplaceLinks } from "@/lib/marketplace";
 import { type MarketPrices, type NormalizedCard, variantLabel } from "@/lib/types";
@@ -21,6 +22,8 @@ interface HistoryPoint {
 const GRADE_MULT: Record<string, number> = { "PSA 10": 3.0, "PSA 9": 1.4, "PSA 8": 1.0, "BGS 10": 4.5, "BGS 9.5": 2.5, "BGS 9": 1.3, "CGC 10": 2.8, "CGC 9.5": 1.6 };
 
 export default function CardPage() {
+  const hidePrices = useHidePrices();
+  const fm = (n: number | null | undefined, c?: string | null) => (hidePrices ? "•••" : fmtMoney(n, c));
   const { id } = useParams<{ id: string }>();
   const [card, setCard] = useState<NormalizedCard | null>(null);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
@@ -279,18 +282,18 @@ export default function CardPage() {
                   <td className="py-1.5">{variantLabel(k)}</td>
                   {market === "tcgplayer" ? (
                     <>
-                      <td className="text-right text-muted">{fmtMoney(v.low, currency)}</td>
-                      <td className="text-right text-muted">{fmtMoney(v.mid, currency)}</td>
-                      <td className="text-right font-semibold">{fmtMoney(v.market, currency)}</td>
-                      <td className="text-right text-muted">{fmtMoney(v.high, currency)}</td>
+                      <td className="text-right text-muted">{fm(v.low, currency)}</td>
+                      <td className="text-right text-muted">{fm(v.mid, currency)}</td>
+                      <td className="text-right font-semibold">{fm(v.market, currency)}</td>
+                      <td className="text-right text-muted">{fm(v.high, currency)}</td>
                     </>
                   ) : (
                     <>
-                      <td className="text-right text-muted">{fmtMoney(v.low, currency)}</td>
-                      <td className="text-right font-semibold">{fmtMoney(v.trend ?? v.market, currency)}</td>
-                      <td className="text-right text-muted">{fmtMoney(v.market ?? v.avg1, currency)}</td>
+                      <td className="text-right text-muted">{fm(v.low, currency)}</td>
+                      <td className="text-right font-semibold">{fm(v.trend ?? v.market, currency)}</td>
+                      <td className="text-right text-muted">{fm(v.market ?? v.avg1, currency)}</td>
                       <td className="text-right text-muted">
-                        {fmtMoney(v.avg7, currency)} / {fmtMoney(v.avg30, currency)}
+                        {fm(v.avg7, currency)} / {fm(v.avg30, currency)}
                       </td>
                     </>
                   )}
@@ -307,7 +310,7 @@ export default function CardPage() {
               {Object.entries(GRADE_MULT).map(([g, m]) => (
                 <div key={g} className="flex justify-between rounded-xl bg-white/[0.03] border border-line px-3 py-2">
                   <span className="text-muted">{g}</span>
-                  <span className="font-semibold">{headline ? fmtMoney(toDisplay(headline.amount * m), displayCurrency) : "—"}</span>
+                  <span className="font-semibold">{headline ? fm(toDisplay(headline.amount * m), displayCurrency) : "—"}</span>
                 </div>
               ))}
             </div>

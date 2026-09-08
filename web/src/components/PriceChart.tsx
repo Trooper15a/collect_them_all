@@ -2,6 +2,7 @@
 
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { fmtMoney } from "@/lib/format";
+import { getHidePrices } from "@/lib/ui-prefs";
 
 export interface Point {
   date: string;
@@ -37,7 +38,7 @@ export function PriceChart({ data, currency, height = 180, color }: { data: Poin
         <Tooltip
           contentStyle={{ background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: 12, fontSize: 12 }}
           labelStyle={{ color: "var(--muted)" }}
-          formatter={(v) => [fmtMoney(Number(v), currency), ""]}
+          formatter={(v) => [getHidePrices() ? "•••" : fmtMoney(Number(v), currency), ""]}
           separator=""
         />
         <Area type="monotone" dataKey="value" stroke={stroke} strokeWidth={2} fill="url(#fill)" dot={false} isAnimationActive={false} />
