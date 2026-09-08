@@ -12,10 +12,17 @@ export async function GET() {
 export async function POST() {
   if (running) return NextResponse.json({ error: "Update already in progress" }, { status: 409 });
 
+  const mlDir = path.resolve(process.cwd(), "..", "ml");
+  if (!require("fs").existsSync(path.join(mlDir, "update_index.py"))) {
+    return NextResponse.json(
+      { error: "Not available in production. Run the ML pipeline locally and redeploy." },
+      { status: 501 }
+    );
+  }
+
   running = true;
   lastResult = null;
 
-  const mlDir = path.resolve(process.cwd(), "..", "ml");
   const venvPython = path.join(mlDir, ".venv", "Scripts", "python.exe");
   const pythonBin = require("fs").existsSync(venvPython) ? venvPython : "python";
   const child = spawn(pythonBin, ["update_index.py"], {
