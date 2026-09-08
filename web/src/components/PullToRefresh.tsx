@@ -33,7 +33,9 @@ export function PullToRefresh({ onRefresh, children }: Props) {
         setPullY(0);
         return;
       }
-      const dy = Math.max(0, e.touches[0].clientY - startY.current);
+      const t = e.touches[0];
+      if (!t) return;
+      const dy = Math.max(0, t.clientY - startY.current);
       setPullY(Math.min(dy * 0.5, 120));
     },
     [pulling, refreshing]

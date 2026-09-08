@@ -46,7 +46,7 @@ export default function OpensPage() {
         return r.json();
       })
       .then((d) => {
-        setOpens(d.opens);
+        setOpens(d.opens ?? []);
         setCurrency(d.currency);
         setError(null);
       })

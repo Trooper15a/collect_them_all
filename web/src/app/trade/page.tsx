@@ -35,8 +35,16 @@ function loadSaved(side: "giving" | "getting"): TradeCard[] {
 }
 
 export default function TradePage() {
-  const [giving, setGiving] = useState<TradeCard[]>(() => loadSaved("giving"));
-  const [getting, setGetting] = useState<TradeCard[]>(() => loadSaved("getting"));
+  const [giving, setGiving] = useState<TradeCard[]>([]);
+  const [getting, setGetting] = useState<TradeCard[]>([]);
+
+  // Load persisted state after mount (SSR-safe defaults above avoid hydration mismatch).
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- one-time localStorage restore after mount; lazy useState initializers would break SSR/hydration */
+    setGiving(loadSaved("giving"));
+    setGetting(loadSaved("getting"));
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
 
   // Persist on change.
   useEffect(() => {

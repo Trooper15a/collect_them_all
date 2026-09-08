@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getScanEngine, type ScanEngine } from "@/lib/scanner/engine";
 import type { Match } from "@/lib/scanner/matcher";
 import { cardGuide, preprocess } from "@/lib/scanner/preprocess";
+import { showToast } from "./Toast";
 import { Button } from "./ui";
 
 /** Map an ML index card id (pw:/sf:/ygo:) straight to the app's card id: they use the same scheme. */
@@ -72,6 +73,8 @@ export function Scanner({ onMatches, onClose, bulkMode, bulkCount }: { onMatches
     try {
       const m = await scanOnce();
       if (m) onMatches(m);
+    } catch {
+      showToast("Scan failed — try again", "down");
     } finally {
       setBusy(false);
     }

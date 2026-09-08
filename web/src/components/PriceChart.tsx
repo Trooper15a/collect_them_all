@@ -9,7 +9,7 @@ export interface Point {
 }
 
 export function PriceChart({ data, currency, height = 180, color }: { data: Point[]; currency: string; height?: number; color?: string }) {
-  const pts = data.filter((d) => d.value != null);
+  const pts = (data ?? []).filter((d) => d.value != null);
   if (pts.length < 2) {
     return (
       <div className="flex items-center justify-center text-xs text-muted" style={{ height }}>
