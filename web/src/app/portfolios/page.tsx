@@ -108,7 +108,7 @@ export default function PortfoliosPage() {
     <div>
       <header className="pt-2 pb-3 flex items-center justify-between anim-widget d1">
         <h1 className="text-xl font-bold uppercase tracking-wider">My Binders</h1>
-        <Button variant="ghost" className="px-3 py-1.5 text-xs" onClick={() => setCreating((v) => !v)}>
+        <Button variant="rainbow" className="px-3 py-1.5 text-xs" onClick={() => setCreating((v) => !v)}>
           + New
         </Button>
       </header>

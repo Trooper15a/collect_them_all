@@ -260,12 +260,12 @@ export default function ScanPage() {
                   <rect x="8" y="7" width="8" height="10" rx="1" />
                 </svg>
               </button>
-              <button onClick={() => { setBulkMode(true); setScanning(true); }} className="w-20 h-20 rounded-full bg-elev border-2 border-accent text-accent flex flex-col items-center justify-center active:scale-95 transition">
-                <svg viewBox="0 0 24 24" className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <button onClick={() => { setBulkMode(true); setScanning(true); }} className="w-20 h-20 rounded-full border-rainbow bg-elev flex flex-col items-center justify-center active:scale-95 transition">
+                <svg viewBox="0 0 24 24" className="w-7 h-7 icon-rainbow" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                   <path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" />
                   <rect x="8" y="7" width="8" height="10" rx="1" />
                 </svg>
-                <span className="text-[9px] font-bold mt-0.5">BULK</span>
+                <span className="text-[9px] font-bold mt-0.5 text-rainbow">BULK</span>
               </button>
             </div>
             <div className="mt-4 font-semibold">Point your camera at a card</div>
