@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { SetLogo } from "@/components/SetLogo";
 import { Empty, Segmented, Skeleton, inputCls } from "@/components/ui";
 import { langLabel } from "@/lib/format";
+import { TCGS } from "@/lib/types";
+import { useActiveTcg } from "@/lib/ui-prefs";
 
 interface SetRow {
   id: string;
@@ -19,7 +21,7 @@ interface SetRow {
 export default function SetsPage() {
   const [sets, setSets] = useState<SetRow[] | null>(null);
   const [owned, setOwned] = useState<Record<string, number>>({});
-  const [tcg, setTcg] = useState<"all" | "pokemon" | "mtg" | "yugioh">("pokemon");
+  const tcg = useActiveTcg(); // global game picker (top-left); "all" shows every game
   const [lang, setLang] = useState<"all" | "eng" | "jap">("all");
   const [q, setQ] = useState("");
   const [onlyOwned, setOnlyOwned] = useState(false);
@@ -56,17 +58,10 @@ export default function SetsPage() {
       </header>
       <input className={inputCls} placeholder="Filter sets…" value={q} onChange={(e) => setQ(e.target.value)} />
       <div className="mt-3 flex flex-wrap gap-2 items-center">
-        <Segmented
-          value={tcg}
-          onChange={setTcg}
-          size="xs"
-          options={[
-            { value: "pokemon", label: "Pokémon" },
-            { value: "mtg", label: "Magic" },
-            { value: "yugioh", label: "Yu-Gi-Oh!" },
-            { value: "all", label: "All" },
-          ]}
-        />
+        <span className="inline-flex items-center gap-1.5 text-xs text-muted" title="Filtered by the global game picker (top-left)">
+          <span className="h-2 w-2 rounded-full" style={{ background: TCGS.find((t) => t.id === tcg)?.accent ?? "var(--color-muted, #888)" }} />
+          {tcg === "all" ? "All games" : TCGS.find((t) => t.id === tcg)?.label ?? tcg}
+        </span>
         <Segmented
           value={lang}
           onChange={setLang}
@@ -110,10 +105,10 @@ export default function SetsPage() {
         </div>
       )}
       {sets && list.length > 0 && (
-        <ul className={`mt-4 card-surface rounded-2xl divide-y divide-line overflow-hidden ${loading ? "opacity-60" : ""}`}>
+        <ul className={`mt-4 space-y-2 ${loading ? "opacity-60" : ""}`}>
           {list.map((s) => (
             <li key={s.id}>
-              <Link href={`/sets/${encodeURIComponent(s.id)}`} className="flex items-center gap-3 p-3 hover:bg-white/[0.03]">
+              <Link href={`/sets/${encodeURIComponent(s.id)}`} className="card-surface rounded-2xl flex items-center gap-3 p-3 hover:bg-white/[0.03] transition-colors">
                 <SetLogo id={s.id} code={s.code} />
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">{s.name}</div>
