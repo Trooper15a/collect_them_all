@@ -22,14 +22,14 @@ export interface AddSheetCard {
 }
 
 export function AddToPortfolioSheet(props: { card: AddSheetCard | null; onClose: () => void; onAdded?: () => void }) {
-  const hidePrices = useHidePrices();
-  const fm = (n: number, c: string) => (hidePrices ? "•••" : fmtMoney(n, c));
   // Keyed on the card id so every open starts with fresh form state.
   if (!props.card) return null;
   return <Sheet key={props.card.id} {...props} card={props.card} />;
 }
 
 function Sheet({ card, onClose, onAdded }: { card: AddSheetCard; onClose: () => void; onAdded?: () => void }) {
+  const hidePrices = useHidePrices();
+  const fm = (n: number, c: string) => (hidePrices ? "•••" : fmtMoney(n, c));
   const sealed = !!card.sealed;
   const [portfolios, setPortfolios] = useState<PortfolioLite[]>([]);
   const [portfolioId, setPortfolioId] = useState<number | "new">("new");

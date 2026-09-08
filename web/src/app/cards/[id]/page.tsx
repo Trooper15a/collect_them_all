@@ -23,7 +23,7 @@ const GRADE_MULT: Record<string, number> = { "PSA 10": 3.0, "PSA 9": 1.4, "PSA 8
 
 export default function CardPage() {
   const hidePrices = useHidePrices();
-  const fm = (n: number | null | undefined, c?: string | null) => (hidePrices ? "•••" : fmtMoney(n, c));
+  const fm = (n: number | null | undefined, c?: string | null) => (hidePrices ? "•••" : fmtMoney(n, c ?? undefined));
   const { id } = useParams<{ id: string }>();
   const [card, setCard] = useState<NormalizedCard | null>(null);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
