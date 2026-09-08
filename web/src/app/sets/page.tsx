@@ -6,7 +6,7 @@ import { SetLogo } from "@/components/SetLogo";
 import { Empty, Segmented, Skeleton, inputCls } from "@/components/ui";
 import { langLabel } from "@/lib/format";
 import { TCGS } from "@/lib/types";
-import { useActiveTcg } from "@/lib/ui-prefs";
+import { useActiveTcgHydrated } from "@/lib/ui-prefs";
 
 interface SetRow {
   id: string;
@@ -21,32 +21,13 @@ interface SetRow {
 export default function SetsPage() {
   const [sets, setSets] = useState<SetRow[] | null>(null);
   const [owned, setOwned] = useState<Record<string, number>>({});
-  const tcg = useActiveTcg(); // global game picker (top-left); "all" shows every game
+  const { tcg, hydrated } = useActiveTcgHydrated(); // global game picker (top-left); "all" shows every game
   const [lang, setLang] = useState<"all" | "eng" | "jap">("all");
   const [q, setQ] = useState("");
   const [onlyOwned, setOnlyOwned] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const loading = loadedKey !== `${tcg}/${lang}`;
-
-  useEffect(() => {
-    const ac = new AbortController();
-    setSets(null);
-    setOwned({});
-    fetch(`/api/sets?tcg=${tcg}&lang=${lang}`, { signal: ac.signal })
-      .then(async (r) => {
-        if (!r.ok) throw new Error("Failed to load sets");
-        return r.json();
-      })
-      .then((d) => {
-        setSets(d.sets ?? []);
-        setOwned(d.owned ?? {});
-        setError(null);
-        setLoadedKey(`${tcg}/${lang}`);
-      })
-      .catch((e) => { if ((e as Error).name !== "AbortError") setError(e.message); });
-    return () => ac.abort();
-  }, [tcg, lang]);
 
   const load = useCallback(() => {
     setSets(null);
@@ -64,11 +45,30 @@ export default function SetsPage() {
       })
       .catch((e) => setError(e.message));
   }, [tcg, lang]);
+  useEffect(() => {
+    if (!hydrated) return;
+    const ac = new AbortController();
+    setSets(null);
+    setOwned({});
+    fetch(`/api/sets?tcg=${tcg}&lang=${lang}`, { signal: ac.signal })
+      .then(async (r) => {
+        if (!r.ok) throw new Error("Failed to load sets");
+        return r.json();
+      })
+      .then((d) => {
+        setSets(d.sets ?? []);
+        setOwned(d.owned ?? {});
+        setError(null);
+        setLoadedKey(`${tcg}/${lang}`);
+      })
+      .catch((e) => { if ((e as Error).name !== "AbortError") setError(e.message); });
+    return () => ac.abort();
+  }, [tcg, lang, hydrated]);
 
   const list = useMemo(() => {
     if (!sets) return [];
     const ql = q.trim().toLowerCase();
-    return sets.filter((s) => (!ql || s.name.toLowerCase().includes(ql) || s.code.toLowerCase().includes(ql)) && (!onlyOwned || owned[s.id]));
+    return sets.filter((s) => (!ql || s.name.toLowerCase().includes(ql) || s.code.toLowerCase().includes(ql)) && (!onlyOwned || owned[s.id.toLowerCase()]));
   }, [sets, q, onlyOwned, owned]);
 
   return (
@@ -126,7 +126,9 @@ export default function SetsPage() {
       )}
       {sets && list.length > 0 && (
         <ul className={`mt-4 space-y-2 ${loading ? "opacity-60" : ""}`}>
-          {list.map((s) => (
+          {list.map((s) => {
+            const n = owned[s.id.toLowerCase()] ?? 0;
+            return (
             <li key={s.id}>
               <Link href={`/sets/${encodeURIComponent(s.id)}`} className="card-surface rounded-2xl flex items-center gap-3 p-3 hover:bg-white/[0.03] transition-colors">
                 <SetLogo id={s.id} code={s.code} />
@@ -137,22 +139,23 @@ export default function SetsPage() {
                   </div>
                 </div>
                 <div className="text-right text-xs w-24 shrink-0">
-                  {owned[s.id] && s.total ? (
+                  {n && s.total ? (
                     <>
-                      <span className="text-up font-semibold">{owned[s.id]}/{s.total}</span>
+                      <span className="text-up font-semibold">{n}/{s.total}</span>
                       <div className="mt-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
-                        <div className="h-full rounded-full bg-up transition-all" style={{ width: `${Math.min(100, Math.round((owned[s.id] / s.total) * 100))}%` }} />
+                        <div className="h-full rounded-full bg-up transition-all" style={{ width: `${Math.min(100, Math.round((n / s.total) * 100))}%` }} />
                       </div>
                     </>
-                  ) : owned[s.id] ? (
-                    <span className="text-up font-semibold">{owned[s.id]} owned</span>
+                  ) : n ? (
+                    <span className="text-up font-semibold">{n} owned</span>
                   ) : (
                     <span className="text-muted">{s.total ?? "—"} cards</span>
                   )}
                 </div>
               </Link>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </div>

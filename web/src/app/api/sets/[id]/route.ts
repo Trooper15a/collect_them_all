@@ -76,7 +76,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     .map((r) => {
       const c = rowToCard(r);
       const bp = bestPrice(c.prices);
-      return { id: c.id, name: c.name, price: bp ? convert(bp.amount, bp.currency, currency, fx) : null, owned: owned.get(c.id) ?? 0 };
+      // Include raw prices so the "+ Add" sheet can show the market price.
+      return { id: c.id, name: c.name, price: bp ? convert(bp.amount, bp.currency, currency, fx) : null, prices: c.prices, owned: owned.get(c.id) ?? 0 };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
 

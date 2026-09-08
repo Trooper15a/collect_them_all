@@ -73,10 +73,13 @@ async function fetchImage(url: string | URL, headers: Record<string, string> = {
 }
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  // Short negative cache: logoless sets (JP Pokémon, MTG extras, unmapped codes)
+  // otherwise re-walk the whole fallback chain on every /sets render.
+  const NEGATIVE = { "Cache-Control": "public, max-age=300" };
   const id = decodeURIComponent((await ctx.params).id);
   const sets = await db.select().from(schema.sets).where(eq(schema.sets.id, id)).limit(1);
   const set = sets[0];
-  if (!set) return new NextResponse("not found", { status: 404 });
+  if (!set) return new NextResponse("not found", { status: 404, headers: NEGATIVE });
   try {
     let upstream: Response | null = null;
     if (set.imageUrl) {
@@ -95,11 +98,22 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
     if (!upstream && set.tcg === "mtg" && set.code) {
       upstream = await fetchImage(`https://svgs.scryfall.io/sets/${encodeURIComponent(set.code.toLowerCase())}.svg`);
     }
-    if (!upstream) return new NextResponse("no logo", { status: 404 });
+    if (!upstream) return new NextResponse("no logo", { status: 404, headers: NEGATIVE });
     const type = upstream.headers.get("Content-Type") ?? "image/png";
     const buf = Buffer.from(await upstream.arrayBuffer());
-    return new NextResponse(buf, { headers: { "Content-Type": type, "Cache-Control": "public, max-age=31536000, immutable" } });
+    // Never buffer unbounded upstream bodies into memory per request.
+    if (buf.byteLength > 5_000_000) return new NextResponse("logo too large", { status: 404, headers: NEGATIVE });
+    return new NextResponse(buf, {
+      headers: {
+        "Content-Type": type,
+        "Cache-Control": "public, max-age=31536000, immutable",
+        // Upstream SVGs are re-served same-origin — make sure they're only ever
+        // treated as images, never executed.
+        "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "script-src 'none'",
+      },
+    });
   } catch {
-    return new NextResponse("logo fetch failed", { status: 502 });
+    return new NextResponse("logo fetch failed", { status: 502, headers: NEGATIVE });
   }
 }

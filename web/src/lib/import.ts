@@ -1,4 +1,4 @@
-import { and, eq, like, sql } from "drizzle-orm";
+import { and, eq, isNull, like, or, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { rowToCard } from "./cards";
 import { nowIso } from "./format";
@@ -189,19 +189,25 @@ export async function previewImport(text: string): Promise<ImportRow[]> {
   return results;
 }
 
-export async function commitImport(rows: ImportRow[], defaultPortfolio: string) {
+export async function commitImport(rows: ImportRow[], defaultPortfolio: string, userId: string) {
   let added = 0;
   const skipped: number[] = [];
   const portfolioIds = new Map<string, number>();
   const getPortfolio = async (name: string) => {
     const key = name.trim() || defaultPortfolio;
     if (portfolioIds.has(key)) return portfolioIds.get(key)!;
-    const existing = await db.select().from(schema.portfolios).where(eq(schema.portfolios.name, key)).limit(1);
+    // Reuse the caller's own portfolio, or a legacy orphan (userId NULL — still
+    // claimable via claimOrphanData, but attaching to it now keeps one binder).
+    const existing = await db
+      .select()
+      .from(schema.portfolios)
+      .where(and(eq(schema.portfolios.name, key), or(eq(schema.portfolios.userId, userId), isNull(schema.portfolios.userId))))
+      .limit(1);
     if (existing[0]) {
       portfolioIds.set(key, existing[0].id);
       return existing[0].id;
     }
-    const result = await db.insert(schema.portfolios).values({ name: key, tcgId: null, language: null, createdAt: nowIso() }).returning();
+    const result = await db.insert(schema.portfolios).values({ userId, name: key, tcgId: null, language: null, createdAt: nowIso() }).returning();
     const id = result[0].id;
     portfolioIds.set(key, id);
     return id;

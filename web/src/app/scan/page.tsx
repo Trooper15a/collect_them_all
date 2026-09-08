@@ -9,7 +9,7 @@ import { Button, CardImage, Empty, Money, Segmented, Skeleton, TcgBadge, inputCl
 import { haptic } from "@/lib/haptics";
 import { isScanIndexId, type Match } from "@/lib/scanner/matcher";
 import { TCGS, type CardSummary } from "@/lib/types";
-import { useActiveTcg } from "@/lib/ui-prefs";
+import { useActiveTcgHydrated } from "@/lib/ui-prefs";
 
 interface RecentScan { id: string; name: string; setName: string | null; ts: number; }
 
@@ -18,7 +18,7 @@ type SearchSort = "relevance" | "price-desc" | "price-asc" | "name";
 
 export default function ScanPage() {
   const [q, setQ] = useState("");
-  const tcg = useActiveTcg();
+  const { tcg, hydrated: tcgHydrated } = useActiveTcgHydrated();
   const [lang, setLang] = useState<LangFilter>("all");
   const [results, setResults] = useState<CardSummary[] | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -90,7 +90,9 @@ export default function ScanPage() {
 
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current);
-    if (!q.trim()) return;
+    // Wait for the tcg pref to hydrate so a saved game choice doesn't fire a
+    // throwaway tcg=all search first.
+    if (!tcgHydrated || !q.trim()) return;
     timer.current = setTimeout(async () => {
       abort.current?.abort();
       const ac = new AbortController();
@@ -111,7 +113,7 @@ export default function ScanPage() {
         if (!ac.signal.aborted) setLoading(false);
       }
     }, 350);
-  }, [q, tcg, lang]);
+  }, [q, tcg, lang, tcgHydrated]);
 
   const sortedResults = useMemo(() => {
     if (!results) return null;
