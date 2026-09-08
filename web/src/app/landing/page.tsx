@@ -102,10 +102,10 @@ export default function LandingPage() {
       <section className="py-6 border-y border-line overflow-hidden">
         <div className="flex gap-6 animate-marquee marquee-track whitespace-nowrap">
           {TCGS.map((t) => (
-            <span key={t} className="text-sm font-medium text-muted/60">{t}</span>
+            <span key={t} className="text-sm font-medium text-muted">{t}</span>
           ))}
           {TCGS.map((t) => (
-            <span key={`${t}-duplicate`} aria-hidden="true" className="text-sm font-medium text-muted/60">{t}</span>
+            <span key={`${t}-duplicate`} aria-hidden="true" className="text-sm font-medium text-muted">{t}</span>
           ))}
         </div>
       </section>
