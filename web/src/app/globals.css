@@ -4,7 +4,8 @@
   --bg: #0a0e1a;
   --bg-elev: #111827;
   --fg: #f0f2f5;
-  --muted: #7d8597;
+  /* #9aa3b2 passes WCAG AA (7.5:1) on --bg #0a0e1a */
+  --muted: #9aa3b2;
   --line: rgba(255, 255, 255, 0.07);
   --glass: rgba(17, 24, 39, 0.65);
   --up: #34d399;
@@ -90,8 +91,30 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Keyboard focus must stay visible even where utilities remove the default outline */
+:focus-visible {
+  outline: 2px solid var(--accent, #3b82f6);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Bottom padding ≥ tab bar height (64px + 10px inset + 10px gap) so scroll content
+   is never hidden behind the fixed TabBar; --pwa-banner-inset is set by PwaRegister
+   to additionally reserve space while the install banner is visible. */
 .safe-bottom {
-  padding-bottom: calc(env(safe-area-inset-bottom) + 84px);
+  padding-bottom: calc(env(safe-area-inset-bottom) + 84px + var(--pwa-banner-inset, 0px));
+}
+/* TabBar is hidden on public pages (/landing, /login, /privacy, /terms) */
+html.no-tabbar .safe-bottom {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 16px + var(--pwa-banner-inset, 0px));
+}
+
+/* Install banner sits fixed above the TabBar with an 8px gap */
+.pwa-banner {
+  bottom: calc(64px + max(env(safe-area-inset-bottom), 10px) + 8px);
+}
+html.no-tabbar .pwa-banner {
+  bottom: calc(env(safe-area-inset-bottom) + 12px);
 }
 
 .no-scrollbar::-webkit-scrollbar {
@@ -316,6 +339,9 @@ body {
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
+  .animate-marquee, .marquee-track {
+    animation: none !important;
+  }
   .anim-widget, .anim-fade-up, .anim-pop, .anim-slide-right, .stagger-children > * {
     animation: none !important;
     opacity: 1 !important;

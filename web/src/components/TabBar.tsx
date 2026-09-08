@@ -13,9 +13,18 @@ const tabs = [
   { href: "/settings", label: "Settings", icon: GearIcon },
 ];
 
+const PUBLIC_PATHS = ["/landing", "/login", "/privacy", "/terms"];
+
 export function TabBar() {
   const pathname = usePathname();
   const [scanBadge, setScanBadge] = useState(0);
+  const hidden = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
+
+  useEffect(() => {
+    // Signal to globals.css (.safe-bottom / .pwa-banner) that no tab bar is rendered.
+    document.documentElement.classList.toggle("no-tabbar", hidden);
+    return () => document.documentElement.classList.remove("no-tabbar");
+  }, [hidden]);
 
   useEffect(() => {
     const update = () => {
@@ -30,8 +39,10 @@ export function TabBar() {
     return () => { window.removeEventListener("storage", update); clearInterval(id); };
   }, []);
 
+  if (hidden) return null;
+
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-40 px-3 pb-[max(env(safe-area-inset-bottom),10px)] pointer-events-none">
+    <nav aria-label="Primary" className="fixed bottom-0 inset-x-0 z-40 px-3 pb-[max(env(safe-area-inset-bottom),10px)] pointer-events-none">
       <div className="glass pointer-events-auto mx-auto max-w-md rounded-2xl grid grid-cols-6 h-16 shadow-[0_8px_40px_rgba(0,0,0,0.45)]">
         {tabs.map((t) => {
           const active = t.href === "/" ? pathname === "/" : pathname.startsWith(t.href);
@@ -40,6 +51,7 @@ export function TabBar() {
             <Link
               key={t.href}
               href={t.href}
+              aria-current={active ? "page" : undefined}
               className={`relative flex flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors ${active ? "text-accent" : "text-muted hover:text-fg"}`}
             >
               <div className="relative">
