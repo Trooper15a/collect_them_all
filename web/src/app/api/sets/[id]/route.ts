@@ -27,6 +27,19 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
         sql`card_number is not null`,
       ),
     );
+  // Sealed products (booster boxes, ETBs, tins) live in the same table with card_number = null.
+  const sealedRows = await db
+    .select()
+    .from(schema.cards)
+    .where(
+      and(
+        eq(schema.cards.tcg, set.tcg),
+        eq(schema.cards.language, set.language),
+        group?.setId ? or(eq(schema.cards.setId, group.setId), eq(schema.cards.setCode, set.code)) : eq(schema.cards.setCode, set.code),
+        sql`card_number is null`,
+      ),
+    );
+
   const byNumber = new Map<string, ReturnType<typeof rowToCard>>();
   for (const r of rows.sort((a, b) => Number(b.id.startsWith("tp:")) - Number(a.id.startsWith("tp:")))) {
     const key = (r.cardNumber ?? "").split("/")[0].trim().replace(/^0+(?=\d)/, "").toLowerCase() || r.id;
@@ -35,7 +48,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   const cards = [...byNumber.values()];
   const ids = cards.map((c) => c.id);
   const owned = new Map<string, number>();
-  if (ids.length) {
+  if (ids.length || sealedRows.length) {
     const items = await db.select({ cardId: schema.portfolioItems.cardId, qty: schema.portfolioItems.quantity }).from(schema.portfolioItems);
     for (const it of items) owned.set(it.cardId, (owned.get(it.cardId) ?? 0) + it.qty);
   }
@@ -59,10 +72,19 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     })
     .sort((a, b) => (a.cardNumber ?? "").localeCompare(b.cardNumber ?? "", undefined, { numeric: true }));
 
+  const sealed = sealedRows
+    .map((r) => {
+      const c = rowToCard(r);
+      const bp = bestPrice(c.prices);
+      return { id: c.id, name: c.name, price: bp ? convert(bp.amount, bp.currency, currency, fx) : null, owned: owned.get(c.id) ?? 0 };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+
   return NextResponse.json({
     set,
     currency,
     cards: list,
+    sealed,
     completion: { owned: ownedCount, total: list.length, pct: list.length ? (ownedCount / list.length) * 100 : 0, missingCost, totalValue },
   });
 }
