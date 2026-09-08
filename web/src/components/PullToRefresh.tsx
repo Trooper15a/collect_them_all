@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useCallback, type ReactNode } from "react";
+import { haptic } from "@/lib/haptics";
 
 interface Props {
   onRefresh: () => Promise<void> | void;
@@ -12,12 +13,12 @@ export function PullToRefresh({ onRefresh, children }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [pullY, setPullY] = useState(0);
   const startY = useRef(0);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   const threshold = 80;
 
   const onTouchStart = useCallback((e: React.TouchEvent) => {
-    if (containerRef.current && containerRef.current.scrollTop === 0) {
+    // The window scrolls, not this container — gate on the real scroll position.
+    if (window.scrollY === 0) {
       startY.current = e.touches[0].clientY;
       setPulling(true);
     }
@@ -26,6 +27,12 @@ export function PullToRefresh({ onRefresh, children }: Props) {
   const onTouchMove = useCallback(
     (e: React.TouchEvent) => {
       if (!pulling || refreshing) return;
+      // Abort if the page has scrolled away from the top mid-gesture.
+      if (window.scrollY > 0) {
+        setPulling(false);
+        setPullY(0);
+        return;
+      }
       const dy = Math.max(0, e.touches[0].clientY - startY.current);
       setPullY(Math.min(dy * 0.5, 120));
     },
@@ -36,6 +43,7 @@ export function PullToRefresh({ onRefresh, children }: Props) {
     if (!pulling) return;
     if (pullY >= threshold && !refreshing) {
       setRefreshing(true);
+      haptic("light");
       try {
         await onRefresh();
       } finally {
@@ -48,7 +56,6 @@ export function PullToRefresh({ onRefresh, children }: Props) {
 
   return (
     <div
-      ref={containerRef}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}

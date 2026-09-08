@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 
 export function UserMenu() {
   const { data: session } = useSession();
+  const [confirming, setConfirming] = useState(false);
   if (!session?.user) return null;
 
   return (
@@ -20,12 +22,30 @@ export function UserMenu() {
         <div className="text-sm font-medium truncate">{session.user.name}</div>
         <div className="text-[11px] text-muted truncate">{session.user.email}</div>
       </div>
-      <button
-        onClick={() => signOut()}
-        className="text-xs text-muted hover:text-down transition-colors px-2 py-1 rounded-lg"
-      >
-        Sign out
-      </button>
+      {confirming ? (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted">Sign out?</span>
+          <button
+            onClick={() => signOut()}
+            className="text-xs font-semibold text-down bg-down/15 border border-down/30 rounded-lg px-2 py-1 hover:bg-down/25 transition-colors"
+          >
+            Yes
+          </button>
+          <button
+            onClick={() => setConfirming(false)}
+            className="text-xs text-muted hover:text-fg transition-colors px-2 py-1 rounded-lg"
+          >
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={() => setConfirming(true)}
+          className="text-xs text-muted hover:text-down transition-colors px-2 py-1 rounded-lg"
+        >
+          Sign out
+        </button>
+      )}
     </div>
   );
 }
