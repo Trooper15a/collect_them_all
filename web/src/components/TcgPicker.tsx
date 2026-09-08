@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { setActiveTcg, useActiveTcg, type ActiveTcg } from "@/lib/ui-prefs";
 import { TCGS } from "@/lib/types";
 
@@ -12,6 +12,8 @@ export function TcgPicker() {
   const pathname = usePathname();
   const active = useActiveTcg();
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
   const hidden = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
   const activeMeta = active === "all" ? null : TCGS.find((t) => t.id === active) ?? null;
@@ -26,6 +28,36 @@ export function TcgPicker() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
+  // Focus management: move focus to the active option on open, return it to the
+  // trigger on close.
+  useEffect(() => {
+    if (!open) return;
+    const trigger = triggerRef.current;
+    const sheet = sheetRef.current;
+    const selected = sheet?.querySelector<HTMLElement>('[aria-pressed="true"]');
+    (selected ?? sheet)?.focus();
+    return () => trigger?.focus();
+  }, [open]);
+
+  // Simple focus trap: keep Tab/Shift+Tab cycling inside the sheet.
+  function trapTab(e: ReactKeyboardEvent) {
+    if (e.key !== "Tab") return;
+    const sheet = sheetRef.current;
+    if (!sheet) return;
+    const focusables = Array.from(sheet.querySelectorAll<HTMLElement>("button, [tabindex]")).filter((el) => el.tabIndex >= 0);
+    if (!focusables.length) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    const active = document.activeElement;
+    if (e.shiftKey && (active === first || !sheet.contains(active))) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && (active === last || !sheet.contains(active))) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+
   if (hidden) return null;
 
   function pick(t: ActiveTcg) {
@@ -39,6 +71,7 @@ export function TcgPicker() {
           header row (h1 / BackLink headers end ~52px under the content top). */}
       <button
         type="button"
+        ref={triggerRef}
         onClick={() => setOpen(true)}
         aria-label={`Change game — currently ${activeLabel}`}
         aria-haspopup="dialog"
@@ -53,15 +86,18 @@ export function TcgPicker() {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal aria-label="Choose game">
+        <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal aria-label="Choose game" onKeyDown={trapTab}>
           <button
             className="absolute inset-0 bg-black/60 anim-fade-up"
             style={{ animationDuration: "0.2s" }}
             onClick={() => setOpen(false)}
             aria-label="Close"
+            tabIndex={-1}
           />
           <div
-            className="relative glass w-full max-w-lg rounded-t-3xl p-5 pb-[max(env(safe-area-inset-bottom),20px)] max-h-[88vh] overflow-y-auto anim-widget d1"
+            ref={sheetRef}
+            tabIndex={-1}
+            className="relative glass w-full max-w-lg rounded-t-3xl p-5 pb-[max(env(safe-area-inset-bottom),20px)] max-h-[88vh] overflow-y-auto anim-widget d1 outline-none"
             style={{ animationName: "slide-up-sheet" }}
           >
             <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-4" />

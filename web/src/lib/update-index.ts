@@ -39,6 +39,7 @@ const TCGCSV_CATEGORIES: Record<string, number[]> = {
   vanguard: [16],
   weiss: [20],
   finalfantasy: [24],
+  unionarena: [81],
 };
 
 /** Category IDs that are Japanese. Everything else defaults to "eng". */

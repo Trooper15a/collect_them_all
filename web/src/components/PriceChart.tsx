@@ -2,7 +2,7 @@
 
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { fmtMoney } from "@/lib/format";
-import { getHidePrices } from "@/lib/ui-prefs";
+import { useHidePrices } from "@/lib/ui-prefs";
 
 export interface Point {
   date: string;
@@ -10,6 +10,7 @@ export interface Point {
 }
 
 export function PriceChart({ data, currency, height = 180, color }: { data: Point[]; currency: string; height?: number; color?: string }) {
+  const hidePrices = useHidePrices();
   const pts = (data ?? []).filter((d) => d.value != null);
   if (pts.length < 2) {
     return (
@@ -20,13 +21,16 @@ export function PriceChart({ data, currency, height = 180, color }: { data: Poin
   }
   const first = pts[0].value ?? 0;
   const last = pts[pts.length - 1].value ?? 0;
-  const stroke = color ?? (last >= first ? "var(--up)" : "var(--down)");
-  const min = Math.min(...pts.map((p) => p.value as number));
-  const max = Math.max(...pts.map((p) => p.value as number));
+  // hide-prices: the curve's shape/direction leaks the trend — draw a flat,
+  // neutral placeholder line instead of the real series.
+  const plotPts = hidePrices ? pts.map((p) => ({ ...p, value: first })) : pts;
+  const stroke = hidePrices ? "var(--muted)" : (color ?? (last >= first ? "var(--up)" : "var(--down)"));
+  const min = Math.min(...plotPts.map((p) => p.value as number));
+  const max = Math.max(...plotPts.map((p) => p.value as number));
   const pad = (max - min) * 0.15 || max * 0.1 || 1;
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <AreaChart data={pts} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
+      <AreaChart data={plotPts} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
         <defs>
           <linearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={stroke} stopOpacity={0.35} />
@@ -38,7 +42,7 @@ export function PriceChart({ data, currency, height = 180, color }: { data: Poin
         <Tooltip
           contentStyle={{ background: "var(--bg-elev)", border: "1px solid var(--line)", borderRadius: 12, fontSize: 12 }}
           labelStyle={{ color: "var(--muted)" }}
-          formatter={(v) => [getHidePrices() ? "•••" : fmtMoney(Number(v), currency), ""]}
+          formatter={(v) => [hidePrices ? "•••" : fmtMoney(Number(v), currency), ""]}
           separator=""
         />
         <Area type="monotone" dataKey="value" stroke={stroke} strokeWidth={2} fill="url(#fill)" dot={false} isAnimationActive={false} />

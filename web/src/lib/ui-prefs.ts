@@ -71,11 +71,15 @@ export function setActiveTcg(t: ActiveTcg): void {
   window.dispatchEvent(new CustomEvent(TCG_EVENT));
 }
 
-export function useActiveTcg(): ActiveTcg {
+function useActiveTcgState(): { tcg: ActiveTcg; hydrated: boolean } {
   // start "all" so SSR/CSR markup matches; sync from localStorage after mount
   const [tcg, setTcg] = useState<ActiveTcg>("all");
+  const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
-    const sync = () => setTcg(getActiveTcg());
+    const sync = () => {
+      setTcg(getActiveTcg());
+      setHydrated(true);
+    };
     sync();
     window.addEventListener("storage", sync);
     window.addEventListener(TCG_EVENT, sync);
@@ -84,5 +88,18 @@ export function useActiveTcg(): ActiveTcg {
       window.removeEventListener(TCG_EVENT, sync);
     };
   }, []);
-  return tcg;
+  return { tcg, hydrated };
+}
+
+export function useActiveTcg(): ActiveTcg {
+  return useActiveTcgState().tcg;
+}
+
+/**
+ * Same as useActiveTcg, plus `hydrated`: false until the post-mount localStorage
+ * sync has run. Fetch effects that key off the pref should wait for `hydrated`
+ * so users who picked a game don't fire a throwaway tcg=all request first.
+ */
+export function useActiveTcgHydrated(): { tcg: ActiveTcg; hydrated: boolean } {
+  return useActiveTcgState();
 }
