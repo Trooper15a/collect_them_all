@@ -1,4 +1,4 @@
-# Collect Them All
+# RipnPull
 
 A free, open-source TCG portfolio tracker with an **AI-powered card scanner** that runs entirely on your device. No cloud fees, no subscriptions, no data collection.
 
@@ -39,7 +39,7 @@ You need two free programs. Download and install both — just click "Next" thro
 
 After installing both, **restart your computer**.
 
-### Step 1: Download Collectr
+### Step 1: Download the code
 
 Open your terminal:
 - **Windows**: Press `Win` key, type `cmd`, press Enter
@@ -54,7 +54,7 @@ git clone https://github.com/Trooper15a/collect_them_all.git
 ### Step 2: Install Dependencies
 
 ```bash
-cd collectr/web
+cd collect_them_all/web
 ```
 
 ```bash
@@ -155,7 +155,7 @@ cd ml
 
 ## Access From Anywhere (Free with Tailscale)
 
-Want to use Collect Them All outside your home WiFi — on cellular, at work, anywhere? Use [Tailscale](https://tailscale.com) (free for personal use). It creates a private encrypted network between your devices so only you can access your server.
+Want to use RipnPull outside your home WiFi — on cellular, at work, anywhere? Use [Tailscale](https://tailscale.com) (free for personal use). It creates a private encrypted network between your devices so only you can access your server.
 
 ### Step 1: Install Tailscale on Your Computer
 
@@ -212,7 +212,7 @@ You can also self-host on a VPS or cloud platform (~$4-6/month for Hetzner, Digi
 
 | Data | Source | API Key |
 |------|--------|---------|
-| TCGPlayer prices (all games, daily) | [tcgcsv.com](https://tcgcsv.com) | None (free, no limit) |
+| TCGPlayer prices (all games, daily) | [tcgcsv.com](https://tcgcsv.com) | None (free; keep under ~10k requests/day per their guideline — the importer throttles requests) |
 | CardMarket EUR prices (Pokemon) | [PokéWallet](https://pokewallet.io) | Free key (100/hr) |
 | Pokemon scanner images | [TCGdex](https://tcgdex.net) | None (free, no limit) |
 | Magic images | [Scryfall](https://scryfall.com) | None (free) |
@@ -288,7 +288,7 @@ The model is ~18 MB and is cached in your browser after first load. Everything r
 ## Project Structure
 
 ```
-collectr/
+collect_them_all/
 ├── web/                        # Next.js web application
 │   ├── src/app/                # Pages and API routes
 │   ├── src/components/         # React components

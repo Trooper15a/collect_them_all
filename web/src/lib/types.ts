@@ -1,4 +1,4 @@
-export type Tcg = "pokemon" | "mtg" | "yugioh" | "onepiece" | "lorcana" | "digimon" | "dbs" | "dbfw" | "fab" | "swu" | "vanguard" | "weiss" | "finalfantasy";
+export type Tcg = "pokemon" | "mtg" | "yugioh" | "onepiece" | "lorcana" | "digimon" | "dbs" | "dbfw" | "fab" | "swu" | "vanguard" | "weiss" | "finalfantasy" | "unionarena";
 export const TCGS: { id: Tcg; label: string; accent: string }[] = [
   { id: "pokemon", label: "Pokémon", accent: "#facc15" },
   { id: "mtg", label: "Magic", accent: "#60a5fa" },
@@ -13,6 +13,7 @@ export const TCGS: { id: Tcg; label: string; accent: string }[] = [
   { id: "vanguard", label: "Vanguard", accent: "#a78bfa" },
   { id: "weiss", label: "Weiss Schwarz", accent: "#e5e7eb" },
   { id: "finalfantasy", label: "Final Fantasy", accent: "#67e8f9" },
+  { id: "unionarena", label: "Union Arena", accent: "#34d399" },
 ];
 export const TCG_IDS = TCGS.map((t) => t.id) as [Tcg, ...Tcg[]];
 
