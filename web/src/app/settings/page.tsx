@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button, Field, Section, Skeleton, inputCls } from "@/components/ui";
 import { OfflineStatus } from "@/components/OfflineStatus";
+import { showToast } from "@/components/Toast";
 import { UserMenu } from "@/components/UserMenu";
 import { CURRENCIES } from "@/lib/types";
 
@@ -12,7 +13,6 @@ interface Settings {
   language: string;
   bulkCondition: string;
   bulkCurrency: string;
-  bulkPortfolio: string;
   pokewalletConfigured: boolean;
   pokewalletBudget: { hour: number; day: number };
   fxDate: string;
@@ -30,14 +30,30 @@ export default function SettingsPage() {
   }, []);
 
   async function patch(p: Partial<Settings>) {
-    const r = await fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(p) });
-    const d = await r.json();
-    setS(d);
-    if (p.theme) {
-      document.documentElement.setAttribute("data-theme", p.theme);
-      try {
-        localStorage.setItem("theme", p.theme);
-      } catch {}
+    const prev = s;
+    try {
+      const r = await fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(p) });
+      if (!r.ok) throw new Error("Failed");
+      const d = await r.json();
+      setS(d);
+      if (p.theme) {
+        document.documentElement.setAttribute("data-theme", p.theme);
+        try {
+          localStorage.setItem("theme", p.theme);
+        } catch {}
+      }
+      showToast("Saved ✓", "up");
+    } catch {
+      if (prev) {
+        setS(prev);
+        if (p.theme) {
+          document.documentElement.setAttribute("data-theme", prev.theme);
+          try {
+            localStorage.setItem("theme", prev.theme);
+          } catch {}
+        }
+      }
+      showToast("Save failed — try again", "down");
     }
   }
 
@@ -69,8 +85,10 @@ export default function SettingsPage() {
       const d = await r.json();
       if (!r.ok) throw new Error(d.error);
       setRefreshMsg(`Refreshed ${d.refreshed} cards (${d.failed} failed, ${d.skipped} skipped for rate limit). PokéWallet budget: ${d.pokewalletBudget.hour}/hr, ${d.pokewalletBudget.day}/day left.`);
+      showToast("Prices refreshed ✓", "up");
     } catch (e) {
       setRefreshMsg(e instanceof Error ? e.message : "Failed");
+      showToast("Refresh failed — try again", "down");
     } finally {
       setBusy(false);
     }
@@ -128,7 +146,7 @@ export default function SettingsPage() {
       </Section>
 
       <Section title="Bulk scan defaults">
-        <div className="card-surface rounded-2xl p-4 grid grid-cols-3 gap-3">
+        <div className="card-surface rounded-2xl p-4 grid grid-cols-2 gap-3">
           <Field label="Condition">
             <select className={inputCls} value={s.bulkCondition} onChange={(e) => patch({ bulkCondition: e.target.value } as Partial<Settings>)}>
               <option value="NM">Near Mint</option>
@@ -143,10 +161,7 @@ export default function SettingsPage() {
               {CURRENCIES.map((c) => <option key={c}>{c}</option>)}
             </select>
           </Field>
-          <Field label="Portfolio">
-            <input className={inputCls} value={s.bulkPortfolio} onChange={(e) => patch({ bulkPortfolio: e.target.value } as Partial<Settings>)} />
-          </Field>
-          <div className="col-span-3 text-xs text-muted">Used when you tap "Add All" in bulk scan mode. Quantity defaults to 1.</div>
+          <div className="col-span-2 text-xs text-muted">Used when you tap &quot;Add All&quot; in bulk scan mode. Quantity defaults to 1.</div>
         </div>
       </Section>
 
