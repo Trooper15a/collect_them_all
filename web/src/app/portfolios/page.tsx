@@ -72,7 +72,7 @@ export default function PortfoliosPage() {
   return (
     <PullToRefresh onRefresh={load}>
     <div>
-      <header className="pt-2 pb-3 flex items-center justify-between">
+      <header className="pt-2 pb-3 flex items-center justify-between anim-widget d1">
         <h1 className="text-xl font-bold uppercase tracking-wider">My Binders</h1>
         <Button variant="ghost" className="px-3 py-1.5 text-xs" onClick={() => setCreating((v) => !v)}>
           + New
@@ -110,7 +110,7 @@ export default function PortfoliosPage() {
         </div>
       )}
 
-      <div className="card-surface rounded-3xl p-4">
+      <div className="card-surface rounded-3xl p-4 anim-widget d2">
         <div className="text-xs text-muted">All portfolios</div>
         <div className="text-3xl font-bold tabular mt-1">
           <Money amount={data.all.value} currency={c} />
@@ -140,10 +140,10 @@ export default function PortfoliosPage() {
               <span className="w-2 h-2 rounded-full" style={{ background: t?.accent ?? "#888" }} />
               {t?.label ?? "Other"}
             </h2>
-            <ul className="space-y-2">
+            <ul className="space-y-2 stagger-children">
               {list.map((p) => (
                 <li key={p.id}>
-                  <Link href={`/portfolios/${p.id}`} className="binder-card relative card-surface rounded-2xl p-4 flex items-center justify-between hover:bg-white/[0.03]" style={p.accentColor ? { borderColor: `${p.accentColor}33`, borderLeftWidth: 3, borderLeftColor: p.accentColor } : undefined}>
+                  <Link href={`/portfolios/${p.id}`} className="binder-card relative card-surface rounded-2xl p-4 flex items-center justify-between hover:bg-white/[0.03] tap-scale hover-lift" style={p.accentColor ? { borderColor: `${p.accentColor}33`, borderLeftWidth: 3, borderLeftColor: p.accentColor } : undefined}>
                     <div>
                       <div className="font-semibold">{p.name}</div>
                       <div className="text-xs text-muted">

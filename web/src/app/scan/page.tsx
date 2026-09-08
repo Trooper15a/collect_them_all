@@ -124,7 +124,7 @@ export default function ScanPage() {
 
   return (
     <div>
-      <header className="pt-2 pb-3">
+      <header className="pt-2 pb-3 anim-widget d1">
         <h1 className="text-xl font-bold uppercase tracking-wider">Find a Card</h1>
       </header>
 
@@ -232,9 +232,9 @@ export default function ScanPage() {
             ]} />
             <span className="text-xs text-muted">{sortedResults.length} results</span>
           </div>
-          <div className={`grid grid-cols-2 sm:grid-cols-3 gap-3 ${loading ? "opacity-60" : ""}`}>
+          <div className={`grid grid-cols-2 sm:grid-cols-3 gap-3 stagger-children ${loading ? "opacity-60" : ""}`}>
             {sortedResults.map((c) => (
-              <div key={c.id} className="card-surface rounded-2xl overflow-hidden flex flex-col">
+              <div key={c.id} className="card-surface rounded-2xl overflow-hidden flex flex-col tap-scale hover-lift">
                 <Link href={`/cards/${encodeURIComponent(c.id)}`}>
                   <CardImage id={c.id} className="w-full" alt={c.name} />
                 </Link>
@@ -277,9 +277,9 @@ export default function ScanPage() {
       {matches && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
           <button className="absolute inset-0 bg-black/70" onClick={() => setMatches(null)} aria-label="Close" />
-          <div className="relative glass w-full max-w-lg rounded-t-3xl p-5 pb-[max(env(safe-area-inset-bottom),20px)]">
+          <div className="relative glass w-full max-w-lg rounded-t-3xl p-5 pb-[max(env(safe-area-inset-bottom),20px)] anim-widget d1" style={{ animationName: "slide-up-sheet" }}>
             <div className="text-xs text-muted mb-3">Is it one of these? Tap to add.</div>
-            <ul className="divide-y divide-line">
+            <ul className="divide-y divide-line stagger-children">
               {matches.map((m, i) => (
                 <li key={m.card.id}>
                   <button onClick={() => chooseMatch(m)} className="w-full flex items-center gap-3 py-2.5 text-left">
@@ -364,10 +364,10 @@ export default function ScanPage() {
       {recentScans.length > 0 && !q.trim() && !scanning && bulkQueue.length === 0 && (
         <div className="mt-4">
           <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">Recently scanned</div>
-          <ul className="card-surface rounded-2xl divide-y divide-line overflow-hidden">
+          <ul className="card-surface rounded-2xl divide-y divide-line overflow-hidden stagger-children">
             {recentScans.slice(0, 5).map((s) => (
               <li key={s.id}>
-                <Link href={`/cards/${encodeURIComponent(s.id)}`} className="flex items-center gap-3 p-3 hover:bg-white/[0.03]">
+                <Link href={`/cards/${encodeURIComponent(s.id)}`} className="flex items-center gap-3 p-3 hover:bg-white/[0.03] tap-scale">
                   <CardImage id={s.id} className="w-10 rounded-md" alt="" />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm truncate">{s.name}</div>

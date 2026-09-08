@@ -115,8 +115,8 @@ function Sheet({ card, onClose, onAdded }: { card: AddSheetCard; onClose: () => 
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal>
-      <button className="absolute inset-0 bg-black/60" onClick={onClose} aria-label="Close" />
-      <div className="relative glass w-full max-w-lg rounded-t-3xl p-5 pb-[max(env(safe-area-inset-bottom),20px)] max-h-[88vh] overflow-y-auto">
+      <button className="absolute inset-0 bg-black/60 anim-fade-up" style={{ animationDuration: "0.2s" }} onClick={onClose} aria-label="Close" />
+      <div className="relative glass w-full max-w-lg rounded-t-3xl p-5 pb-[max(env(safe-area-inset-bottom),20px)] max-h-[88vh] overflow-y-auto anim-widget d1" style={{ animationName: "slide-up-sheet" }}>
         <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-4" />
         <div className="mb-4 flex items-start gap-3">
           <CardImage id={card.id} className="w-20 rounded-lg flex-shrink-0" alt="" />

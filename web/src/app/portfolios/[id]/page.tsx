@@ -156,7 +156,7 @@ export default function PortfolioPage() {
         )}
       </div>
 
-      <div className="card-surface rounded-3xl p-5" style={accentColor ? { borderColor: `${accentColor}33`, borderWidth: 1 } : undefined}>
+      <div className="card-surface rounded-3xl p-5 anim-widget d1" style={accentColor ? { borderColor: `${accentColor}33`, borderWidth: 1 } : undefined}>
         <div className="text-xs text-muted">Value</div>
         <div className="text-3xl font-bold tabular mt-1">
           <Money amount={s.value} currency={c} />
@@ -212,10 +212,10 @@ export default function PortfolioPage() {
           </Empty>
         </div>
       ) : (
-        <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3 stagger-children">
           {items.map((i) => (
             <SwipeToDelete key={i.id} onDelete={async () => { await fetch(`/api/items/${i.id}`, { method: "DELETE" }); load(); }}>
-            <div className="card-surface rounded-2xl overflow-hidden flex flex-col">
+            <div className="card-surface rounded-2xl overflow-hidden flex flex-col tap-scale hover-lift">
               <Link href={`/cards/${encodeURIComponent(i.card.id)}`}>
                 <CardImage id={i.card.id} className="w-full" alt="" />
               </Link>
@@ -310,8 +310,8 @@ function EditItemSheet({ item, onClose, onSaved }: { item: Item; onClose: () => 
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center">
-      <button className="absolute inset-0 bg-black/60" onClick={onClose} aria-label="Close" />
-      <div className="relative glass w-full max-w-lg rounded-t-3xl p-5 pb-[max(env(safe-area-inset-bottom),20px)] max-h-[88vh] overflow-y-auto">
+      <button className="absolute inset-0 bg-black/60 anim-fade-up" style={{ animationDuration: "0.2s" }} onClick={onClose} aria-label="Close" />
+      <div className="relative glass w-full max-w-lg rounded-t-3xl p-5 pb-[max(env(safe-area-inset-bottom),20px)] max-h-[88vh] overflow-y-auto anim-widget d1" style={{ animationName: "slide-up-sheet" }}>
         <div className="font-semibold text-lg">{item.card.name}</div>
         <div className="text-xs text-muted mb-3">
           {item.card.setName} · {langLabel(item.card.language)}

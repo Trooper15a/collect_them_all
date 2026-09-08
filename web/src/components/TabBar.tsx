@@ -45,7 +45,7 @@ export function TabBar() {
               <div className="relative">
                 <t.icon className="w-6 h-6" />
                 {badge > 0 && (
-                  <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-down text-white text-[9px] font-bold px-1">
+                  <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-down text-white text-[9px] font-bold px-1 anim-pop">
                     {badge}
                   </span>
                 )}
