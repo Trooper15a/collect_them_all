@@ -67,6 +67,7 @@ export default function PortfolioPage() {
         return r.json();
       })
       .then((d: Data) => {
+        if (!d || !d.portfolio) throw new Error("Couldn't load this binder. Pull to retry.");
         setData(d);
         setName(d.portfolio.name);
         setAccentColor(d.portfolio.accentColor ?? null);
@@ -271,7 +272,7 @@ export default function PortfolioPage() {
           <span className="text-muted">{s.itemCount} cards</span>
         </div>
         <div className="mt-2 -mx-2">
-          <PriceChart data={data.series} currency={c} height={120} />
+          <PriceChart data={data.series ?? []} currency={c} height={120} />
         </div>
         <div className="mt-2 flex justify-center">
           <Segmented value={range} onChange={setRange} size="xs" options={RANGES.map((r) => ({ value: r, label: r }))} />

@@ -265,7 +265,7 @@ export default function CardPage() {
               </tr>
             </thead>
             <tbody className="tabular">
-              {Object.entries(active.variants).map(([k, v]) => (
+              {Object.entries(active.variants ?? {}).map(([k, v]) => (
                 <tr key={k} className="border-t border-line">
                   <td className="py-1.5">{variantLabel(k)}</td>
                   {market === "tcgplayer" ? (
@@ -450,7 +450,7 @@ function Row({ k, v }: { k: string; v: string | null | undefined }) {
 }
 
 function firstMarket(m: MarketPrices) {
-  for (const [variant, v] of Object.entries(m.variants)) {
+  for (const [variant, v] of Object.entries(m.variants ?? {})) {
     const amount = v.market ?? v.trend ?? v.avg7 ?? v.mid ?? v.low;
     if (amount != null) return { amount, variant };
   }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useRef, useState } from "react";
 import { Button, CardImage, Empty, Money, Skeleton, inputCls, Section } from "@/components/ui";
+import { showToast } from "@/components/Toast";
 
 interface CardResult {
   id: string;
@@ -190,7 +191,11 @@ export default function GradeEstimatorPage() {
       const scale = Math.min(600 / img.width, 840 / img.height, 1);
       canvas.width = Math.round(img.width * scale);
       canvas.height = Math.round(img.height * scale);
-      const ctx = canvas.getContext("2d")!;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        showToast("Couldn't analyze that photo — try another one", "down");
+        return;
+      }
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       const result = analyzeCentering(canvas);
       setCentering(result);

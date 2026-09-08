@@ -24,12 +24,8 @@ export default function ScanPage() {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
-  const [bulkMode, setBulkMode] = useState(() => {
-    try { return localStorage.getItem("bulkMode") === "1"; } catch { return false; }
-  });
-  const [bulkQueue, setBulkQueue] = useState<AddSheetCard[]>(() => {
-    try { const s = localStorage.getItem("bulkQueue"); return s ? JSON.parse(s) : []; } catch { return []; }
-  });
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkQueue, setBulkQueue] = useState<AddSheetCard[]>([]);
   const [confirmingClear, setConfirmingClear] = useState(false);
   const [matches, setMatches] = useState<Match[] | null>(null);
   const [adding, setAdding] = useState<AddSheetCard | null>(null);
@@ -40,10 +36,27 @@ export default function ScanPage() {
   const [portfolios, setPortfolios] = useState<{ id: number; name: string }[]>([]);
   const [portfoliosError, setPortfoliosError] = useState<string | null>(null);
   const [bulkPortfolioId, setBulkPortfolioId] = useState<number | null>(null);
-  const [recentScans, setRecentScans] = useState<RecentScan[]>(() => {
-    try { const s = localStorage.getItem("recentScans"); return s ? JSON.parse(s) : []; } catch { return []; }
-  });
+  const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
+
+  // Load persisted state after mount (SSR-safe defaults above avoid hydration mismatch).
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- one-time localStorage restore after mount; lazy useState initializers would break SSR/hydration */
+    try {
+      if (localStorage.getItem("bulkMode") === "1") setBulkMode(true);
+      const q = localStorage.getItem("bulkQueue");
+      if (q) {
+        const parsed = JSON.parse(q);
+        if (Array.isArray(parsed)) setBulkQueue(parsed);
+      }
+      const r = localStorage.getItem("recentScans");
+      if (r) {
+        const parsed = JSON.parse(r);
+        if (Array.isArray(parsed)) setRecentScans(parsed);
+      }
+    } catch { /* corrupt/unavailable storage — keep defaults */ }
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
 
   useEffect(() => {
     try { localStorage.setItem("recentScans", JSON.stringify(recentScans)); } catch {}
@@ -128,23 +141,28 @@ export default function ScanPage() {
     if (resolvingId) return;
     haptic("medium");
     setResolvingId(m.card.id);
-    const card = await resolveMatch(m);
-    setResolvingId(null);
-    setMatches(null);
-    if (!bulkMode) setScanning(false);
-    if (card) {
-      // eslint-disable-next-line react-hooks/purity -- event handler (tap on a match row), not render; rule false-positives through the .map() callback
-      const scan: RecentScan = { id: card.id, name: card.name, setName: card.setName ?? null, ts: Date.now() };
-      setRecentScans((prev) => [scan, ...prev.filter((s) => s.id !== card.id)].slice(0, 10));
-      if (bulkMode) {
-        setBulkQueue((prev) => [...prev, card]);
-        setScanning(true);
+    try {
+      const card = await resolveMatch(m);
+      setMatches(null);
+      if (!bulkMode) setScanning(false);
+      if (card) {
+        // eslint-disable-next-line react-hooks/purity -- event handler (tap on a match row), not render; rule false-positives through the .map() callback
+        const scan: RecentScan = { id: card.id, name: card.name, setName: card.setName ?? null, ts: Date.now() };
+        setRecentScans((prev) => [scan, ...prev.filter((s) => s.id !== card.id)].slice(0, 10));
+        if (bulkMode) {
+          setBulkQueue((prev) => [...prev, card]);
+          setScanning(true);
+        } else {
+          setAdding(card);
+        }
       } else {
-        setAdding(card);
+        setResolveError(`No priced listing found for ${m.card.name ?? m.card.id}. Try searching by name.`);
+        setQ(m.card.name ?? "");
       }
-    } else {
-      setResolveError(`No priced listing found for ${m.card.name ?? m.card.id}. Try searching by name.`);
-      setQ(m.card.name ?? "");
+    } catch {
+      showToast("Couldn't add that card — try again", "down");
+    } finally {
+      setResolvingId(null);
     }
   }
 

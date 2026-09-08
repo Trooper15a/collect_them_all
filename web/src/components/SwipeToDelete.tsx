@@ -26,8 +26,10 @@ export function SwipeToDelete({ onDelete, children }: Props) {
   const onTouchMove = useCallback(
     (e: React.TouchEvent) => {
       if (!swiping) return;
-      const dx = e.touches[0].clientX - startX.current;
-      const dy = e.touches[0].clientY - startY.current;
+      const t = e.touches[0];
+      if (!t) return;
+      const dx = t.clientX - startX.current;
+      const dy = t.clientY - startY.current;
       if (!locked.current) {
         if (Math.abs(dy) > Math.abs(dx)) {
           setSwiping(false);
