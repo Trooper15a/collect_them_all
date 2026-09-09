@@ -17,9 +17,11 @@ services:
       retries: 5
 
   app:
-    build:
-      context: ./web
-      dockerfile: Dockerfile
+    image: ghcr.io/trooper15a/collectr:latest
+    # To build locally instead: docker compose build --build-arg GITHUB_TOKEN=...
+    # build:
+    #   context: ./web
+    #   dockerfile: Dockerfile
     restart: unless-stopped
     ports:
       - "3000:3000"
