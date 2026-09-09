@@ -1,3 +1,4 @@
+import Script from "next/script";
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { TabBar } from "@/components/TabBar";
@@ -85,6 +86,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ToastContainer />
           <PwaRegister />
         </AuthProvider>
+        {process.env.NEXT_PUBLIC_CF_BEACON && (
+          <Script
+            src="https://static.cloudflareinsights.com/beacon.min.js"
+            data-cf-beacon={`{"token":"${process.env.NEXT_PUBLIC_CF_BEACON}"}`}
+            strategy="afterInteractive"
+          />
+        )}
       </body>
     </html>
   );
