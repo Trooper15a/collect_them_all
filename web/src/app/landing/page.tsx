@@ -217,6 +217,7 @@ export default function LandingPage() {
         <p>RipnPull is open source.</p>
         <p className="mt-1">MIT licensed · Built by collectors, for collectors.</p>
         <div className="mt-3 flex gap-4 justify-center">
+          <Link href="/faq" className="hover:text-fg transition-colors">FAQ</Link>
           <Link href="/privacy" className="hover:text-fg transition-colors">Privacy</Link>
           <Link href="/terms" className="hover:text-fg transition-colors">Terms</Link>
           <a href="https://github.com/Trooper15a/collect_them_all" target="_blank" rel="noreferrer" className="hover:text-fg transition-colors">GitHub</a>
