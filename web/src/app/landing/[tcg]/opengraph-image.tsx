@@ -1,14 +1,9 @@
 import { ImageResponse } from "next/og";
-import { TCG_SEO, getTcgBySlug } from "../tcg-data";
+import { getTcgBySlug } from "../tcg-data";
 
-export const runtime = "edge";
 export const alt = "RipnPull — TCG Collection Tracker";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
-
-export function generateStaticParams() {
-  return TCG_SEO.map((t) => ({ tcg: t.slug }));
-}
 
 export default async function Image(props: { params: Promise<{ tcg: string }> }) {
   const { tcg: slug } = await props.params;
