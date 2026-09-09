@@ -26,7 +26,15 @@ export function UserMenu() {
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted">Sign out?</span>
           <button
-            onClick={() => signOut()}
+            onClick={() => {
+              try {
+                localStorage.removeItem("recentScans");
+                localStorage.removeItem("bulkQueue");
+                localStorage.removeItem("bulkMode");
+                localStorage.removeItem("rnp-trade");
+              } catch {}
+              signOut();
+            }}
             className="text-xs font-semibold text-down bg-down/15 border border-down/30 rounded-lg px-2 py-1 hover:bg-down/25 transition-colors"
           >
             Yes
