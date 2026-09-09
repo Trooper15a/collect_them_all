@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useRef, useState } from "react";
 import { Button, CardImage, Empty, Money, Skeleton, inputCls, Section } from "@/components/ui";
 import { showToast } from "@/components/Toast";
+import { GRADE_MULT } from "@/lib/grades";
 
 interface CardResult {
   id: string;
@@ -32,19 +33,21 @@ interface GradeBreakdown {
   label: string;
 }
 
+// Multipliers for PSA/CGC 8+ come from the shared table in lib/grades (single source of
+// truth, also used by portfolio valuation); lower grades are estimator-only heuristics.
 const PSA_GRADES = [
-  { grade: 10, label: "Gem Mint", mult: 3.0 },
-  { grade: 9, label: "Mint", mult: 1.4 },
-  { grade: 8, label: "NM-MT", mult: 1.0 },
+  { grade: 10, label: "Gem Mint", mult: GRADE_MULT["PSA 10"] },
+  { grade: 9, label: "Mint", mult: GRADE_MULT["PSA 9"] },
+  { grade: 8, label: "NM-MT", mult: GRADE_MULT["PSA 8"] },
   { grade: 7, label: "NM", mult: 0.85 },
   { grade: 6, label: "EX-MT", mult: 0.6 },
   { grade: 5, label: "EX", mult: 0.45 },
 ];
 
 const CGC_GRADES = [
-  { grade: 10, label: "Pristine", mult: 4.0 },
-  { grade: 9.5, label: "Gem Mint", mult: 2.0 },
-  { grade: 9, label: "Mint", mult: 1.3 },
+  { grade: 10, label: "Pristine", mult: GRADE_MULT["CGC 10"] },
+  { grade: 9.5, label: "Gem Mint", mult: GRADE_MULT["CGC 9.5"] },
+  { grade: 9, label: "Mint", mult: GRADE_MULT["CGC 9"] },
   { grade: 8.5, label: "NM/Mint+", mult: 1.0 },
   { grade: 8, label: "NM/Mint", mult: 0.9 },
 ];
@@ -199,6 +202,13 @@ export default function GradeEstimatorPage() {
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       const result = analyzeCentering(canvas);
       setCentering(result);
+    };
+    img.onerror = () => {
+      // broken/corrupt image file — reset instead of hanging in the "uploaded" state
+      showToast("Couldn't read that image — try another photo", "down");
+      URL.revokeObjectURL(url);
+      setPhotoUrl(null);
+      setCentering(null);
     };
     img.src = url;
   }
