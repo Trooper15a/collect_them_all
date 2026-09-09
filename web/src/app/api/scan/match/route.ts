@@ -47,9 +47,10 @@ function getIndex(): ServerIndex | null {
 
 export async function POST(req: NextRequest) {
   try {
-    const { embedding, k = 5 } = (await req.json()) as {
+    const { embedding, k = 5, tcg } = (await req.json()) as {
       embedding: number[];
       k?: number;
+      tcg?: string;
     };
     if (!Array.isArray(embedding) || embedding.length === 0) {
       return NextResponse.json({ error: "Missing embedding" }, { status: 400 });
@@ -63,6 +64,7 @@ export async function POST(req: NextRequest) {
     const n = vectors.length / dim;
     const best: { i: number; s: number }[] = [];
     for (let i = 0; i < n; i++) {
+      if (tcg && cards[i].tcg !== tcg) continue;
       let s = 0;
       const off = i * dim;
       for (let d = 0; d < dim; d++) s += query[d] * vectors[off + d];

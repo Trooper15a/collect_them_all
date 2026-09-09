@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getScanEngine, type ScanEngine } from "@/lib/scanner/engine";
 import type { Match } from "@/lib/scanner/matcher";
 import { cardGuide, preprocess } from "@/lib/scanner/preprocess";
+import { useActiveTcg } from "@/lib/ui-prefs";
 import { showToast } from "./Toast";
 import { Button } from "./ui";
 
@@ -12,6 +13,7 @@ export function Scanner({ onMatches, onClose, bulkMode, bulkCount }: { onMatches
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [engine, setEngine] = useState<ScanEngine | null>(null);
+  const activeTcg = useActiveTcg();
   const [camError, setCamError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [auto, setAuto] = useState(true);
@@ -45,8 +47,8 @@ export function Scanner({ onMatches, onClose, bulkMode, bulkCount }: { onMatches
     if (!v || !engine || engine.status !== "ready" || v.videoWidth === 0) return null;
     const guide = cardGuide(v.videoWidth, v.videoHeight);
     const input = preprocess(v, guide, canvasRef.current ?? undefined);
-    return engine.match(input, 5);
-  }, [engine]);
+    return engine.match(input, 5, activeTcg === "all" ? undefined : activeTcg);
+  }, [engine, activeTcg]);
 
   // Live preview: run a match ~3x/sec while auto mode is on.
   useEffect(() => {
