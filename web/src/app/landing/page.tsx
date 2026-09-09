@@ -13,6 +13,7 @@ export const metadata: Metadata = {
     description:
       "The free, open-source TCG portfolio tracker. AI card scanning, daily prices across 14 games, wishlist price alerts, and offline support.",
     url: `${SITE.url}/landing`,
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "RipnPull — Free TCG Portfolio Tracker with AI Card Scanner" }],
   },
 };
 

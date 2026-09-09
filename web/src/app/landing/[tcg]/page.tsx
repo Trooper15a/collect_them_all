@@ -21,6 +21,7 @@ export async function generateMetadata(props: { params: Promise<{ tcg: string }>
       title: tcg.title,
       description: tcg.description,
       url: `${SITE.url}/landing/${tcg.slug}`,
+      images: [{ url: "/og-image.png", width: 1200, height: 630, alt: tcg.title }],
     },
   };
 }
