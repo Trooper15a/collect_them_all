@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 interface Stats {
   overview: {
@@ -18,6 +18,30 @@ interface Stats {
   tcgBreakdown: { tcg: string; cards: number; sets: number }[];
   topPortfolios: { name: string; items: number; user_name: string | null }[];
   generatedAt: string;
+}
+
+interface ImportStatus {
+  status: {
+    running: boolean;
+    last?: {
+      categories: number[];
+      groups: number;
+      products: number;
+      priced: number;
+      historyRows: number;
+      skippedGroups: number;
+      startedAt: string;
+      finishedAt: string;
+      errors: string[];
+    };
+    progress?: {
+      category: number;
+      group: number;
+      of: number;
+    };
+  };
+  categories: { id: number; tcg: string; language: string; label: string }[];
+  defaults: number[];
 }
 
 export default function AdminPage() {
@@ -50,6 +74,8 @@ export default function AdminPage() {
           {new Date(stats.generatedAt).toLocaleString()}
         </span>
       </div>
+
+      <ImportProgress />
 
       <section className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <StatCard label="Users" value={overview.totalUsers} />
@@ -133,6 +159,130 @@ export default function AdminPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+function ImportProgress() {
+  const [data, setData] = useState<ImportStatus | null>(null);
+  const [starting, setStarting] = useState(false);
+
+  const poll = useCallback(() => {
+    fetch("/api/tcgcsv")
+      .then((r) => r.json())
+      .then(setData)
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    poll();
+  }, [poll]);
+
+  useEffect(() => {
+    if (!data?.status.running) return;
+    const id = setInterval(poll, 3000);
+    return () => clearInterval(id);
+  }, [data?.status.running, poll]);
+
+  async function triggerImport() {
+    setStarting(true);
+    try {
+      await fetch("/api/tcgcsv", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      setTimeout(poll, 1000);
+    } catch {
+      // ignore
+    } finally {
+      setStarting(false);
+    }
+  }
+
+  if (!data) return null;
+
+  const { status, categories } = data;
+  const running = status.running;
+  const progress = status.progress;
+  const last = status.last;
+
+  const currentCat = running && progress
+    ? categories.find((c) => c.id === progress.category)
+    : null;
+
+  const pct = progress && progress.of > 0
+    ? Math.round((progress.group / progress.of) * 100)
+    : 0;
+
+  return (
+    <section className="rounded-xl border border-line bg-elev p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">Card Import</h2>
+        {running ? (
+          <span className="flex items-center gap-2 text-xs font-semibold text-accent">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-accent" />
+            </span>
+            Running
+          </span>
+        ) : (
+          <button
+            onClick={triggerImport}
+            disabled={starting}
+            className="text-xs font-semibold text-accent hover:text-accent/80 transition-colors disabled:opacity-50"
+          >
+            {starting ? "Starting..." : "Run Import"}
+          </button>
+        )}
+      </div>
+
+      {running && progress && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span>
+              {currentCat ? currentCat.label : `Category ${progress.category}`}
+            </span>
+            <span className="text-muted">
+              Group {progress.group}/{progress.of} ({pct}%)
+            </span>
+          </div>
+          <div className="h-2 rounded-full bg-line overflow-hidden">
+            <div
+              className="h-full rounded-full bg-accent transition-all duration-500"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {!running && last && (
+        <div className="text-sm text-muted space-y-1">
+          <div className="flex justify-between">
+            <span>Last run</span>
+            <span>{new Date(last.finishedAt).toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Products imported</span>
+            <span className="text-fg">{last.products.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>With prices</span>
+            <span className="text-fg">{last.priced.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Sets processed</span>
+            <span className="text-fg">{last.groups}</span>
+          </div>
+          {last.errors.length > 0 && (
+            <div className="flex justify-between">
+              <span>Errors</span>
+              <span className="text-down">{last.errors.length}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 
