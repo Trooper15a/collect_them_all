@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
 import { getCard } from "@/lib/cards";
 import { indexCard } from "@/lib/model-index";
-import { pwRawImage } from "@/lib/pokewallet";
+import { hasPokewalletKey, pwRawImage } from "@/lib/pokewallet";
 
 /**
  * Image proxy. GET /api/images/<cardId>?size=high|low&lang=fr
@@ -22,6 +22,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   try {
     let upstream: Response;
     if (src === "pw") {
+      // without an API key there is no upstream to proxy — 404 so CardImage degrades quietly
+      if (!hasPokewalletKey()) return new NextResponse("no image", { status: 404 });
       upstream = await pwRawImage(sourceId, size, lang);
     } else if (src === "tcgdex" || src === "pcjp") {
       const img = indexCard(id)?.img;

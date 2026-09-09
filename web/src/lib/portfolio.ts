@@ -3,6 +3,7 @@ import { db, schema } from "@/db";
 import { getCard, recordPriceSnapshot, refreshCardPrices, rowToCard } from "./cards";
 import { convert, getRates, type Rates } from "./currency";
 import { daysAgo, today, type Range, rangeToDays } from "./format";
+import { GRADE_MULT } from "./grades";
 import { pokewalletLimiter } from "./pokewallet";
 import { bestPrice, type CardPrices, type NormalizedCard } from "./types";
 
@@ -32,10 +33,6 @@ export interface ValuedItem {
 }
 
 const CONDITION_MULT: Record<string, number> = { NM: 1, LP: 0.85, MP: 0.7, HP: 0.5, DMG: 0.35 };
-
-const GRADE_MULT: Record<string, number> = {
-  "PSA 10": 3.0, "PSA 9": 1.4, "PSA 8": 1.0, "BGS 10": 4.5, "BGS 9.5": 2.5, "BGS 9": 1.3, "CGC 10": 2.8, "CGC 9.5": 1.6, "CGC 9": 1.2,
-};
 
 export function unitValue(card: NormalizedCard, variant: string, condition: string, isGraded: boolean, gradingCompany: string | null, grade: string | null) {
   const bp = bestPrice(card.prices, variant);
