@@ -307,16 +307,27 @@ const ARCHIVE_BASE = "https://tcgcsv.com/archive/tcgplayer";
 const ARCHIVE_START = "2024-02-08";
 
 const backfillInFlight = new Set<string>();
+let backfillQueue: Promise<void> = Promise.resolve();
 
 /**
  * Backfill price history for a single tp: card from the TCGCSV daily archives.
  * Downloads ~12 monthly archive snapshots, extracts the card's group prices,
  * and inserts market prices into price_history.
+ * Only one backfill runs at a time to protect the 4GB VPS.
  */
 export async function backfillCardHistory(cardId: string): Promise<number> {
   if (!cardId.startsWith("tp:")) return 0;
   if (backfillInFlight.has(cardId)) return 0;
   backfillInFlight.add(cardId);
+
+  // Queue behind any running backfill so only one runs at a time
+  const result = new Promise<number>((resolve) => {
+    backfillQueue = backfillQueue.then(() => doBackfill(cardId).then(resolve).catch(() => resolve(0)));
+  });
+  return result;
+}
+
+async function doBackfill(cardId: string): Promise<number> {
 
   try {
     const productId = Number(cardId.slice(3));
