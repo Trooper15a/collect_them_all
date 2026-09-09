@@ -499,6 +499,8 @@ export default function ScanPage() {
         </div>
       )}
       <AddToPortfolioSheet card={adding} onClose={() => setAdding(null)} onAdded={() => {
+        // unmounting here kills the sheet's 700ms "Added ✓" flash — toast instead
+        showToast(`Added ${adding?.name ?? "card"} ✓`, "up");
         setAdding(null);
         if (bulkQueue.length > 0) {
           const rest = bulkQueue.filter((c) => c.id !== adding?.id);
