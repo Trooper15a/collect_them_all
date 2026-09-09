@@ -43,6 +43,7 @@ TCGCSV_CATEGORIES: dict[str, list[int]] = {
     "vanguard": [16],
     "weiss": [20],
     "finalfantasy": [24],
+    "unionarena": [81],
 }
 
 CATEGORY_LANG: dict[int, str] = {85: "jap"}
