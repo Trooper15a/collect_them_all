@@ -34,6 +34,7 @@ export const metadata: Metadata = {
     "open source",
     "PWA",
   ],
+  verification: { google: "7qLcY3B-bE3hub28UwqGaTlr6uirwWMam13JZVjq5fg" },
   manifest: "/manifest.json",
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "RipnPull" },
   icons: { icon: "/icons/icon-192.png", apple: "/icons/apple-touch-icon.png" },
