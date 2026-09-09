@@ -14,18 +14,22 @@ const Patch = z.object({
 });
 
 export async function GET() {
-  const fx = await getRates();
-  return NextResponse.json({
-    currency: getSetting("currency", "USD"),
-    theme: getSetting("theme", "dark"),
-    language: getSetting("language", "en"),
-    bulkCondition: getSetting("bulkCondition", "NM"),
-    bulkCurrency: getSetting("bulkCurrency", "CAD"),
-    bulkPortfolio: getSetting("bulkPortfolio", "My Collection"),
-    pokewalletConfigured: hasPokewalletKey(),
-    pokewalletBudget: pokewalletLimiter.remaining,
-    fxDate: fx.date,
-  });
+  try {
+    const fx = await getRates();
+    return NextResponse.json({
+      currency: await getSetting("currency", "USD"),
+      theme: await getSetting("theme", "dark"),
+      language: await getSetting("language", "en"),
+      bulkCondition: await getSetting("bulkCondition", "NM"),
+      bulkCurrency: await getSetting("bulkCurrency", "CAD"),
+      bulkPortfolio: await getSetting("bulkPortfolio", "My Collection"),
+      pokewalletConfigured: hasPokewalletKey(),
+      pokewalletBudget: pokewalletLimiter.remaining,
+      fxDate: fx.date,
+    });
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Failed" }, { status: 500 });
+  }
 }
 
 export async function PATCH(req: NextRequest) {

@@ -1,23 +1,35 @@
 import { eq, lt } from "drizzle-orm";
 import { db, schema } from "@/db";
 
-/** Read-through cache stored in Postgres. TTL in seconds. */
+/** Read-through cache stored in Postgres. TTL in seconds. Falls through to fetcher on DB errors. */
 export async function cached<T>(key: string, ttlSeconds: number, fetcher: () => Promise<T>): Promise<T> {
   const now = Date.now();
-  const rows = await db.select().from(schema.apiCache).where(eq(schema.apiCache.key, key)).limit(1);
-  const row = rows[0];
-  if (row && row.expiresAt > now) return JSON.parse(row.value) as T;
+  try {
+    const rows = await db.select().from(schema.apiCache).where(eq(schema.apiCache.key, key)).limit(1);
+    const row = rows[0];
+    if (row && row.expiresAt > now) return JSON.parse(row.value) as T;
+  } catch {
+    // DB unreachable — skip cache read, fall through to fetcher
+  }
   const value = await fetcher();
-  await db.insert(schema.apiCache)
-    .values({ key, value: JSON.stringify(value), expiresAt: now + ttlSeconds * 1000 })
-    .onConflictDoUpdate({ target: schema.apiCache.key, set: { value: JSON.stringify(value), expiresAt: now + ttlSeconds * 1000 } });
-  if (Math.random() < 0.02) await db.delete(schema.apiCache).where(lt(schema.apiCache.expiresAt, now));
+  try {
+    await db.insert(schema.apiCache)
+      .values({ key, value: JSON.stringify(value), expiresAt: now + ttlSeconds * 1000 })
+      .onConflictDoUpdate({ target: schema.apiCache.key, set: { value: JSON.stringify(value), expiresAt: now + ttlSeconds * 1000 } });
+    if (Math.random() < 0.02) await db.delete(schema.apiCache).where(lt(schema.apiCache.expiresAt, now));
+  } catch {
+    // DB unreachable — value still usable, just not cached
+  }
   return value;
 }
 
 export async function getSetting(key: string, fallback: string): Promise<string> {
-  const rows = await db.select().from(schema.settings).where(eq(schema.settings.key, key)).limit(1);
-  return rows[0]?.value ?? fallback;
+  try {
+    const rows = await db.select().from(schema.settings).where(eq(schema.settings.key, key)).limit(1);
+    return rows[0]?.value ?? fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 export async function setSetting(key: string, value: string) {

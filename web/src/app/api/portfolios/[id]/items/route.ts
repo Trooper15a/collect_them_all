@@ -8,7 +8,8 @@ import { snapshotPortfolios } from "@/lib/portfolio";
 import { ItemBody } from "@/lib/validation";
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const userId = await requireUserId();
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
   const portfolioId = Number((await ctx.params).id);
   if (!Number.isInteger(portfolioId)) return NextResponse.json({ error: "Bad id" }, { status: 400 });
   const portfolios = await db.select().from(schema.portfolios).where(and(eq(schema.portfolios.id, portfolioId), eq(schema.portfolios.userId, userId))).limit(1);

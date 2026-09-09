@@ -16,7 +16,8 @@ const Body = z.object({
 });
 
 export async function GET(req: NextRequest) {
-  const userId = await requireUserId();
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
   const currency = req.nextUrl.searchParams.get("currency") ?? await getSetting("currency", "USD");
   try {
     const fx = await getRates();
@@ -30,7 +31,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const userId = await requireUserId();
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
   const result = await db

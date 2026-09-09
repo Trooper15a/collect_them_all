@@ -11,7 +11,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     if (!card) return NextResponse.json({ error: "Card not found" }, { status: 404 });
     const history = await getPriceHistory(card.id);
     const fx = await getRates();
-    return NextResponse.json({ card, history, fx, displayCurrency: getSetting("currency", "USD") });
+    return NextResponse.json({ card, history, fx, displayCurrency: await getSetting("currency", "USD") });
   } catch (err) {
     console.error("card error", err);
     return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to load card" }, { status: 500 });
