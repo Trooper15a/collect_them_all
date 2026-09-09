@@ -1,4 +1,20 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { SITE } from "@/lib/site";
+import { TCG_SEO } from "./tcg-data";
+
+export const metadata: Metadata = {
+  title: "Free TCG Portfolio Tracker — AI Scanner, Prices & Collection Tracking | RipnPull",
+  description:
+    "Track your Pokémon, Magic, Yu-Gi-Oh! and 11 more TCG collections for free. AI card scanner, daily TCGPlayer prices, wishlist alerts, grading support, and full offline mode. Open source.",
+  alternates: { canonical: `${SITE.url}/landing` },
+  openGraph: {
+    title: "RipnPull — Free TCG Portfolio Tracker with AI Card Scanner",
+    description:
+      "The free, open-source TCG portfolio tracker. AI card scanning, daily prices across 14 games, wishlist price alerts, and offline support.",
+    url: `${SITE.url}/landing`,
+  },
+};
 
 const FEATURES = [
   {
@@ -60,9 +76,23 @@ const FEATURES = [
 
 const TCGS = ["Pokémon", "Magic", "Yu-Gi-Oh!", "One Piece", "Lorcana", "Digimon", "Dragon Ball Super", "DB Fusion World", "Flesh and Blood", "Star Wars Unlimited", "Vanguard", "Weiß Schwarz", "Final Fantasy", "Union Arena"];
 
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "RipnPull",
+  applicationCategory: "UtilitiesApplication",
+  operatingSystem: "Web, iOS, Android",
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+  description: SITE.description,
+  url: SITE.url,
+  screenshot: `${SITE.url}/og-image.png`,
+  featureList: "AI Card Scanner, Daily TCGPlayer Prices, 14 TCGs, Portfolio Tracking, Wishlist Price Alerts, Offline Mode, Open Source",
+};
+
 export default function LandingPage() {
   return (
     <div className="min-h-screen flex flex-col -mx-4 -mt-[max(env(safe-area-inset-top),12px)]">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       {/* Header */}
       <header className="h-16 px-6 flex items-center justify-between border-b border-line">
         <Link href="/landing" className="text-lg font-extrabold tracking-tight">
@@ -170,6 +200,24 @@ export default function LandingPage() {
                 <li className="text-up">14 TCGs supported</li>
               </ul>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Supported TCGs */}
+      <section className="px-6 py-16 border-t border-line">
+        <div className="max-w-3xl mx-auto text-center">
+          <h2 className="text-2xl font-bold mb-8">Supported Trading Card Games</h2>
+          <div className="flex flex-wrap gap-2 justify-center">
+            {TCG_SEO.map((t) => (
+              <Link
+                key={t.slug}
+                href={`/landing/${t.slug}`}
+                className="rounded-full bg-elev border border-line px-4 py-2 text-sm font-medium text-muted hover:text-fg hover:border-accent/40 transition-colors"
+              >
+                {t.name}
+              </Link>
+            ))}
           </div>
         </div>
       </section>
