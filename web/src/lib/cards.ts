@@ -1,4 +1,4 @@
-import { and, eq, like, or, sql } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { cached, getSetting } from "./cache";
 import { convert, getRates } from "./currency";
@@ -199,7 +199,7 @@ export async function getCard(cardId: string, opts: { forceRefresh?: boolean } =
     return fresh;
   } catch (err) {
     if (row) return rowToCard(row);
-    if (err instanceof Error && /404|not found/i.test(err.message)) return null;
+    if (err instanceof Error && /404|not found|unknown (source|card id prefix)/i.test(err.message)) return null;
     throw err;
   }
 }
@@ -233,8 +233,17 @@ export async function searchCards(opts: SearchOpts): Promise<{ cards: CardSummar
       if (r) rarityWords.push(r);
       return !r;
     });
-  const conditions = words.map((w) => or(like(schema.cards.name, `%${w}%`), like(schema.cards.cardNumber, `${w}%`), like(schema.cards.setCode, w), like(schema.cards.setName, `%${w}%`)));
-  for (const r of rarityWords) conditions.push(like(schema.cards.rarity, `%${r}%`));
+  // case-insensitive matching (lower() on both sides) so lowercase queries find cards
+  const conditions = words.map((w) => {
+    const lw = w.toLowerCase();
+    return or(
+      sql`lower(${schema.cards.name}) like ${`%${lw}%`}`,
+      sql`lower(${schema.cards.cardNumber}) like ${`${lw}%`}`,
+      sql`lower(${schema.cards.setCode}) like ${lw}`,
+      sql`lower(${schema.cards.setName}) like ${`%${lw}%`}`,
+    );
+  });
+  for (const r of rarityWords) conditions.push(sql`lower(${schema.cards.rarity}) like ${`%${r.toLowerCase()}%`}`);
   if (tcg !== "all") conditions.push(eq(schema.cards.tcg, tcg));
   if (lang !== "all") conditions.push(eq(schema.cards.language, lang));
   const localRows = await db
