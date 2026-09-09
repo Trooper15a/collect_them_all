@@ -1,12 +1,25 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { setActiveTcg, useActiveTcg, type ActiveTcg } from "@/lib/ui-prefs";
 import { TCGS } from "@/lib/types";
 
 const PUBLIC_PATHS = ["/landing", "/login", "/privacy", "/terms"];
 const ALL_ACCENT = "conic-gradient(from 0deg, #facc15, #f87171, #c084fc, #60a5fa, #34d399, #facc15)";
+const POS_KEY = "tcgPickerPos";
+const DEFAULT_POS = { x: 12, y: 68 };
+
+function loadPos(): { x: number; y: number } {
+  try {
+    const raw = localStorage.getItem(POS_KEY);
+    if (raw) { const p = JSON.parse(raw); if (typeof p.x === "number" && typeof p.y === "number") return p; }
+  } catch {}
+  return DEFAULT_POS;
+}
+function savePos(pos: { x: number; y: number }) {
+  try { localStorage.setItem(POS_KEY, JSON.stringify(pos)); } catch {}
+}
 
 export function TcgPicker() {
   const pathname = usePathname();
@@ -15,6 +28,50 @@ export function TcgPicker() {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
   const hidden = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
+
+  const [pos, setPos] = useState(DEFAULT_POS);
+  const dragging = useRef(false);
+  const dragStart = useRef({ px: 0, py: 0, ox: 0, oy: 0 });
+  const didDrag = useRef(false);
+
+  useEffect(() => { setPos(loadPos()); }, []);
+
+  const clamp = useCallback((x: number, y: number) => {
+    const w = window.innerWidth - 40;
+    const h = window.innerHeight - 40;
+    return { x: Math.max(0, Math.min(x, w)), y: Math.max(0, Math.min(y, h)) };
+  }, []);
+
+  useEffect(() => {
+    if (!dragging.current) return;
+    const onMove = (e: TouchEvent | MouseEvent) => {
+      const pt = "touches" in e ? e.touches[0] : e;
+      const dx = pt.clientX - dragStart.current.px;
+      const dy = pt.clientY - dragStart.current.py;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) didDrag.current = true;
+      setPos(clamp(dragStart.current.ox + dx, dragStart.current.oy + dy));
+    };
+    const onEnd = () => {
+      dragging.current = false;
+      setPos((p) => { savePos(p); return p; });
+    };
+    window.addEventListener("touchmove", onMove, { passive: true });
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("touchend", onEnd);
+    window.addEventListener("mouseup", onEnd);
+    return () => {
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("touchend", onEnd);
+      window.removeEventListener("mouseup", onEnd);
+    };
+  });
+
+  const startDrag = useCallback((clientX: number, clientY: number) => {
+    dragging.current = true;
+    didDrag.current = false;
+    dragStart.current = { px: clientX, py: clientY, ox: pos.x, oy: pos.y };
+  }, [pos]);
 
   const activeMeta = active === "all" ? null : TCGS.find((t) => t.id === active) ?? null;
   const activeLabel = activeMeta?.label ?? "All games";
@@ -67,15 +124,16 @@ export function TcgPicker() {
 
   return (
     <>
-      {/* Floating trigger — top-left, offset below the safe-area and the page
-          header row (h1 / BackLink headers end ~52px under the content top). */}
       <button
         type="button"
         ref={triggerRef}
-        onClick={() => setOpen(true)}
+        onTouchStart={(e) => startDrag(e.touches[0].clientX, e.touches[0].clientY)}
+        onMouseDown={(e) => { if (e.button === 0) startDrag(e.clientX, e.clientY); }}
+        onClick={() => { if (!didDrag.current) setOpen(true); }}
         aria-label={`Change game — currently ${activeLabel}`}
         aria-haspopup="dialog"
-        className="fixed z-40 left-[max(env(safe-area-inset-left),12px)] top-[calc(max(env(safe-area-inset-top),12px)+56px)] w-10 h-10 rounded-xl bg-white shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex items-center justify-center text-black tap-scale"
+        className="fixed z-40 w-10 h-10 rounded-xl bg-white shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex items-center justify-center text-black touch-none select-none"
+        style={{ left: pos.x, top: pos.y }}
       >
         <CardsIcon className="w-5 h-5" />
         <span

@@ -121,7 +121,7 @@ export default function SetPage() {
         <BackLink fallback="/sets" label="Sets" />
       </header>
       <div className="card-surface rounded-3xl p-4 flex items-center gap-4">
-        <SetLogo id={set.id} code={set.code} className="w-20 h-14" />
+        <SetLogo id={set.id} code={set.code} tcg={set.tcg} className="w-20 h-14" />
         <div className="flex-1 min-w-0">
           <h1 className="text-lg font-bold leading-tight">{set.name}</h1>
           <div className="text-xs text-muted">

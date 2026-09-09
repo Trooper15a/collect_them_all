@@ -332,7 +332,7 @@ export default function PortfolioPage() {
                 )}
               </Link>
               {i.quantity > 1 && <div className="absolute top-1.5 right-1.5 rounded-full bg-up text-black text-[10px] font-bold px-1.5">×{i.quantity}</div>}
-              <button type="button" className="p-2.5 flex-1 flex flex-col gap-0.5 text-left" onClick={() => setEditing(i)}>
+              <div className="p-2.5 flex-1 flex flex-col gap-0.5">
                 <div className="font-medium text-sm leading-tight line-clamp-2">{i.card.name}</div>
                 <div className="text-[11px] text-muted truncate">
                   {i.card.setName} {i.card.cardNumber ? `#${i.card.cardNumber}` : sealed ? "· Sealed" : ""}
@@ -346,7 +346,16 @@ export default function PortfolioPage() {
                     <Delta pct={i.change24hPct} />
                   </span>
                 </div>
-              </button>
+                <div className="flex gap-1 mt-1.5">
+                  <button type="button" onClick={() => setEditing(i)} className="flex-1 flex items-center justify-center gap-1 text-[10px] font-medium text-accent bg-accent/10 rounded-lg py-1.5 tap-scale">
+                    <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                    Edit
+                  </button>
+                  <button type="button" onClick={() => deleteItem(i)} className="flex items-center justify-center gap-1 text-[10px] font-medium text-down bg-down/10 rounded-lg py-1.5 px-2.5 tap-scale">
+                    <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                  </button>
+                </div>
+              </div>
             </div>
             </SwipeToDelete>
             );

@@ -131,7 +131,7 @@ export default function SetsPage() {
             return (
             <li key={s.id}>
               <Link href={`/sets/${encodeURIComponent(s.id)}`} className="card-surface rounded-2xl flex items-center gap-3 p-3 hover:bg-white/[0.03] transition-colors">
-                <SetLogo id={s.id} code={s.code} />
+                <SetLogo id={s.id} code={s.code} tcg={s.tcg} />
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">{s.name}</div>
                   <div className="text-xs text-muted">
