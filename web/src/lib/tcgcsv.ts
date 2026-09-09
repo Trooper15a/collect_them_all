@@ -1,8 +1,15 @@
 import { and, eq, sql } from "drizzle-orm";
+import { execFile } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { promisify } from "node:util";
 import { db, schema } from "@/db";
 import { getSetting, setSetting } from "./cache";
 import { nowIso, today } from "./format";
 import type { CardPrices, PriceVariant } from "./types";
+
+const execFileAsync = promisify(execFile);
 
 const BASE = "https://tcgcsv.com/tcgplayer";
 
@@ -292,4 +299,131 @@ export async function hasTcgcsvData(tcg: string, language?: string): Promise<boo
     .where(and(eq(schema.cards.tcg, tcg), language ? eq(schema.cards.language, language) : sql`1=1`, sql`id like 'tp:%'`))
     .limit(1);
   return !!row[0];
+}
+
+// ── Price history backfill from TCGCSV daily archives ──
+
+const ARCHIVE_BASE = "https://tcgcsv.com/archive/tcgplayer";
+const ARCHIVE_START = "2024-02-08";
+
+const backfillInFlight = new Set<string>();
+
+/**
+ * Backfill price history for a single tp: card from the TCGCSV daily archives.
+ * Downloads ~12 monthly archive snapshots, extracts the card's group prices,
+ * and inserts market prices into price_history.
+ */
+export async function backfillCardHistory(cardId: string): Promise<number> {
+  if (!cardId.startsWith("tp:")) return 0;
+  if (backfillInFlight.has(cardId)) return 0;
+  backfillInFlight.add(cardId);
+
+  try {
+    const productId = Number(cardId.slice(3));
+    if (!Number.isFinite(productId)) return 0;
+
+    const card = await db.select({ metaJson: schema.cards.metaJson, tcg: schema.cards.tcg })
+      .from(schema.cards).where(eq(schema.cards.id, cardId)).limit(1);
+    if (!card[0]?.metaJson) return 0;
+
+    const meta = JSON.parse(card[0].metaJson);
+    const groupId = meta.groupId;
+    if (!groupId) return 0;
+
+    const cat = TCGCSV_CATEGORIES.find((c) => c.tcg === card[0].tcg);
+    if (!cat) return 0;
+
+    const dates = sampleDates(12);
+    let inserted = 0;
+
+    for (const date of dates) {
+      try {
+        const prices = await fetchArchivePrices(date, cat.id, groupId);
+        if (!prices) continue;
+
+        for (const p of prices) {
+          if (p.productId !== productId) continue;
+          const market = num(p.marketPrice);
+          if (market == null) continue;
+          const variant = variantKey(p.subTypeName);
+
+          await db.insert(schema.priceHistory)
+            .values({ cardId, date, variantType: variant, tcgplayerMarket: market, cardmarketAvg: null })
+            .onConflictDoUpdate({
+              target: [schema.priceHistory.cardId, schema.priceHistory.date, schema.priceHistory.variantType],
+              set: { tcgplayerMarket: market },
+            });
+          inserted++;
+        }
+      } catch {
+        // skip dates that fail (archive might not exist)
+      }
+    }
+    return inserted;
+  } finally {
+    backfillInFlight.delete(cardId);
+  }
+}
+
+/** Generate ~N sample dates spread across the past year + archive start. */
+function sampleDates(count: number): string[] {
+  const now = new Date();
+  const start = new Date(ARCHIVE_START + "T00:00:00Z");
+  const oneYearAgo = new Date(now);
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+  const from = oneYearAgo > start ? oneYearAgo : start;
+
+  const range = now.getTime() - from.getTime();
+  const step = range / count;
+  const dates: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const d = new Date(from.getTime() + step * i);
+    dates.push(d.toISOString().slice(0, 10));
+  }
+  return dates;
+}
+
+const archiveCache = new Map<string, J[] | null>();
+
+/** Download + extract a single group's prices from a daily archive. */
+async function fetchArchivePrices(date: string, categoryId: number, groupId: number): Promise<J[] | null> {
+  const cacheKey = `${date}:${categoryId}:${groupId}`;
+  if (archiveCache.has(cacheKey)) return archiveCache.get(cacheKey) ?? null;
+
+  const tmp = join(tmpdir(), `tcgcsv-${date}-${Date.now()}`);
+  mkdirSync(tmp, { recursive: true });
+  const archiveFile = join(tmp, `prices-${date}.ppmd.7z`);
+
+  try {
+    const url = `${ARCHIVE_BASE}/prices-${date}.ppmd.7z`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+    if (!res.ok) { archiveCache.set(cacheKey, null); return null; }
+
+    const buf = Buffer.from(await res.arrayBuffer());
+    writeFileSync(archiveFile, buf);
+
+    // Extract only the specific group's price file
+    const innerPath = `${date}/${categoryId}/${groupId}/prices`;
+    try {
+      await execFileAsync("7z", ["e", archiveFile, innerPath, `-o${tmp}`, "-y"], { timeout: 30_000 });
+    } catch {
+      // 7z might be named 7za on some systems
+      await execFileAsync("7za", ["e", archiveFile, innerPath, `-o${tmp}`, "-y"], { timeout: 30_000 });
+    }
+
+    const pricesFile = join(tmp, "prices");
+    if (!existsSync(pricesFile)) { archiveCache.set(cacheKey, null); return null; }
+
+    const raw = readFileSync(pricesFile, "utf-8").trim();
+    // The file is JSON (array of price objects)
+    const data = JSON.parse(raw);
+    const result = Array.isArray(data) ? data : (data.results ?? []);
+    archiveCache.set(cacheKey, result);
+    return result;
+  } catch {
+    archiveCache.set(cacheKey, null);
+    return null;
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
 }
