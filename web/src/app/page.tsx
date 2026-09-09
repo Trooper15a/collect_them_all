@@ -44,6 +44,10 @@ interface Stats {
   cheapestMissing: { id: string; name: string; setName: string | null; price: number } | null;
   overallPct: number;
   setsStarted: number;
+  tcgCount: number;
+  avgCardValue: number;
+  topTcg: { name: string; count: number } | null;
+  topTcgByValue: { name: string; value: number } | null;
 }
 
 interface Dashboard {
@@ -143,28 +147,26 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* ── Widget: Key Stats Row ── */}
-      <div className="grid grid-cols-3 gap-2 mt-3 anim-widget d2">
-        <StatWidget label="Cards" value={s.itemCount} />
-        <StatWidget label="Unique" value={s.uniqueCount} />
-        <StatWidget label="Binders" value={data.stats?.portfolioCount ?? 0} />
+      {/* ── Widget: Stats Showcase ── */}
+      <div className="grid grid-cols-2 gap-2 mt-3 anim-widget d2">
+        <GlowStat icon="cards" label="Cards" value={String(s.itemCount)} sub={`${s.uniqueCount} unique`} color="accent" />
+        <GlowStat icon="binders" label="Binders" value={String(data.stats?.portfolioCount ?? 0)} sub={`${data.stats?.setsStarted ?? 0} sets tracked`} color="purple" />
+        <GlowStat icon="cost" label="Cost Basis" value={<Money amount={s.cost} currency={c} />} sub={s.cost > 0 ? <><Delta amount={s.gain} currency={c} /> gain</> : "No cost data"} color="blue" />
+        <GlowStat icon="roi" label="All Time" value={<Delta pct={s.gainPct} />} sub={s.change24h !== 0 ? <><Delta amount={s.change24h} currency={c} /> today</> : "No change today"} color="green" />
       </div>
 
-      {/* ── Widget: P&L Strip ── */}
-      <div className="grid grid-cols-3 gap-2 mt-2 anim-widget d3">
-        <div className="card-surface rounded-2xl p-3 text-center">
-          <div className="text-[10px] text-muted uppercase tracking-wider">Cost</div>
-          <div className="text-sm font-semibold mt-0.5 tabular"><Money amount={s.cost} currency={c} /></div>
+      {/* ── Widget: Ring Stats ── */}
+      {data.stats && (data.stats.tcgCount > 0 || data.stats.avgCardValue > 0) && (
+        <div className="grid grid-cols-3 gap-2 mt-2 anim-widget d3">
+          <RingStat pct={Math.min(data.stats.tcgCount * 7, 100)} label="TCGs" value={String(data.stats.tcgCount)} color="var(--color-accent)" />
+          <RingStat pct={data.stats.overallPct} label="Complete" value={`${data.stats.overallPct}%`} color="var(--color-up)" />
+          <div className="card-surface rounded-2xl p-3 flex flex-col items-center justify-center text-center">
+            <div className="text-lg font-bold tabular"><Money amount={data.stats.avgCardValue} currency={c} /></div>
+            <div className="text-[10px] text-muted uppercase tracking-wider mt-0.5">Avg Value</div>
+            {data.stats.topTcg && <div className="text-[10px] text-accent mt-1 truncate max-w-full">{data.stats.topTcg.name}</div>}
+          </div>
         </div>
-        <div className="card-surface rounded-2xl p-3 text-center">
-          <div className="text-[10px] text-muted uppercase tracking-wider">Gain</div>
-          <div className="text-sm font-semibold mt-0.5"><Delta amount={s.cost > 0 ? s.gain : null} currency={c} /></div>
-        </div>
-        <div className="card-surface rounded-2xl p-3 text-center">
-          <div className="text-[10px] text-muted uppercase tracking-wider">All time</div>
-          <div className="text-sm font-semibold mt-0.5"><Delta pct={s.gainPct} /></div>
-        </div>
-      </div>
+      )}
 
       {/* ── Widget: Quick Actions ── */}
       <div className="card-surface rounded-3xl p-4 mt-3 anim-widget d4">
@@ -417,11 +419,53 @@ export default function HomePage() {
 
 /* ── Sub-components ── */
 
-function StatWidget({ label, value }: { label: string; value: number }) {
+const GLOW_ICONS: Record<string, React.ReactNode> = {
+  cards: <><rect x="3" y="3" width="18" height="18" rx="3" /><path d="M9 3v18M3 9h18" /></>,
+  binders: <><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></>,
+  cost: <><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></>,
+  roi: <><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" /></>,
+};
+const GLOW_COLORS: Record<string, string> = {
+  accent: "from-accent/20 to-accent/5",
+  purple: "from-purple-500/20 to-purple-500/5",
+  blue: "from-blue-500/20 to-blue-500/5",
+  green: "from-emerald-500/20 to-emerald-500/5",
+};
+
+function GlowStat({ icon, label, value, sub, color }: { icon: string; label: string; value: React.ReactNode; sub: React.ReactNode; color: string }) {
   return (
-    <div className="card-surface rounded-2xl p-3 text-center tap-scale">
-      <div className="text-2xl font-bold tabular">{value}</div>
-      <div className="text-[10px] text-muted uppercase tracking-wider">{label}</div>
+    <div className={`relative overflow-hidden card-surface rounded-2xl p-3.5 tap-scale`}>
+      <div className={`absolute inset-0 bg-gradient-to-br ${GLOW_COLORS[color] ?? GLOW_COLORS.accent} pointer-events-none`} />
+      <div className="relative flex items-start gap-2.5">
+        <div className="w-8 h-8 rounded-xl bg-white/[0.08] flex items-center justify-center shrink-0">
+          <svg viewBox="0 0 24 24" className="w-4 h-4 text-fg/70" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            {GLOW_ICONS[icon]}
+          </svg>
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[10px] text-muted uppercase tracking-wider">{label}</div>
+          <div className="text-lg font-bold tabular mt-0.5 leading-tight">{value}</div>
+          <div className="text-[11px] text-muted mt-0.5 truncate">{sub}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RingStat({ pct, label, value, color }: { pct: number; label: string; value: string; color: string }) {
+  const r = 20;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (circ * Math.min(pct, 100)) / 100;
+  return (
+    <div className="card-surface rounded-2xl p-3 flex flex-col items-center justify-center text-center tap-scale">
+      <div className="relative w-12 h-12">
+        <svg viewBox="0 0 48 48" className="w-full h-full -rotate-90">
+          <circle cx="24" cy="24" r={r} fill="none" stroke="currentColor" strokeWidth="3" className="text-white/[0.06]" />
+          <circle cx="24" cy="24" r={r} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset} className="anim-bar" />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center text-[11px] font-bold tabular">{value}</div>
+      </div>
+      <div className="text-[10px] text-muted uppercase tracking-wider mt-1.5">{label}</div>
     </div>
   );
 }

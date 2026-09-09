@@ -111,5 +111,27 @@ async function collectionStats(items: ValuedItem[], currency: string, fx: Rates)
     }
   }
 
-  return { totalCards, uniqueCards, portfolioCount, closestSet, cheapestMissing, overallPct, setsStarted };
+  const tcgSet = new Set(items.map((i) => i.card.tcg));
+  const tcgCount = tcgSet.size;
+  const avgCardValue = uniqueCards > 0 ? Math.round(items.reduce((s, i) => s + i.value, 0) / uniqueCards * 100) / 100 : 0;
+
+  const tcgTotals = new Map<string, number>();
+  for (const i of items) {
+    tcgTotals.set(i.card.tcg, (tcgTotals.get(i.card.tcg) ?? 0) + i.quantity);
+  }
+  let topTcg: { name: string; count: number } | null = null;
+  for (const [name, count] of tcgTotals) {
+    if (!topTcg || count > topTcg.count) topTcg = { name, count };
+  }
+
+  const tcgValues = new Map<string, number>();
+  for (const i of items) {
+    tcgValues.set(i.card.tcg, (tcgValues.get(i.card.tcg) ?? 0) + i.value);
+  }
+  let topTcgByValue: { name: string; value: number } | null = null;
+  for (const [name, value] of tcgValues) {
+    if (!topTcgByValue || value > topTcgByValue.value) topTcgByValue = { name, value };
+  }
+
+  return { totalCards, uniqueCards, portfolioCount, closestSet, cheapestMissing, overallPct, setsStarted, tcgCount, avgCardValue, topTcg, topTcgByValue };
 }
