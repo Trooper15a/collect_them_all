@@ -39,8 +39,8 @@ jobs:
             GITHUB_TOKEN=${{ secrets.MODEL_TOKEN }}
 
       - name: Trigger Coolify deploy
-        if: env.COOLIFY_WEBHOOK != ''
-        env:
-          COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK }}
+        if: ${{ secrets.COOLIFY_TOKEN != '' && secrets.COOLIFY_APP_UUID != '' }}
         run: |
-          curl -fsSL -X GET "$COOLIFY_WEBHOOK" || echo "Coolify webhook failed (non-fatal)"
+          curl -fsSL -X POST "http://62.238.17.137:8000/api/v1/applications/${{ secrets.COOLIFY_APP_UUID }}/restart" \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}" \
+            -H "Content-Type: application/json" || echo "Coolify deploy failed (non-fatal)"
