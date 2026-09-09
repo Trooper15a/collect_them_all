@@ -19,6 +19,7 @@ interface CenteringResult {
   topBottom: [number, number];
   score: number;
   psaCentering: string;
+  psaTier: string;
 }
 
 interface GradeBreakdown {
@@ -68,23 +69,73 @@ function analyzeCentering(canvas: HTMLCanvasElement): CenteringResult {
     return (data[i] + data[i + 1] + data[i + 2]) / 3;
   };
 
-  const edgeThreshold = 40;
+  const edgeThreshold = 30;
+  const numSamples = 15;
 
-  let left = 0, right = 0, top = 0, bottom = 0;
-  const midY = Math.floor(h / 2);
-  for (let x = 1; x < w; x++) {
-    if (Math.abs(brightness(x, midY) - brightness(x - 1, midY)) > edgeThreshold) { left = x; break; }
+  function findEdge(scanFn: (sample: number) => number | null): number {
+    const values: number[] = [];
+    for (let s = 0; s < numSamples; s++) {
+      const v = scanFn(s);
+      if (v != null) values.push(v);
+    }
+    if (values.length === 0) return 0;
+    values.sort((a, b) => a - b);
+    return values[Math.floor(values.length / 2)];
   }
-  for (let x = w - 2; x >= 0; x--) {
-    if (Math.abs(brightness(x, midY) - brightness(x + 1, midY)) > edgeThreshold) { right = w - x; break; }
-  }
-  const midX = Math.floor(w / 2);
-  for (let y = 1; y < h; y++) {
-    if (Math.abs(brightness(midX, y) - brightness(midX, y - 1)) > edgeThreshold) { top = y; break; }
-  }
-  for (let y = h - 2; y >= 0; y--) {
-    if (Math.abs(brightness(midX, y) - brightness(midX, y + 1)) > edgeThreshold) { bottom = h - y; break; }
-  }
+
+  const yStart = Math.floor(h * 0.25);
+  const yEnd = Math.floor(h * 0.75);
+  const yStep = Math.max(1, Math.floor((yEnd - yStart) / numSamples));
+
+  const left = findEdge((s) => {
+    const y = yStart + s * yStep;
+    if (y >= h) return null;
+    for (let x = 1; x < w * 0.4; x++) {
+      if (Math.abs(brightness(x, y) - brightness(x - 1, y)) > edgeThreshold) return x;
+    }
+    return null;
+  });
+
+  const right = findEdge((s) => {
+    const y = yStart + s * yStep;
+    if (y >= h) return null;
+    for (let x = w - 2; x > w * 0.6; x--) {
+      if (Math.abs(brightness(x, y) - brightness(x + 1, y)) > edgeThreshold) return w - x;
+    }
+    return null;
+  });
+
+  const xStart = Math.floor(w * 0.25);
+  const xEnd = Math.floor(w * 0.75);
+  const xStep = Math.max(1, Math.floor((xEnd - xStart) / numSamples));
+
+  const top = findEdge((s) => {
+    const x = xStart + s * xStep;
+    if (x >= w) return null;
+    for (let y = 1; y < h * 0.4; y++) {
+      if (Math.abs(brightness(x, y) - brightness(x, y - 1)) > edgeThreshold) return y;
+    }
+    return null;
+  });
+
+  const bottom = findEdge((s) => {
+    const x = xStart + s * xStep;
+    if (x >= w) return null;
+    for (let y = h - 2; y > h * 0.6; y--) {
+      if (Math.abs(brightness(x, y) - brightness(x, y + 1)) > edgeThreshold) return h - y;
+    }
+    return null;
+  });
+
+  // Draw overlay lines on the canvas
+  ctx.strokeStyle = "rgba(167,139,250,0.7)";
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 4]);
+  if (left > 0) { ctx.beginPath(); ctx.moveTo(left, 0); ctx.lineTo(left, h); ctx.stroke(); }
+  if (right > 0) { ctx.beginPath(); ctx.moveTo(w - right, 0); ctx.lineTo(w - right, h); ctx.stroke(); }
+  if (top > 0) { ctx.beginPath(); ctx.moveTo(0, top); ctx.lineTo(w, top); ctx.stroke(); }
+  if (bottom > 0) { ctx.beginPath(); ctx.moveTo(0, h - bottom); ctx.lineTo(w, h - bottom); ctx.stroke(); }
+  ctx.setLineDash([]);
 
   const lrTotal = left + right || 1;
   const tbTotal = top + bottom || 1;
@@ -97,11 +148,19 @@ function analyzeCentering(canvas: HTMLCanvasElement): CenteringResult {
   const tbOff = Math.abs(50 - tPct);
   const score = Math.max(0, 10 - (lrOff + tbOff) * 0.3);
 
+  const worstOff = Math.max(lrOff, tbOff);
+  let psaTier: string;
+  if (worstOff <= 5) psaTier = "PSA 10 eligible";
+  else if (worstOff <= 10) psaTier = "PSA 9 range";
+  else if (worstOff <= 15) psaTier = "PSA 8 range";
+  else psaTier = "Below PSA 8";
+
   return {
     leftRight: [lPct, rPct],
     topBottom: [tPct, bPct],
     score: Math.round(score * 10) / 10,
     psaCentering: `${lPct}/${rPct} - ${tPct}/${bPct}`,
+    psaTier,
   };
 }
 
@@ -135,6 +194,7 @@ export default function GradeEstimatorPage() {
   const [cardCurrency, setCardCurrency] = useState("USD");
 
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [overlayUrl, setOverlayUrl] = useState<string | null>(null);
   const [centering, setCentering] = useState<CenteringResult | null>(null);
   const [priceLoading, setPriceLoading] = useState(false);
   const [confirmingChange, setConfirmingChange] = useState(false);
@@ -199,6 +259,7 @@ export default function GradeEstimatorPage() {
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       const result = analyzeCentering(canvas);
       setCentering(result);
+      setOverlayUrl(canvas.toDataURL("image/png"));
     };
     img.src = url;
   }
@@ -207,6 +268,7 @@ export default function GradeEstimatorPage() {
     if (photoUrl) URL.revokeObjectURL(photoUrl);
     setCard(null);
     setPhotoUrl(null);
+    setOverlayUrl(null);
     setCentering(null);
     setSurface(8.5);
     setEdges(8.5);
@@ -306,30 +368,35 @@ export default function GradeEstimatorPage() {
               ) : (
                 <div>
                   <div className="relative rounded-xl overflow-hidden bg-black flex justify-center">
-                    <img src={photoUrl} alt="Card photo" className="max-h-64 object-contain" />
+                    <img src={overlayUrl ?? photoUrl!} alt="Card photo with centering overlay" className="max-h-64 object-contain" />
                   </div>
                   {centering && (
                     <div className="mt-3 grid grid-cols-2 gap-2 text-center">
-                      <div className="rounded-xl bg-white/[0.03] border border-line py-2">
+                      <div className="rounded-xl bg-white/[0.03] border border-line py-2 px-1">
                         <div className="text-[10px] text-muted uppercase tracking-wider">L/R centering</div>
                         <div className="text-sm font-semibold tabular">{centering.leftRight[0]}/{centering.leftRight[1]}</div>
                       </div>
-                      <div className="rounded-xl bg-white/[0.03] border border-line py-2">
+                      <div className="rounded-xl bg-white/[0.03] border border-line py-2 px-1">
                         <div className="text-[10px] text-muted uppercase tracking-wider">T/B centering</div>
                         <div className="text-sm font-semibold tabular">{centering.topBottom[0]}/{centering.topBottom[1]}</div>
                       </div>
                     </div>
                   )}
                   {centering && (
-                    <div className="mt-2 text-center">
-                      <span className="text-xs text-muted">Centering score: </span>
-                      <span className={`text-sm font-bold ${centering.score >= 9 ? "text-up" : centering.score >= 7 ? "text-accent" : "text-down"}`}>
-                        {centering.score}/10
-                      </span>
-                      <span className="text-xs text-muted ml-2">({centering.psaCentering})</span>
+                    <div className="mt-2 text-center space-y-1">
+                      <div>
+                        <span className="text-xs text-muted">Centering score: </span>
+                        <span className={`text-sm font-bold ${centering.score >= 9 ? "text-up" : centering.score >= 7 ? "text-accent" : "text-down"}`}>
+                          {centering.score}/10
+                        </span>
+                        <span className="text-xs text-muted ml-2">({centering.psaCentering})</span>
+                      </div>
+                      <div className={`inline-block text-[10px] font-semibold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${centering.score >= 9 ? "bg-up/15 text-up" : centering.score >= 7 ? "bg-accent/15 text-accent" : "bg-down/15 text-down"}`}>
+                        {centering.psaTier}
+                      </div>
                     </div>
                   )}
-                  <button onClick={() => { if (photoUrl) URL.revokeObjectURL(photoUrl); setPhotoUrl(null); setCentering(null); }} className="mt-2 text-xs text-accent">Retake photo</button>
+                  <button onClick={() => { if (photoUrl) URL.revokeObjectURL(photoUrl); setPhotoUrl(null); setOverlayUrl(null); setCentering(null); }} className="mt-2 text-xs text-accent">Retake photo</button>
                 </div>
               )}
             </div>
