@@ -14,14 +14,24 @@ const Patch = z.object({
 });
 
 export async function GET() {
-  const fx = await getRates();
+  // getSetting is async (Postgres); without await each field serializes as {}
+  // and clients crash (e.g. Intl.NumberFormat "Invalid currency code").
+  const [fx, currency, theme, language, bulkCondition, bulkCurrency, bulkPortfolio] = await Promise.all([
+    getRates(),
+    getSetting("currency", "USD"),
+    getSetting("theme", "dark"),
+    getSetting("language", "en"),
+    getSetting("bulkCondition", "NM"),
+    getSetting("bulkCurrency", "CAD"),
+    getSetting("bulkPortfolio", "My Collection"),
+  ]);
   return NextResponse.json({
-    currency: getSetting("currency", "USD"),
-    theme: getSetting("theme", "dark"),
-    language: getSetting("language", "en"),
-    bulkCondition: getSetting("bulkCondition", "NM"),
-    bulkCurrency: getSetting("bulkCurrency", "CAD"),
-    bulkPortfolio: getSetting("bulkPortfolio", "My Collection"),
+    currency,
+    theme,
+    language,
+    bulkCondition,
+    bulkCurrency,
+    bulkPortfolio,
     pokewalletConfigured: hasPokewalletKey(),
     pokewalletBudget: pokewalletLimiter.remaining,
     fxDate: fx.date,
@@ -31,6 +41,6 @@ export async function GET() {
 export async function PATCH(req: NextRequest) {
   const parsed = Patch.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
-  for (const [k, v] of Object.entries(parsed.data)) if (v) setSetting(k, v);
+  for (const [k, v] of Object.entries(parsed.data)) if (v) await setSetting(k, v);
   return GET();
 }

@@ -9,9 +9,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   try {
     const card = await getCard(decodeURIComponent(id), { forceRefresh: refresh });
     if (!card) return NextResponse.json({ error: "Card not found" }, { status: 404 });
-    const history = await getPriceHistory(card.id);
-    const fx = await getRates();
-    return NextResponse.json({ card, history, fx, displayCurrency: getSetting("currency", "USD") });
+    const [history, fx, displayCurrency] = await Promise.all([getPriceHistory(card.id), getRates(), getSetting("currency", "USD")]);
+    return NextResponse.json({ card, history, fx, displayCurrency });
   } catch (err) {
     console.error("card error", err);
     return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to load card" }, { status: 500 });
