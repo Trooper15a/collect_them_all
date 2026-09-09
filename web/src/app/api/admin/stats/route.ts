@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { sql } from "drizzle-orm";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { auth } from "@/lib/auth";
@@ -24,28 +23,30 @@ export async function GET() {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const [[{ count: totalUsers }]] = await Promise.all([
-      db.execute<{ count: number }>(sql`SELECT COUNT(*)::int AS count FROM users`),
-    ]);
+    // Run all counts in a single query to avoid 11 round trips
+    const [counts] = await db.execute<{
+      users: number; portfolios: number; items: number; wishlist: number;
+      box_opens: number; alerts: number; cards: number; sets: number; sessions: number;
+    }>(sql`SELECT
+      (SELECT COUNT(*)::int FROM users) AS users,
+      (SELECT COUNT(*)::int FROM portfolios) AS portfolios,
+      (SELECT COUNT(*)::int FROM portfolio_items) AS items,
+      (SELECT COUNT(*)::int FROM wishlist_items) AS wishlist,
+      (SELECT COUNT(*)::int FROM box_opens) AS box_opens,
+      (SELECT COUNT(*)::int FROM alerts) AS alerts,
+      (SELECT COUNT(*)::int FROM cards) AS cards,
+      (SELECT COUNT(*)::int FROM sets) AS sets,
+      (SELECT COUNT(*)::int FROM sessions WHERE expires > NOW()) AS sessions`);
 
-    const results = await Promise.all([
-      db.execute<{ count: number }>(sql`SELECT COUNT(*)::int AS count FROM portfolios`),
-      db.execute<{ count: number }>(sql`SELECT COUNT(*)::int AS count FROM portfolio_items`),
-      db.execute<{ count: number }>(sql`SELECT COUNT(*)::int AS count FROM wishlist_items`),
-      db.execute<{ count: number }>(sql`SELECT COUNT(*)::int AS count FROM box_opens`),
-      db.execute<{ count: number }>(sql`SELECT COUNT(*)::int AS count FROM alerts`),
-      db.execute<{ count: number }>(sql`SELECT COUNT(*)::int AS count FROM cards`),
-      db.execute<{ count: number }>(sql`SELECT COUNT(*)::int AS count FROM sets`),
-      db.execute<{ count: number }>(
-        sql`SELECT COUNT(*)::int AS count FROM sessions WHERE expires > NOW()`
-      ),
+    const [recentUsers, cardsByTcg, setsByTcg, topPortfolios] = await Promise.all([
       db.execute<{ name: string | null; email: string | null }>(
         sql`SELECT name, email FROM users ORDER BY id DESC LIMIT 10`
       ),
-      db.execute<{ tcg: string; cards: number; sets: number }>(
-        sql`SELECT c.tcg, COUNT(DISTINCT c.id)::int AS cards, COUNT(DISTINCT s.id)::int AS sets
-            FROM cards c LEFT JOIN sets s ON s.tcg = c.tcg
-            GROUP BY c.tcg ORDER BY cards DESC`
+      db.execute<{ tcg: string; cards: number }>(
+        sql`SELECT tcg, COUNT(*)::int AS cards FROM cards GROUP BY tcg ORDER BY cards DESC`
+      ),
+      db.execute<{ tcg: string; sets: number }>(
+        sql`SELECT tcg, COUNT(*)::int AS sets FROM sets GROUP BY tcg ORDER BY sets DESC`
       ),
       db.execute<{ name: string; items: number; user_name: string | null }>(
         sql`SELECT p.name, COUNT(pi.id)::int AS items, u.name AS user_name
@@ -57,21 +58,24 @@ export async function GET() {
       ),
     ]);
 
+    const setsMap = new Map(setsByTcg.map((r) => [r.tcg, r.sets]));
+    const tcgBreakdown = cardsByTcg.map((r) => ({ tcg: r.tcg, cards: r.cards, sets: setsMap.get(r.tcg) ?? 0 }));
+
     return NextResponse.json({
       overview: {
-        totalUsers,
-        activeSessions: results[7][0]?.count ?? 0,
-        totalPortfolios: results[0][0]?.count ?? 0,
-        totalPortfolioItems: results[1][0]?.count ?? 0,
-        totalWishlistItems: results[2][0]?.count ?? 0,
-        totalBoxOpens: results[3][0]?.count ?? 0,
-        totalAlerts: results[4][0]?.count ?? 0,
-        totalCards: results[5][0]?.count ?? 0,
-        totalSets: results[6][0]?.count ?? 0,
+        totalUsers: counts.users,
+        activeSessions: counts.sessions,
+        totalPortfolios: counts.portfolios,
+        totalPortfolioItems: counts.items,
+        totalWishlistItems: counts.wishlist,
+        totalBoxOpens: counts.box_opens,
+        totalAlerts: counts.alerts,
+        totalCards: counts.cards,
+        totalSets: counts.sets,
       },
-      recentUsers: results[8],
-      tcgBreakdown: results[9],
-      topPortfolios: results[10],
+      recentUsers,
+      tcgBreakdown,
+      topPortfolios,
       generatedAt: new Date().toISOString(),
     });
   } catch (err) {
