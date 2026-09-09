@@ -192,9 +192,10 @@ export default function HomePage() {
           </ActionBtn>
         </div>
         <div className="grid grid-cols-3 gap-2 mt-2 stagger-children">
-          <ActionBtn href="/grade" label="Grader">
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.35-4.35" />
+          <ActionBtn href="/grade" label="Centering">
+            <circle cx="12" cy="12" r="9" strokeDasharray="4 2" />
+            <line x1="12" y1="3" x2="12" y2="21" />
+            <line x1="3" y1="12" x2="21" y2="12" />
           </ActionBtn>
           <ActionBtn href="/wishlist" label="Wishlist">
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
