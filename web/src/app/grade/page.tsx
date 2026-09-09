@@ -165,7 +165,28 @@ export default function CenteringCheckerPage() {
       <div className="card-surface rounded-2xl p-4">
         {!photoUrl ? (
           <div className="text-center">
-            <p className="text-sm text-muted mb-3">Take a photo of the front of your card</p>
+            <div className="relative mx-auto mb-4 rounded-xl bg-black/40 border border-line overflow-hidden" style={{ width: "200px", aspectRatio: "63/88" }}>
+              <div className="absolute inset-0 flex items-center justify-center">
+                {/* Corner brackets */}
+                <div className="relative w-[85%] h-[85%]">
+                  <div className="absolute top-0 left-0 w-5 h-5 border-t-[2.5px] border-l-[2.5px] border-white/60 rounded-tl-lg" />
+                  <div className="absolute top-0 right-0 w-5 h-5 border-t-[2.5px] border-r-[2.5px] border-white/60 rounded-tr-lg" />
+                  <div className="absolute bottom-0 left-0 w-5 h-5 border-b-[2.5px] border-l-[2.5px] border-white/60 rounded-bl-lg" />
+                  <div className="absolute bottom-0 right-0 w-5 h-5 border-b-[2.5px] border-r-[2.5px] border-white/60 rounded-br-lg" />
+                  {/* Center crosshair */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-px h-4 bg-white/30" />
+                  </div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="h-px w-4 bg-white/30" />
+                  </div>
+                </div>
+              </div>
+              <div className="absolute bottom-2 inset-x-0 text-center text-[10px] text-white/50 font-medium">
+                Place card here
+              </div>
+            </div>
+            <p className="text-sm text-muted mb-3">Snap a close-up of your card — fill the frame with even borders</p>
             <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && handlePhoto(e.target.files[0])} />
             <div className="flex gap-2 justify-center">
               <Button onClick={() => fileRef.current?.click()}>Take photo</Button>

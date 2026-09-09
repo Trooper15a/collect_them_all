@@ -150,10 +150,27 @@ export function Scanner({ onMatches, onClose, bulkMode, bulkCount }: { onMatches
 }
 
 function Guide() {
+  const corner = "absolute w-6 h-6 border-white/90";
   return (
     <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
       <div className="relative" style={{ width: "78%", aspectRatio: "63/88", maxHeight: "85%" }}>
-        <div className="absolute inset-0 rounded-xl border-2 border-white/70 shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]" />
+        <div className="absolute inset-0 rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]" />
+        {/* Corner brackets */}
+        <div className={`${corner} top-0 left-0 border-t-[3px] border-l-[3px] rounded-tl-xl`} />
+        <div className={`${corner} top-0 right-0 border-t-[3px] border-r-[3px] rounded-tr-xl`} />
+        <div className={`${corner} bottom-0 left-0 border-b-[3px] border-l-[3px] rounded-bl-xl`} />
+        <div className={`${corner} bottom-0 right-0 border-b-[3px] border-r-[3px] rounded-br-xl`} />
+        {/* Center crosshair */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-30">
+          <div className="w-px h-5 bg-white" />
+        </div>
+        <div className="absolute inset-0 flex items-center justify-center opacity-30">
+          <div className="h-px w-5 bg-white" />
+        </div>
+        {/* Label */}
+        <div className="absolute -bottom-7 inset-x-0 text-center text-[11px] text-white/60 font-medium">
+          Align card within frame
+        </div>
       </div>
     </div>
   );
