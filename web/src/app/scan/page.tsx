@@ -499,12 +499,16 @@ export default function ScanPage() {
         </div>
       )}
       <AddToPortfolioSheet card={adding} onClose={() => setAdding(null)} onAdded={() => {
+        const addedId = adding?.id;
         setAdding(null);
-        if (bulkQueue.length > 0) {
-          const rest = bulkQueue.filter((c) => c.id !== adding?.id);
-          setBulkQueue(rest);
+        setBulkQueue((prev) => {
+          if (!addedId) return prev;
+          const idx = prev.findIndex((c) => c.id === addedId);
+          if (idx === -1) return prev;
+          const rest = [...prev.slice(0, idx), ...prev.slice(idx + 1)];
           if (rest.length > 0) setTimeout(() => setAdding(rest[0]), 300);
-        }
+          return rest;
+        });
       }} />
     </div>
   );
