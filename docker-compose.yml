@@ -18,6 +18,7 @@ services:
 
   app:
     image: ghcr.io/trooper15a/collectr:latest
+    pull_policy: always
     # To build locally instead: docker compose build --build-arg GITHUB_TOKEN=...
     # build:
     #   context: ./web
