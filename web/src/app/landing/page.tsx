@@ -20,57 +20,32 @@ const FEATURES = [
   {
     title: "AI Card Scanner",
     desc: "Point your camera at any card and instantly identify it with on-device AI recognition. Works offline.",
-    icon: (
-      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z" />
-      </svg>
-    ),
+    emoji: "📸",
   },
   {
     title: "Up-to-Date Prices",
     desc: "Prices from TCGPlayer across 14 TCGs updated daily. Track market value, low, mid, and high for every variant.",
-    icon: (
-      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18 9 11.25l4.306 4.306a11.95 11.95 0 0 1 5.814-5.518l2.74-1.22m0 0-5.94-2.281m5.94 2.28-2.28 5.941" />
-      </svg>
-    ),
+    emoji: "📈",
   },
   {
     title: "14 TCGs Supported",
     desc: "Pokémon, Magic, Yu-Gi-Oh!, One Piece, Lorcana, Digimon, Dragon Ball, Flesh and Blood, Star Wars, Union Arena, and more.",
-    icon: (
-      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M6 6.878V6a2.25 2.25 0 0 1 2.25-2.25h7.5A2.25 2.25 0 0 1 18 6v.878m-12 0c.235-.083.487-.128.75-.128h10.5c.263 0 .515.045.75.128m-12 0A2.25 2.25 0 0 0 4.5 9v.878m13.5-3A2.25 2.25 0 0 1 19.5 9v.878m-13.5-3c.235-.083.487-.128.75-.128h10.5c.263 0 .515.045.75.128m-12 0A2.25 2.25 0 0 0 3 12M18 9.878a2.25 2.25 0 0 1 1.5 2.122M3 12v6a2.25 2.25 0 0 0 2.25 2.25h13.5A2.25 2.25 0 0 0 21 18v-6m-18 0h18" />
-      </svg>
-    ),
+    emoji: "🃏",
   },
   {
     title: "Portfolio Binders",
     desc: "Organize cards into binders with grading support. Track purchase price, quantity, and see gains over time.",
-    icon: (
-      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" />
-      </svg>
-    ),
+    emoji: "📁",
   },
   {
     title: "Works Offline",
     desc: "Full PWA with offline caching. Browse your collection, scan cards, and queue changes — syncs when you're back online.",
-    icon: (
-      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 0 1 1.06 0Z" />
-      </svg>
-    ),
+    emoji: "📶",
   },
   {
-    title: "100% Free & Open Source",
-    desc: "No paywalls, no subscriptions. Self-hostable. Your data stays yours. Community-driven development.",
-    icon: (
-      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
-      </svg>
-    ),
+    title: "Open Source",
+    desc: "No hidden fees. Self-hostable. Your data stays yours. Community-driven development on GitHub.",
+    emoji: "🔓",
   },
 ];
 
@@ -82,7 +57,7 @@ const jsonLd = {
   name: "RipnPull",
   applicationCategory: "UtilitiesApplication",
   operatingSystem: "Web, iOS, Android",
-  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+  offers: { "@type": "Offer", price: "4.99", priceCurrency: "USD" },
   description: SITE.description,
   url: SITE.url,
   screenshot: `${SITE.url}/og-image.png`,
@@ -123,7 +98,7 @@ export default function LandingPage() {
             <span className="text-rainbow">Know their worth.</span>
           </h1>
           <p className="mt-6 text-lg text-muted max-w-lg mx-auto leading-relaxed">
-            The free, open-source TCG portfolio tracker with AI card scanning, daily prices across 14 games, and offline support.
+            The TCG portfolio tracker with AI card scanning, daily prices across 14 games, and offline support. Free during beta, then just $4.99 — once, forever.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
             <Link
@@ -166,8 +141,8 @@ export default function LandingPage() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {FEATURES.map((f) => (
             <div key={f.title} className="rounded-2xl bg-elev border border-line p-5">
-              <div className="w-12 h-12 rounded-xl bg-accent/10 text-accent flex items-center justify-center mb-4">
-                {f.icon}
+              <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center mb-4 text-2xl">
+                {f.emoji}
               </div>
               <h3 className="font-semibold mb-1">{f.title}</h3>
               <p className="text-sm text-muted leading-relaxed">{f.desc}</p>
@@ -193,9 +168,9 @@ export default function LandingPage() {
             <div className="rounded-xl bg-elev border border-accent/30 p-4 text-left space-y-3">
               <p className="font-semibold text-accent">RipnPull</p>
               <ul className="space-y-2 text-muted">
-                <li className="text-up">Free forever</li>
-                <li className="text-up">PSA + BGS + CGC grading links</li>
-                <li className="text-up">Open source (MIT)</li>
+                <li className="text-up">$4.99 one-time (free beta)</li>
+                <li className="text-up">No subscription ever</li>
+                <li className="text-up">Full price history included</li>
                 <li className="text-up">Full offline mode</li>
                 <li className="text-up">14 TCGs supported</li>
               </ul>
@@ -225,7 +200,7 @@ export default function LandingPage() {
       {/* CTA */}
       <section className="px-6 py-20 text-center">
         <h2 className="text-3xl font-bold mb-4">Start tracking for free</h2>
-        <p className="text-muted mb-8 max-w-md mx-auto">No credit card. No subscription. Sign in with Google and start adding cards in seconds.</p>
+        <p className="text-muted mb-8 max-w-md mx-auto">Free during beta. No credit card needed. Sign in with Google and start adding cards in seconds.</p>
         <Link
           href="/login"
           className="btn-rainbow inline-flex items-center justify-center gap-2 rounded-xl px-8 py-3.5 text-base font-semibold shadow-lg shadow-[rgba(167,139,250,0.35)] hover:brightness-110 transition"

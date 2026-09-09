@@ -62,8 +62,9 @@ export function PwaRegister() {
     window.addEventListener("appinstalled", onInstalled);
 
     // Deferred so server and first client render match (banner starts hidden).
+    // Hide on public landing pages — it overlaps content and distracts new visitors.
     const showTimer = window.setTimeout(() => {
-      if (!isInstalled() && !dismissedRecently()) setVisible(true);
+      if (!isInstalled() && !dismissedRecently() && !location.pathname.startsWith("/landing")) setVisible(true);
     }, 0);
 
     return () => {
