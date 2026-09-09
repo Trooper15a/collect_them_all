@@ -1,0 +1,18 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { SITE } from "@/lib/site";
+import { TCG_SEO } from "./tcg-data";
+
+export const metadata: Metadata = {
+  title: "Free TCG Portfolio Tracker — AI Scanner, Prices & Collection Tracking | RipnPull",
+  description:
+    "Track your Pokémon, Magic, Yu-Gi-Oh! and 11 more TCG collections for free. AI card scanner, daily TCGPlayer prices, wishlist alerts, grading support, and full offline mode. Open source.",
+  alternates: { canonical: `${SITE.url}/landing` },
+  openGraph: {
+    title: "RipnPull — Free TCG Portfolio Tracker with AI Card Scanner",
+    description:
+      "The free, open-source TCG portfolio tracker. AI card scanning, daily prices across 14 games, wishlist price alerts, and offline support.",
+    url: `${SITE.url}/landing`,
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "RipnPull — Free TCG Portfolio Tracker with AI Card Scanner" }],
+  },
+};
