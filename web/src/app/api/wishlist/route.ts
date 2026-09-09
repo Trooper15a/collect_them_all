@@ -4,8 +4,9 @@ import { addToWishlist, listWishlist, removeFromWishlist } from "@/lib/wishlist"
 import { requireUserId } from "@/lib/auth";
 
 export async function GET() {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
   try {
-    const userId = await requireUserId();
     const items = await listWishlist(userId);
     return NextResponse.json({ items });
   } catch (err) {
@@ -21,10 +22,11 @@ const AddSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
   try {
     const body = await req.json();
     const data = AddSchema.parse(body);
-    const userId = await requireUserId();
     const item = await addToWishlist(userId, data.cardId, data.targetPrice, data.targetCurrency);
     return NextResponse.json({ item }, { status: 201 });
   } catch (err) {
@@ -39,10 +41,11 @@ export async function POST(req: NextRequest) {
 const DeleteSchema = z.object({ cardId: z.string().min(1) });
 
 export async function DELETE(req: NextRequest) {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
   try {
     const body = await req.json();
     const data = DeleteSchema.parse(body);
-    const userId = await requireUserId();
     await removeFromWishlist(userId, data.cardId);
     return NextResponse.json({ ok: true });
   } catch (err) {

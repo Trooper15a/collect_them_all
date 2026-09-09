@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AddToPortfolioSheet, type AddSheetCard } from "@/components/AddToPortfolioSheet";
 import { BackLink } from "@/components/BackLink";
 import { SetLogo } from "@/components/SetLogo";
 import { CardImage, Empty, Money, Segmented, Skeleton } from "@/components/ui";
+import { showToast } from "@/components/Toast";
 import { langLabel } from "@/lib/format";
 import { tcgplayerSearchUrl } from "@/lib/marketplace";
 import type { CardPrices } from "@/lib/types";
@@ -43,6 +44,41 @@ export default function SetPage() {
   const [filter, setFilter] = useState<"all" | "owned" | "missing">("all");
   const [sort, setSort] = useState<Sort>("number");
   const [adding, setAdding] = useState<AddSheetCard | null>(null);
+  const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
+
+  const loadWishlist = useCallback(() => {
+    fetch("/api/wishlist")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.items) setWishlistIds(new Set(d.items.map((i: { card: { id: string } }) => i.card.id)));
+      })
+      .catch(() => {});
+  }, []);
+
+  const toggleWishlist = async (cardId: string) => {
+    const isWished = wishlistIds.has(cardId);
+    setWishlistIds((prev) => {
+      const next = new Set(prev);
+      if (isWished) next.delete(cardId); else next.add(cardId);
+      return next;
+    });
+    try {
+      const r = await fetch("/api/wishlist", {
+        method: isWished ? "DELETE" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cardId }),
+      });
+      if (!r.ok) throw new Error();
+      showToast(isWished ? "Removed from wishlist" : "Added to wishlist ✓", isWished ? "info" : "up");
+    } catch {
+      setWishlistIds((prev) => {
+        const next = new Set(prev);
+        if (isWished) next.add(cardId); else next.delete(cardId);
+        return next;
+      });
+      showToast("Failed — try again", "down");
+    }
+  };
 
   const load = () =>
     fetch(`/api/sets/${encodeURIComponent(id)}`)
@@ -54,6 +90,7 @@ export default function SetPage() {
       .catch((e) => setError(e.message));
   useEffect(() => {
     load();
+    loadWishlist();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -163,9 +200,14 @@ export default function SetPage() {
                 {card.owned > 0 ? "+ More" : "+ Add"}
               </button>
               {card.owned === 0 && (
-                <a href={tcgplayerSearchUrl(card.name)} target="_blank" rel="noreferrer" className="mt-0.5 flex w-full min-h-8 items-center justify-center text-center text-[11px] text-muted hover:text-accent">
-                  Buy ↗
-                </a>
+                <div className="mt-0.5 flex gap-1">
+                  <a href={tcgplayerSearchUrl(card.name)} target="_blank" rel="noreferrer" className="flex flex-1 min-h-8 items-center justify-center text-center text-[11px] text-muted hover:text-accent">
+                    Buy ↗
+                  </a>
+                  <button onClick={() => toggleWishlist(card.id)} className={`min-w-8 min-h-8 flex items-center justify-center text-sm rounded-md ${wishlistIds.has(card.id) ? "text-down" : "text-muted hover:text-down/60"}`} aria-label={wishlistIds.has(card.id) ? "Remove from wishlist" : "Add to wishlist"}>
+                    {wishlistIds.has(card.id) ? "♥" : "♡"}
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -193,9 +235,14 @@ export default function SetPage() {
                     {p.owned > 0 ? "+ More" : "+ Add"}
                   </button>
                   {p.owned === 0 && (
-                    <a href={tcgplayerSearchUrl(p.name)} target="_blank" rel="noreferrer" className="mt-0.5 flex w-full min-h-8 items-center justify-center text-center text-[11px] text-muted hover:text-accent">
-                      Buy ↗
-                    </a>
+                    <div className="mt-0.5 flex gap-1">
+                      <a href={tcgplayerSearchUrl(p.name)} target="_blank" rel="noreferrer" className="flex flex-1 min-h-8 items-center justify-center text-center text-[11px] text-muted hover:text-accent">
+                        Buy ↗
+                      </a>
+                      <button onClick={() => toggleWishlist(p.id)} className={`min-w-8 min-h-8 flex items-center justify-center text-sm rounded-md ${wishlistIds.has(p.id) ? "text-down" : "text-muted hover:text-down/60"}`} aria-label={wishlistIds.has(p.id) ? "Remove from wishlist" : "Add to wishlist"}>
+                        {wishlistIds.has(p.id) ? "♥" : "♡"}
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
