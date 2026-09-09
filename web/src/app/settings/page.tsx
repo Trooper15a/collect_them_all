@@ -249,10 +249,6 @@ export default function SettingsPage() {
           </div>
         </Box>
 
-        <Box title="Scanner">
-          <UpdateIndexPanel />
-        </Box>
-
         <section>
           <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-2">Offline mode</h2>
           <OfflineStatus />
@@ -471,58 +467,6 @@ function ImportPanel() {
         </div>
       )}
       {msg && <div className="text-xs">{msg}</div>}
-    </div>
-  );
-}
-
-
-function UpdateIndexPanel() {
-  const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<{ ok: boolean; output: string; finishedAt: string } | null>(null);
-  const [msg, setMsg] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch("/api/update-index").then((r) => r.json()).then((d) => {
-      setRunning(d.running);
-      if (d.lastResult) setResult(d.lastResult);
-    }).catch(() => undefined);
-  }, []);
-
-  useEffect(() => {
-    if (!running) return;
-    const t = setInterval(() => {
-      fetch("/api/update-index").then((r) => r.json()).then((d) => {
-        setRunning(d.running);
-        if (d.lastResult) setResult(d.lastResult);
-      }).catch(() => undefined);
-    }, 3000);
-    return () => clearInterval(t);
-  }, [running]);
-
-  async function start() {
-    setMsg(null);
-    setResult(null);
-    const r = await fetch("/api/update-index", { method: "POST" });
-    const d = await r.json();
-    if (!r.ok) { setMsg(d.error ?? "Failed"); return; }
-    setRunning(true);
-  }
-
-  return (
-    <div className="space-y-3 text-sm">
-      <div className="text-muted">
-        The card recognition model runs on-device (~20 MB, cached). Check for new card sets from PokéWallet, download images, compute embeddings with the existing model, and update the scanner index — no retraining needed.
-      </div>
-      <Button onClick={start} disabled={running}>
-        {running ? "Updating… (this may take a few minutes)" : "Check for new cards"}
-      </Button>
-      {msg && <div className="text-xs text-down">{msg}</div>}
-      {result && (
-        <div className={`text-xs ${result.ok ? "text-muted" : "text-down"}`}>
-          <div>{result.ok ? "Update completed successfully" : "Update failed"} — {new Date(result.finishedAt).toLocaleString()}</div>
-          <pre className="mt-1 whitespace-pre-wrap font-mono text-[11px] bg-elev rounded-lg p-2 max-h-40 overflow-auto">{result.output}</pre>
-        </div>
-      )}
     </div>
   );
 }
