@@ -42,6 +42,8 @@ export default function ScanPage() {
   const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [showAllGames, setShowAllGames] = useState(false);
+  const [guestQueue, setGuestQueue] = useState<AddSheetCard[]>([]);
+  const GUEST_QUEUE_LIMIT = 10;
 
   // Load persisted state after mount (SSR-safe defaults above avoid hydration mismatch).
   useEffect(() => {
@@ -58,6 +60,11 @@ export default function ScanPage() {
         const parsed = JSON.parse(r);
         if (Array.isArray(parsed)) setRecentScans(parsed);
       }
+      const gq = localStorage.getItem("guestQueue");
+      if (gq) {
+        const parsed = JSON.parse(gq);
+        if (Array.isArray(parsed)) setGuestQueue(parsed);
+      }
     } catch { /* corrupt/unavailable storage — keep defaults */ }
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
@@ -65,6 +72,9 @@ export default function ScanPage() {
   useEffect(() => {
     try { localStorage.setItem("recentScans", JSON.stringify(recentScans)); } catch {}
   }, [recentScans]);
+  useEffect(() => {
+    try { localStorage.setItem("guestQueue", JSON.stringify(guestQueue)); } catch {}
+  }, [guestQueue]);
 
   const loadPortfolios = useCallback(() => {
     fetch("/api/portfolios")
@@ -165,7 +175,12 @@ export default function ScanPage() {
         const scan: RecentScan = { id: card.id, name: card.name, setName: card.setName ?? null, ts: Date.now() };
         setRecentScans((prev) => [scan, ...prev.filter((s) => s.id !== card.id)].slice(0, 10));
         if (!isLoggedIn) {
-          // Guest mode — just show the card page, nothing is saved
+          if (guestQueue.length < GUEST_QUEUE_LIMIT && !guestQueue.some((c) => c.id === card.id)) {
+            setGuestQueue((prev) => [...prev, card]);
+          } else if (guestQueue.length >= GUEST_QUEUE_LIMIT) {
+            showToast(`Guest limit reached (${GUEST_QUEUE_LIMIT}). Sign in to save more!`, "info");
+          }
+          setScanning(true);
         } else if (bulkMode) {
           setBulkQueue((prev) => [...prev, card]);
           setScanning(true);
@@ -329,11 +344,17 @@ export default function ScanPage() {
                         <span className="text-muted">—</span>
                       )}
                     </span>
-                    {isLoggedIn && (
+                    {isLoggedIn ? (
                     <button onClick={() => setAdding({ id: c.id, name: c.name, setName: c.setName, prices: c.prices })} className="text-xs font-semibold text-accent px-2 py-1 rounded-lg bg-accent/10">
                       + Add
                     </button>
-                    )}
+                    ) : guestQueue.length < GUEST_QUEUE_LIMIT && !guestQueue.some((g) => g.id === c.id) ? (
+                    <button onClick={() => { setGuestQueue((prev) => [...prev, { id: c.id, name: c.name, setName: c.setName, prices: c.prices }]); haptic("medium"); }} className="text-xs font-semibold text-accent px-2 py-1 rounded-lg bg-accent/10">
+                      + Queue
+                    </button>
+                    ) : guestQueue.some((g) => g.id === c.id) ? (
+                    <span className="text-[10px] text-muted">Queued</span>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -391,13 +412,56 @@ export default function ScanPage() {
           </div>
         </div>
       )}
-      {!isLoggedIn && !scanning && !q.trim() && (
-        <div className="card-surface rounded-2xl p-4 mt-4 flex items-center gap-3">
-          <div className="flex-1">
-            <div className="text-sm font-semibold">Scanning as guest</div>
-            <div className="text-xs text-muted">Sign in to save cards to your collection.</div>
+      {!isLoggedIn && !scanning && (
+        <div className="card-surface rounded-3xl p-4 mt-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-semibold">
+              {guestQueue.length > 0 ? `Scanned cards (${guestQueue.length}/${GUEST_QUEUE_LIMIT})` : "Scanning as guest"}
+            </h3>
+            {guestQueue.length > 0 && (
+              <Button variant="ghost" className="text-xs !py-1 !px-2" onClick={() => { setGuestQueue([]); showToast("Queue cleared", "info"); }}>Clear</Button>
+            )}
           </div>
-          <Link href="/login" className="text-xs font-semibold text-accent px-3 py-1.5 rounded-lg bg-accent/10">Sign in</Link>
+          {guestQueue.length > 0 && (
+            <>
+              <div className="w-full bg-white/10 rounded-full h-1.5 mb-3">
+                <div className="bg-accent h-1.5 rounded-full transition-all" style={{ width: `${(guestQueue.length / GUEST_QUEUE_LIMIT) * 100}%` }} />
+              </div>
+              <ul className="divide-y divide-line mb-3">
+                {guestQueue.map((c, i) => (
+                  <li key={`${c.id}-${i}`} className="flex items-center gap-3 py-2">
+                    <Link href={`/cards/${encodeURIComponent(c.id)}`}>
+                      <CardImage id={c.id} className="w-10 rounded-md" alt="" />
+                    </Link>
+                    <Link href={`/cards/${encodeURIComponent(c.id)}`} className="flex-1 min-w-0">
+                      <div className="font-medium text-sm truncate">{c.name}</div>
+                      <div className="text-xs text-muted truncate">{c.setName}</div>
+                    </Link>
+                    {c.prices && (() => {
+                      const tp = c.prices.tcgplayer ?? c.prices.cardmarket;
+                      if (!tp) return null;
+                      const variants = tp.variants ?? {};
+                      const first = Object.values(variants)[0] as Record<string, number | null> | undefined;
+                      const amt = first?.market ?? first?.mid ?? first?.low;
+                      if (!amt) return null;
+                      return <span className="text-xs tabular text-muted"><Money amount={amt} currency={tp.currency ?? "USD"} /></span>;
+                    })()}
+                    <button onClick={() => setGuestQueue((prev) => prev.filter((_, j) => j !== i))} className="text-xs text-muted px-1">✕</button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <div className="text-xs text-muted">
+                {guestQueue.length >= GUEST_QUEUE_LIMIT
+                  ? "Queue full — sign in to save your cards and scan more."
+                  : "Sign in to save cards to your collection."}
+              </div>
+            </div>
+            <Link href="/login" className="text-xs font-semibold text-accent px-3 py-1.5 rounded-lg bg-accent/10 whitespace-nowrap">Sign in</Link>
+          </div>
         </div>
       )}
       {isLoggedIn && bulkQueue.length > 0 && !scanning && (
