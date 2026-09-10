@@ -6,7 +6,7 @@ import { TCG_SEO } from "./tcg-data";
 export const metadata: Metadata = {
   title: "Free TCG Portfolio Tracker — AI Scanner, Prices & Collection Tracking | RipnPull",
   description:
-    "Track your Pokémon, Magic, Yu-Gi-Oh! and 11 more TCG collections for free. AI card scanner, daily TCGPlayer prices, wishlist alerts, grading support, and full offline mode. Open source.",
+    "Track your Pokémon, Magic, Yu-Gi-Oh! and 11 more TCG collections — free during beta, then $4.99 one-time. AI card scanner, daily TCGPlayer prices, wishlist alerts, grading support, and full offline mode. Open source.",
   alternates: { canonical: `${SITE.url}/landing` },
   openGraph: {
     title: "RipnPull — Free TCG Portfolio Tracker with AI Card Scanner",
@@ -51,6 +51,14 @@ const FEATURES = [
 ];
 
 const TCGS = ["Pokémon", "Magic", "Yu-Gi-Oh!", "One Piece", "Lorcana", "Digimon", "Dragon Ball Super", "DB Fusion World", "Flesh and Blood", "Star Wars Unlimited", "Vanguard", "Weiß Schwarz", "Final Fantasy", "Union Arena"];
+
+const COMPARISON = [
+  { label: "Price", paid: "$5–10/mo subscriptions", ripnpull: "$4.99 one-time (free during beta) — no subscription" },
+  { label: "Price history", paid: "Paywalled", ripnpull: "Full price history included" },
+  { label: "Source", paid: "Closed source", ripnpull: "Open source (MIT)" },
+  { label: "Offline", paid: "No offline mode", ripnpull: "Full offline mode" },
+  { label: "Games", paid: "Limited TCG support", ripnpull: "14 TCGs supported" },
+];
 
 const jsonLd = {
   "@context": "https://schema.org",
@@ -138,7 +146,7 @@ export default function LandingPage() {
       </section>
 
       {/* Features */}
-      <section className="px-6 py-20 max-w-4xl mx-auto">
+      <section className="px-6 py-20 max-w-5xl mx-auto">
         <h2 className="text-2xl font-bold text-center mb-12">Everything you need to manage your collection</h2>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {FEATURES.map((f) => (
@@ -155,35 +163,29 @@ export default function LandingPage() {
 
       {/* Comparison */}
       <section className="px-6 py-16 border-t border-line">
-        <div className="max-w-2xl mx-auto text-center">
+        <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-2xl font-bold mb-4">Why RipnPull over typical paid trackers?</h2>
-          <div className="grid grid-cols-2 gap-4 text-sm mt-8">
-            <div className="rounded-xl bg-elev border border-line p-4 text-left space-y-3">
-              <p className="font-semibold text-down">Typical paid trackers</p>
-              <ul className="space-y-2 text-muted">
-                <li>$5–10/mo subscriptions</li>
-                <li>Paywalled price history</li>
-                <li>Closed source</li>
-                <li>No offline mode</li>
-              </ul>
+          <div className="mt-8 space-y-3 text-sm text-left">
+            <div className="grid grid-cols-2 gap-4 px-4 font-semibold">
+              <p className="text-down">Typical paid trackers</p>
+              <p className="text-accent">RipnPull</p>
             </div>
-            <div className="rounded-xl bg-elev border border-accent/30 p-4 text-left space-y-3">
-              <p className="font-semibold text-accent">RipnPull</p>
-              <ul className="space-y-2 text-muted">
-                <li className="text-up">$4.99 one-time (free beta)</li>
-                <li className="text-up">No subscription ever</li>
-                <li className="text-up">Full price history included</li>
-                <li className="text-up">Full offline mode</li>
-                <li className="text-up">14 TCGs supported</li>
-              </ul>
-            </div>
+            {COMPARISON.map((row) => (
+              <div key={row.label} className="rounded-xl bg-elev border border-line p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted mb-2">{row.label}</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <p className="text-muted">{row.paid}</p>
+                  <p className="text-up">{row.ripnpull}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
       {/* Supported TCGs */}
       <section className="px-6 py-16 border-t border-line">
-        <div className="max-w-3xl mx-auto text-center">
+        <div className="max-w-5xl mx-auto text-center">
           <h2 className="text-2xl font-bold mb-8">Supported Trading Card Games</h2>
           <div className="flex flex-wrap gap-2 justify-center">
             {TCG_SEO.map((t) => (

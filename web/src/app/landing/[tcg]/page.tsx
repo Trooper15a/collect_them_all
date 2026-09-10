@@ -4,9 +4,21 @@ import { notFound } from "next/navigation";
 import { SITE } from "@/lib/site";
 import { TCG_SEO, getTcgBySlug } from "../tcg-data";
 
+const COMPARISON = [
+  { label: "Price", paid: "$5–10/mo subscriptions", ripnpull: "$4.99 one-time (free during beta) — no subscription" },
+  { label: "Price history", paid: "Paywalled", ripnpull: "Full price history included, plus wishlist price alerts" },
+  { label: "Source", paid: "Closed source", ripnpull: "Open source (MIT)" },
+  { label: "Offline", paid: "No offline scanning", ripnpull: "Offline AI scanner" },
+  { label: "Games", paid: "Limited TCG support", ripnpull: "14 TCGs in one app" },
+];
+
 export function generateStaticParams() {
   return TCG_SEO.map((t) => ({ tcg: t.slug }));
 }
+
+// Only the slugs in TCG_SEO exist — anything else must be a real 404 (HTTP
+// status), not a 200 with the not-found UI.
+export const dynamicParams = false;
 
 export async function generateMetadata(props: { params: Promise<{ tcg: string }> }): Promise<Metadata> {
   const { tcg: slug } = await props.params;
@@ -36,7 +48,7 @@ export default async function TcgLandingPage(props: { params: Promise<{ tcg: str
     name: `RipnPull — ${tcg.name} Tracker`,
     applicationCategory: "UtilitiesApplication",
     operatingSystem: "Web, iOS, Android",
-    offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    offers: { "@type": "Offer", price: "4.99", priceCurrency: "USD" },
     description: tcg.description,
     url: `${SITE.url}/landing/${tcg.slug}`,
   };
@@ -96,30 +108,24 @@ export default async function TcgLandingPage(props: { params: Promise<{ tcg: str
       </section>
 
       <section className="px-6 py-16 border-t border-line">
-        <div className="max-w-2xl mx-auto text-center">
+        <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-2xl font-bold mb-4">
             Why RipnPull for {tcg.shortName}?
           </h2>
-          <div className="grid grid-cols-2 gap-4 text-sm mt-8">
-            <div className="rounded-xl bg-elev border border-line p-4 text-left space-y-3">
-              <p className="font-semibold text-down">Paid trackers</p>
-              <ul className="space-y-2 text-muted">
-                <li>$5–10/mo subscriptions</li>
-                <li>Paywalled price history</li>
-                <li>No offline scanning</li>
-                <li>Limited TCG support</li>
-              </ul>
+          <div className="mt-8 space-y-3 text-sm text-left">
+            <div className="grid grid-cols-2 gap-4 px-4 font-semibold">
+              <p className="text-down">Paid trackers</p>
+              <p className="text-accent">RipnPull</p>
             </div>
-            <div className="rounded-xl bg-elev border border-accent/30 p-4 text-left space-y-3">
-              <p className="font-semibold text-accent">RipnPull</p>
-              <ul className="space-y-2 text-muted">
-                <li className="text-up">Free to start</li>
-                <li className="text-up">Full price history</li>
-                <li className="text-up">Offline AI scanner</li>
-                <li className="text-up">14 TCGs in one app</li>
-                <li className="text-up">Wishlist price alerts</li>
-              </ul>
-            </div>
+            {COMPARISON.map((row) => (
+              <div key={row.label} className="rounded-xl bg-elev border border-line p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted mb-2">{row.label}</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <p className="text-muted">{row.paid}</p>
+                  <p className="text-up">{row.ripnpull}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
