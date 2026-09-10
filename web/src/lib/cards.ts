@@ -229,7 +229,7 @@ export async function searchCards(opts: SearchOpts): Promise<{ cards: CardSummar
       c.prices = {};
       missingMarketData = true;
     }
-    const numKey = (c.cardNumber ?? "").split("/")[0].trim().replace(/^0+(?=\d)/, "").toLowerCase();
+    const numKey = (c.cardNumber ?? "").trim().toLowerCase();
     const key = c.setCode && numKey ? `${c.tcg}:${c.language}:${c.setCode.toLowerCase()}:${numKey}` : c.id;
     const prev = byPrinting.get(key);
     if (!prev) {

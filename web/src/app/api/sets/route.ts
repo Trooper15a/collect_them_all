@@ -11,11 +11,13 @@ const Query = z.object({
   lang: z.enum(["all", "eng", "jap"]).default("all"),
 });
 
-// Same card-number normalization the set-detail route uses (api/sets/[id]):
-// strip anything after "/", trim, strip leading zeros (keeping a lone "0"),
-// lowercase — so list-page totals match the detail page's completion count.
-// NULL card numbers (sealed products) must stay NULL so count(distinct) skips them.
-const NORMALIZED_NUMBER = sql`case when ${schema.cards.cardNumber} is not null then lower(coalesce(nullif(regexp_replace(trim(split_part(${schema.cards.cardNumber}, '/', 1)), '^0+', ''), ''), '0')) end`;
+// Normalize card numbers for distinct counting. Some TCGs use "001/100" (number
+// before slash) while others use "SET/001EN" (number after slash). We take the
+// part that looks like the card number: if the part after the slash starts with a
+// digit, use the full string as-is (it's "SET/001EN" style); otherwise split on
+// "/" and keep the first segment ("001/100" style). Strip leading zeros, lowercase.
+// NULL card numbers (sealed products) stay NULL so count(distinct) skips them.
+const NORMALIZED_NUMBER = sql`case when ${schema.cards.cardNumber} is not null then lower(trim(${schema.cards.cardNumber})) end`;
 // Codes are grouped lowercased because TCGCSV set rows use uppercase codes
 // (mtg:MH3:eng) while e.g. Scryfall-imported cards store them lowercase
 // (mtg:mh3:eng) — one set, one total.

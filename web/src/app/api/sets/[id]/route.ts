@@ -42,7 +42,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
 
   const byNumber = new Map<string, ReturnType<typeof rowToCard>>();
   for (const r of rows.sort((a, b) => Number(b.id.startsWith("tp:")) - Number(a.id.startsWith("tp:")))) {
-    const key = (r.cardNumber ?? "").split("/")[0].trim().replace(/^0+(?=\d)/, "").toLowerCase() || r.id;
+    const key = (r.cardNumber ?? "").trim().toLowerCase() || r.id;
     if (!byNumber.has(key)) byNumber.set(key, rowToCard(r));
   }
   const cards = [...byNumber.values()];
@@ -54,7 +54,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   }
   const ownedNumbers = new Set<string>();
   const allOwnedCards = await db.select({ card: schema.cards }).from(schema.portfolioItems).innerJoin(schema.cards, eq(schema.portfolioItems.cardId, schema.cards.id)).where(and(eq(schema.cards.tcg, set.tcg), eq(schema.cards.language, set.language), eq(schema.cards.setCode, set.code)));
-  for (const { card } of allOwnedCards) ownedNumbers.add((card.cardNumber ?? "").split("/")[0].trim().replace(/^0+(?=\d)/, "").toLowerCase());
+  for (const { card } of allOwnedCards) ownedNumbers.add((card.cardNumber ?? "").trim().toLowerCase());
 
   let missingCost = 0;
   let totalValue = 0;
@@ -63,7 +63,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     .map((c) => {
       const bp = bestPrice(c.prices);
       const price = bp ? convert(bp.amount, bp.currency, currency, fx) : null;
-      const key = (c.cardNumber ?? "").split("/")[0].trim().replace(/^0+(?=\d)/, "").toLowerCase();
+      const key = (c.cardNumber ?? "").trim().toLowerCase();
       const qty = owned.get(c.id) ?? (ownedNumbers.has(key) ? 1 : 0);
       if (qty > 0) ownedCount++;
       else if (price != null) missingCost += price;
