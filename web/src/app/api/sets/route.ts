@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
       db
         .select({ tcg: schema.cards.tcg, code: LOWER_CODE, language: schema.cards.language, n: sql<number>`count(distinct ${NORMALIZED_NUMBER})` })
         .from(schema.cards)
+        .where(sql`${schema.cards.id} like 'tp:%'`)
         .groupBy(schema.cards.tcg, LOWER_CODE, schema.cards.language),
     );
     const cardTotals: Record<string, number> = {};
@@ -49,13 +50,16 @@ export async function GET(req: NextRequest) {
       .groupBy(schema.cards.tcg, LOWER_CODE, schema.cards.language);
     const owned: Record<string, number> = {};
     for (const r of ownedRows) if (r.code) owned[`${r.tcg}:${r.code}:${r.language}`] = Number(r.n);
-    return NextResponse.json({
-      sets: sets.map((s) => {
+    const enriched = sets
+      .map((s) => {
         const total = cardTotals[s.id.toLowerCase()];
         return total !== undefined ? { ...s, total } : s;
-      }),
-      owned,
-    });
+      })
+      .filter((s) => {
+        const key = s.id.toLowerCase();
+        return key in cardTotals || s.total != null;
+      });
+    return NextResponse.json({ sets: enriched, owned });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Failed" }, { status: 500 });
   }

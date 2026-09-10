@@ -209,6 +209,7 @@ export async function searchCards(opts: SearchOpts): Promise<{ cards: CardSummar
     });
   const conditions = words.map((w) => or(like(schema.cards.name, `%${w}%`), like(schema.cards.cardNumber, `${w}%`), like(schema.cards.setCode, w), like(schema.cards.setName, `%${w}%`)));
   for (const r of rarityWords) conditions.push(like(schema.cards.rarity, `%${r}%`));
+  conditions.push(sql`${schema.cards.id} like 'tp:%'`);
   if (tcg !== "all") conditions.push(eq(schema.cards.tcg, tcg));
   if (lang !== "all") conditions.push(eq(schema.cards.language, lang));
   const localRows = await db
