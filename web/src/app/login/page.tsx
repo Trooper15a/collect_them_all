@@ -6,14 +6,32 @@ import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
+// Human-readable text for NextAuth error codes (?error=…).
+const ERROR_MESSAGES: Record<string, string> = {
+  OAuthSignin: "Couldn't start Google sign-in — try again.",
+  OAuthCallback: "Sign-in was cancelled or failed — try again.",
+  OAuthCreateAccount: "Couldn't create your account — try again.",
+  OAuthAccountNotLinked: "That email is already linked to a different sign-in method.",
+  Callback: "Sign-in was cancelled or failed — try again.",
+  SessionRequired: "Please sign in to continue.",
+  Default: "Sign-in was cancelled or failed — try again.",
+};
+
 function LoginInner() {
   const params = useSearchParams();
   const callbackUrl = params.get("callbackUrl") ?? "/";
+  const error = params.get("error");
+  const errorMessage = error ? (ERROR_MESSAGES[error] ?? ERROR_MESSAGES.Default) : null;
 
   return (
     <div className="min-h-[100dvh] -mx-4 -mt-[max(env(safe-area-inset-top),12px)] px-4 grid place-items-center">
       <div className="w-full max-w-sm">
         <div className="rounded-2xl bg-elev border border-line p-10 flex flex-col items-center gap-6">
+          {errorMessage && (
+            <div role="alert" className="w-full rounded-xl border border-down/40 bg-down/10 px-4 py-3 text-sm text-down text-center">
+              {errorMessage}
+            </div>
+          )}
           <div className="text-center">
             <Image
               src="/icons/icon-192.png"
