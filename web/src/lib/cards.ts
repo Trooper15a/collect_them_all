@@ -50,7 +50,8 @@ export function rowToCard(row: schema.Card): NormalizedCard {
     imageUrl: row.imageUrl,
     releaseDate: row.releaseDate,
     sourceId: row.sourceId,
-    prices: row.pricesJson ? (JSON.parse(row.pricesJson) as CardPrices) : {},
+    // Legacy rows may hold the literal text "null" — JSON.parse returns null for it.
+    prices: row.pricesJson ? ((JSON.parse(row.pricesJson) as CardPrices | null) ?? {}) : {},
     meta: row.metaJson ? JSON.parse(row.metaJson) : undefined,
   };
 }
@@ -284,7 +285,14 @@ export async function searchCards(opts: SearchOpts): Promise<{ cards: CardSummar
     }
   }
   const byPrinting = new Map<string, NormalizedCard>();
+  let missingMarketData = false;
   for (const c of merged.values()) {
+    // Cards whose stored price blob is null/corrupt must not crash the merge —
+    // treat them as unpriced and report a warning instead of a 500.
+    if (!c.prices || typeof c.prices !== "object") {
+      c.prices = {};
+      missingMarketData = true;
+    }
     const numKey = (c.cardNumber ?? "").split("/")[0].trim().replace(/^0+(?=\d)/, "").toLowerCase();
     const key = c.setCode && numKey ? `${c.tcg}:${c.language}:${c.setCode.toLowerCase()}:${numKey}` : c.id;
     const prev = byPrinting.get(key);
@@ -316,6 +324,7 @@ export async function searchCards(opts: SearchOpts): Promise<{ cards: CardSummar
     if (sa !== sb) return sa - sb;
     return (b.price?.amount ?? 0) - (a.price?.amount ?? 0);
   });
+  if (missingMarketData) warnings.push("Some results have no market data yet — prices appear after the next price sync.");
   return { cards: cards.slice(0, Math.max(60, limit * 2)), warnings };
 }
 

@@ -14,7 +14,7 @@ export default function NotFound() {
           href="/"
           className="btn-rainbow inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-base font-semibold shadow-lg hover:brightness-110 transition"
         >
-          Go to dashboard
+          Go home
         </Link>
         <Link
           href="/landing"

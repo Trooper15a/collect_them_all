@@ -18,8 +18,11 @@ type LangFilter = "all" | "eng" | "jap";
 type SearchSort = "relevance" | "price-desc" | "price-asc" | "name";
 
 export default function ScanPage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const isLoggedIn = !!session?.user;
+  // Only "unauthenticated" counts as guest — during "loading" keep normal links
+  // (middleware protects /cards/* anyway) so authed users never see the interstitial.
+  const isGuest = status === "unauthenticated";
   const [q, setQ] = useState("");
   const { tcg, hydrated: tcgHydrated } = useActiveTcgHydrated();
   const [lang, setLang] = useState<LangFilter>("all");
@@ -41,6 +44,7 @@ export default function ScanPage() {
   const [bulkPortfolioId, setBulkPortfolioId] = useState<number | null>(null);
   const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [guestPrompt, setGuestPrompt] = useState<CardSummary | null>(null);
   const [showAllGames, setShowAllGames] = useState(false);
   const [guestQueue, setGuestQueue] = useState<AddSheetCard[]>([]);
   const GUEST_QUEUE_LIMIT = 10;
@@ -318,9 +322,16 @@ export default function ScanPage() {
           <div className={`grid grid-cols-2 sm:grid-cols-3 gap-3 stagger-children ${loading ? "opacity-60" : ""}`}>
             {sortedResults.map((c) => (
               <div key={c.id} className="card-surface rounded-2xl overflow-hidden flex flex-col tap-scale hover-lift">
+                {isGuest ? (
+                  // Card detail is auth-gated — show an interstitial instead of bouncing to /login.
+                  <button type="button" onClick={() => { haptic("light"); setGuestPrompt(c); }} aria-label={`Sign in to view ${c.name}`}>
+                    <CardImage id={c.id} className="w-full" alt={c.name} />
+                  </button>
+                ) : (
                 <Link href={`/cards/${encodeURIComponent(c.id)}`}>
                   <CardImage id={c.id} className="w-full" alt={c.name} />
                 </Link>
+                )}
                 <div className="p-2.5 flex-1 flex flex-col gap-1">
                   <div className="font-medium text-sm leading-tight line-clamp-2">{c.name}</div>
                   <div className="text-[11px] text-muted truncate">
@@ -365,6 +376,30 @@ export default function ScanPage() {
       </div>
 
       {scanning && !matches && <Scanner onClose={() => { setScanning(false); setBulkMode(false); }} onMatches={(m) => { haptic("heavy"); setShowAllGames(false); setMatches(m); }} bulkMode={bulkMode} bulkCount={bulkQueue.length} />}
+      {guestPrompt && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center">
+          <button className="absolute inset-0 bg-black/70" onClick={() => setGuestPrompt(null)} aria-label="Close" />
+          <div className="relative glass w-full max-w-lg rounded-t-3xl p-5 pb-[max(env(safe-area-inset-bottom),20px)] anim-widget d1" style={{ animationName: "slide-up-sheet" }}>
+            <div className="flex items-center gap-4">
+              <CardImage id={guestPrompt.id} className="w-14 rounded-md" alt="" />
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold truncate">{guestPrompt.name}</div>
+                <div className="text-xs text-muted truncate">{guestPrompt.setName}</div>
+              </div>
+            </div>
+            <p className="text-sm text-muted mt-4">Sign in to see full price history and save cards.</p>
+            <Link
+              href={`/login?callbackUrl=${encodeURIComponent(`/cards/${guestPrompt.id}`)}`}
+              className="btn-rainbow w-full mt-4 inline-flex items-center justify-center rounded-xl px-6 py-3 font-semibold shadow-lg hover:brightness-110 transition"
+            >
+              Sign in
+            </Link>
+            <Button variant="ghost" className="w-full mt-2" onClick={() => setGuestPrompt(null)}>
+              Not now
+            </Button>
+          </div>
+        </div>
+      )}
       {matches && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
           <button className="absolute inset-0 bg-black/70" onClick={() => setMatches(null)} aria-label="Close" />

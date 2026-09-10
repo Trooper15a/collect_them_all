@@ -10,11 +10,18 @@ export default {
   ],
   pages: {
     signIn: "/login",
+    error: "/auth/error",
   },
   callbacks: {
     authorized({ auth, request }) {
       const isLoggedIn = !!auth?.user;
       const { pathname } = request.nextUrl;
+      // Normalize double-slash URLs (//landing etc.) with a permanent redirect.
+      if (pathname.includes("//")) {
+        const url = request.nextUrl.clone();
+        url.pathname = pathname.replace(/\/{2,}/g, "/");
+        return Response.redirect(url, 301);
+      }
       // Public pages (defensive: these are outside the middleware matcher).
       if (
         pathname === "/login" ||
@@ -22,6 +29,10 @@ export default {
         pathname === "/privacy" ||
         pathname === "/terms"
       ) {
+        return true;
+      }
+      // The coming-soon shop page is marketing real estate — public.
+      if (pathname === "/shop" || pathname.startsWith("/shop/")) {
         return true;
       }
       // Public pages accessible without login.
