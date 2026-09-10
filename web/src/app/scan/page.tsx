@@ -325,11 +325,11 @@ export default function ScanPage() {
                 {isGuest ? (
                   // Card detail is auth-gated — show an interstitial instead of bouncing to /login.
                   <button type="button" onClick={() => { haptic("light"); setGuestPrompt(c); }} aria-label={`Sign in to view ${c.name}`}>
-                    <CardImage id={c.id} className="w-full" alt={c.name} />
+                    <CardImage id={c.id} className="w-full" alt={c.name} directUrl={c.imageUrl} />
                   </button>
                 ) : (
                 <Link href={`/cards/${encodeURIComponent(c.id)}`}>
-                  <CardImage id={c.id} className="w-full" alt={c.name} />
+                  <CardImage id={c.id} className="w-full" alt={c.name} directUrl={c.imageUrl} />
                 </Link>
                 )}
                 <div className="p-2.5 flex-1 flex flex-col gap-1">
@@ -381,7 +381,7 @@ export default function ScanPage() {
           <button className="absolute inset-0 bg-black/70" onClick={() => setGuestPrompt(null)} aria-label="Close" />
           <div className="relative glass w-full max-w-lg rounded-t-3xl p-5 pb-[max(env(safe-area-inset-bottom),20px)] anim-widget d1" style={{ animationName: "slide-up-sheet" }}>
             <div className="flex items-center gap-4">
-              <CardImage id={guestPrompt.id} className="w-14 rounded-md" alt="" />
+              <CardImage id={guestPrompt.id} className="w-14 rounded-md" alt="" directUrl={guestPrompt.imageUrl} />
               <div className="flex-1 min-w-0">
                 <div className="font-semibold truncate">{guestPrompt.name}</div>
                 <div className="text-xs text-muted truncate">{guestPrompt.setName}</div>

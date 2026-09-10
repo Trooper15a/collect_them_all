@@ -133,7 +133,9 @@ export function PwaRegister() {
   if (!visible) return null;
 
   return (
-    <div ref={bannerRef} className="pwa-banner fixed left-4 right-4 z-50 mx-auto max-w-sm animate-in slide-in-from-bottom">
+    // z-30: below modal sheets (z-50) and the TabBar (z-40) so the banner can
+    // never cover a bottom sheet's CTAs; its space is reserved via --pwa-banner-inset.
+    <div ref={bannerRef} className="pwa-banner fixed left-4 right-4 z-30 mx-auto max-w-sm animate-in slide-in-from-bottom">
       <div className="rounded-2xl bg-card border border-line p-4 shadow-xl flex items-center gap-3">
         <div aria-hidden="true" className="shrink-0 w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center text-lg">
           +

@@ -71,6 +71,8 @@ export interface CardSummary {
   cardNumber?: string | null;
   rarity?: string | null;
   language: Lang;
+  /** CDN image URL when known (lets clients render thumbs without a proxy lookup). */
+  imageUrl?: string | null;
   /** Best single price for display, in the card's native market currency. */
   price: { amount: number; currency: "USD" | "EUR"; variant: string } | null;
   /** `price` converted to the user's display currency (same as price when identical). */

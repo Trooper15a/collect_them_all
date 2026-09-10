@@ -109,9 +109,7 @@ export default async function TcgLandingPage(props: { params: Promise<{ tcg: str
 
       <section className="px-6 py-16 border-t border-line">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-2xl font-bold mb-4">
-            Why RipnPull for {tcg.shortName}?
-          </h2>
+          <h2 className="text-2xl font-bold mb-4">{`Why RipnPull for ${tcg.shortName}?`}</h2>
           <div className="mt-8 space-y-3 text-sm text-left">
             <div className="grid grid-cols-2 gap-4 px-4 font-semibold">
               <p className="text-down">Paid trackers</p>
@@ -168,6 +166,7 @@ export default async function TcgLandingPage(props: { params: Promise<{ tcg: str
         <p className="mt-1">MIT licensed &middot; Built by collectors, for collectors.</p>
         <div className="mt-3 flex gap-4 justify-center">
           <Link href="/landing" className="hover:text-fg transition-colors">Home</Link>
+          <Link href="/faq" className="hover:text-fg transition-colors">FAQ</Link>
           <Link href="/privacy" className="hover:text-fg transition-colors">Privacy</Link>
           <Link href="/terms" className="hover:text-fg transition-colors">Terms</Link>
           <a href="https://github.com/Trooper15a/collect_them_all" target="_blank" rel="noreferrer" className="hover:text-fg transition-colors">GitHub</a>
