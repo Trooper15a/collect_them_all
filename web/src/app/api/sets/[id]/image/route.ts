@@ -1,7 +1,6 @@
 import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
-import { hasPokewalletKey, pokewalletLimiter, POKEWALLET_BASE } from "@/lib/pokewallet";
 
 /**
  * Set logo proxy — free sources only, no API key required. Vercel CDN caches via Cache-Control.
@@ -12,11 +11,10 @@ import { hasPokewalletKey, pokewalletLimiter, POKEWALLET_BASE } from "@/lib/poke
  *      so we map via pokemon-tcg-data's ptcgoCode field (ptcgoCode == TCGplayer
  *      abbreviation for mainline sets). Pokémon JP (category 85) is not covered by
  *      pokemontcg.io at all → falls through to the chip.
- *   3. Pokémon fallback: PokéWallet, only if a key is configured (user has none today).
- *   4. Magic: Scryfall's free set-icon SVG at svgs.scryfall.io/sets/{code}.svg —
+ *   3. Magic: Scryfall's free set-icon SVG at svgs.scryfall.io/sets/{code}.svg —
  *      TCGplayer MTG abbreviations are (mostly) Scryfall set codes; extras like art
  *      series 404 → chip.
- *   5. Everything else → 404 and the client renders the code chip.
+ *   4. Everything else → 404 and the client renders the code chip.
  */
 
 // pokemon-tcg-data set list (~77KB, free, no key). Lazily fetched once per process
@@ -88,12 +86,6 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
     if (!upstream && set.tcg === "pokemon") {
       const symbolUrl = await pokemonSymbolUrl(set);
       if (symbolUrl) upstream = await fetchImage(symbolUrl);
-      if (!upstream && hasPokewalletKey() && pokewalletLimiter.remaining.hour > 10) {
-        await pokewalletLimiter.acquire();
-        const url = new URL(`${POKEWALLET_BASE}/sets/${encodeURIComponent(set.code)}/image`);
-        if (set.language) url.searchParams.set("language", set.language);
-        upstream = await fetchImage(url, { "X-API-Key": process.env.POKEWALLET_API_KEY ?? "" });
-      }
     }
     if (!upstream && set.tcg === "mtg" && set.code) {
       upstream = await fetchImage(`https://svgs.scryfall.io/sets/${encodeURIComponent(set.code.toLowerCase())}.svg`);

@@ -6,9 +6,8 @@ import { backfillCardHistory } from "@/lib/tcgcsv";
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
-  const refresh = req.nextUrl.searchParams.get("refresh") === "1";
   try {
-    const card = await getCard(decodeURIComponent(id), { forceRefresh: refresh });
+    const card = await getCard(decodeURIComponent(id));
     if (!card) return NextResponse.json({ error: "Card not found" }, { status: 404 });
     const history = await getPriceHistory(card.id);
     const fx = await getRates();

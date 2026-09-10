@@ -14,10 +14,7 @@ export async function GET(req: NextRequest) {
     const { card, method } = await resolveScanId(parsed.data.id);
     const scan = indexCard(parsed.data.id) ?? null;
     if (!card) {
-      const msg =
-        method === "no-api-key"
-          ? "PokéWallet API key not configured. CardMarket EUR prices unavailable."
-          : `No priced listing found for ${scan?.name ?? parsed.data.id}${scan?.set ? ` (${scan.set} #${scan.num})` : ""}. Search by name and pick it manually.`;
+      const msg = `No priced listing found for ${scan?.name ?? parsed.data.id}${scan?.set ? ` (${scan.set} #${scan.num})` : ""}. Search by name and pick it manually.`;
       return NextResponse.json({ card: null, method, scan, error: msg }, { status: 404 });
     }
     return NextResponse.json({ card, method, scan });

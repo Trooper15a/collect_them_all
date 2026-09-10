@@ -3,7 +3,6 @@ import { db, schema } from "@/db";
 import { getCard, recordPriceSnapshot, refreshCardPrices, rowToCard } from "./cards";
 import { convert, getRates, type Rates } from "./currency";
 import { daysAgo, today, type Range, rangeToDays } from "./format";
-import { pokewalletLimiter } from "./pokewallet";
 import { bestPrice, type CardPrices, type NormalizedCard } from "./types";
 
 export interface ValuedItem {
@@ -167,15 +166,10 @@ export async function refreshOwnedPrices(opts: { maxCards?: number; onlyStale?: 
   const ids = [...new Set(itemRows.map((r) => r.cardId))];
   const cards = ids.length ? await db.select().from(schema.cards).where(inArray(schema.cards.id, ids)) : [];
   const stale = opts.onlyStale === false ? cards : cards.filter((c) => !c.priceUpdatedAt || Date.now() - Date.parse(c.priceUpdatedAt) > 20 * 3600 * 1000);
-  const ordered = [...stale.filter((c) => !c.id.startsWith("pw:")), ...stale.filter((c) => c.id.startsWith("pw:"))];
   let refreshed = 0;
   let failed = 0;
-  let skipped = 0;
-  for (const c of ordered.slice(0, opts.maxCards ?? 500)) {
-    if (c.id.startsWith("pw:") && pokewalletLimiter.remaining.hour < 5) {
-      skipped++;
-      continue;
-    }
+  const skipped = 0;
+  for (const c of stale.slice(0, opts.maxCards ?? 500)) {
     try {
       await refreshCardPrices(c.id);
       refreshed++;

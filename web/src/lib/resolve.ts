@@ -4,7 +4,6 @@ import { getCard, rowToCard, upsertCard } from "./cards";
 import { nowIso } from "./format";
 import { indexCard } from "./model-index";
 import { isScanIndexId } from "./scanner/matcher";
-import { hasPokewalletKey, pwSearch } from "./pokewallet";
 import type { NormalizedCard } from "./types";
 
 export async function resolveScanId(scanId: string): Promise<{ card: NormalizedCard | null; method: string }> {
@@ -44,27 +43,6 @@ export async function resolveScanId(scanId: string): Promise<{ card: NormalizedC
     if (local) {
       await remember(scanId, local.id, "tcgcsv-local");
       return { card: local, method: "tcgcsv-local" };
-    }
-  }
-  if (!hasPokewalletKey()) return { card: null, method: "no-api-key" };
-
-  const attempts: { q: string; method: string }[] = [];
-  if (setCode && num) attempts.push({ q: `${setCode} ${num}`, method: "setcode+number" });
-  if (name && num && lang === "eng") attempts.push({ q: `${name} ${num}`, method: "name+number" });
-  if (name && lang === "eng") attempts.push({ q: name, method: "name" });
-
-  for (const a of attempts) {
-    let results: NormalizedCard[] = [];
-    try {
-      results = await pwSearch(a.q, 20);
-    } catch {
-      continue;
-    }
-    const hit = pickMatch(results, { setCode, num, name, lang });
-    if (hit) {
-      await upsertCard(hit);
-      await remember(scanId, hit.id, a.method);
-      return { card: hit, method: a.method };
     }
   }
   await remember(scanId, null, "none");

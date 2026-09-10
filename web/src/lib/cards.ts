@@ -3,13 +3,8 @@ import { db, schema } from "@/db";
 import { cached, getSetting } from "./cache";
 import { convert, getRates } from "./currency";
 import { nowIso, today } from "./format";
-import { hasPokewalletKey, pwCard, pwPriceHistory, pwSearch, pwSets } from "./pokewallet";
-import { sfCard, sfSearch, sfSets } from "./scryfall";
 import { bestPrice, type CardPrices, type CardSummary, type NormalizedCard, type Tcg } from "./types";
-import { hasTcgcsvData, TCGCSV_CATEGORIES } from "./tcgcsv";
-import { ygoCard, ygoSearch } from "./ygoprodeck";
-
-const PRICE_TTL_MS = 20 * 3600 * 1000; // refresh a card's price at most once a day
+import { TCGCSV_CATEGORIES } from "./tcgcsv";
 
 /** Collector shorthand -> substring of the TCGPlayer rarity name. */
 const RARITY_ALIASES: Record<string, string> = {
@@ -176,36 +171,14 @@ export async function recordPriceSnapshot(c: NormalizedCard, date = today()) {
   }
 }
 
-async function fetchRemote(cardId: string): Promise<NormalizedCard> {
-  const [src, ...rest] = cardId.split(":");
-  const sourceId = rest.join(":");
-  if (src === "pw") return pwCard(sourceId);
-  if (src === "sf") return sfCard(sourceId);
-  if (src === "ygo") return ygoCard(sourceId);
-  if (src === "tp") throw new Error("TCGPlayer products are refreshed by the nightly TCGCSV import");
-  throw new Error(`unknown source ${src}`);
-}
-
-/** Get a card, from the local DB when fresh, otherwise from its API (and cache it). */
-export async function getCard(cardId: string, opts: { forceRefresh?: boolean } = {}): Promise<NormalizedCard | null> {
+/** Get a card from the local DB. All data comes from the nightly TCGCSV import. */
+export async function getCard(cardId: string): Promise<NormalizedCard | null> {
   const rows = await db.select().from(schema.cards).where(eq(schema.cards.id, cardId)).limit(1);
-  const row = rows[0];
-  if (row && cardId.startsWith("tp:")) return rowToCard(row);
-  const stale = !row || !row.priceUpdatedAt || Date.now() - Date.parse(row.priceUpdatedAt) > PRICE_TTL_MS;
-  if (row && !stale && !opts.forceRefresh) return rowToCard(row);
-  try {
-    const fresh = await fetchRemote(cardId);
-    await upsertCard(fresh);
-    return fresh;
-  } catch (err) {
-    if (row) return rowToCard(row);
-    if (err instanceof Error && /404|not found/i.test(err.message)) return null;
-    throw err;
-  }
+  return rows[0] ? rowToCard(rows[0]) : null;
 }
 
 export async function refreshCardPrices(cardId: string) {
-  return getCard(cardId, { forceRefresh: true });
+  return getCard(cardId);
 }
 
 export interface SearchOpts {
@@ -215,7 +188,7 @@ export interface SearchOpts {
   limit?: number;
 }
 
-/** Search the local DB first (instant, offline), then the live APIs, merging by id. */
+/** Search the local DB (populated by the nightly TCGCSV import). */
 export async function searchCards(opts: SearchOpts): Promise<{ cards: CardSummary[]; warnings: string[] }> {
   const q = opts.q.trim();
   const limit = opts.limit ?? 24;
@@ -245,44 +218,6 @@ export async function searchCards(opts: SearchOpts): Promise<{ cards: CardSummar
     .limit(400);
   const merged = new Map<string, NormalizedCard>(localRows.map((r) => [r.id, rowToCard(r)]));
 
-  const localComplete = async (t: string) => (await hasTcgcsvData(t, lang === "all" ? undefined : lang)) && merged.size > 0;
-  const remote: Promise<NormalizedCard[]>[] = [];
-  if ((tcg === "all" || tcg === "pokemon") && !((await localComplete("pokemon")) && lang !== "jap")) {
-    if (hasPokewalletKey()) {
-      remote.push(
-        cached(`pw:search:${q}:${limit}`, 6 * 3600, () => pwSearch(q, limit)).catch((e: Error) => {
-          warnings.push(`PokéWallet: ${e.message}`);
-          return [];
-        }),
-      );
-    } else warnings.push("PokéWallet API key not configured; Pokémon results are local only.");
-  }
-  if ((tcg === "all" || tcg === "mtg") && lang !== "jap" && !(await localComplete("mtg"))) {
-    remote.push(
-      cached(`sf:search:${q}:${limit}`, 6 * 3600, () => sfSearch(q, limit)).catch((e: Error) => {
-        warnings.push(`Scryfall: ${e.message}`);
-        return [];
-      }),
-    );
-  }
-  if ((tcg === "all" || tcg === "yugioh") && lang !== "jap" && !(await localComplete("yugioh"))) {
-    remote.push(
-      cached(`ygo:search:${q}:${limit}`, 6 * 3600, () => ygoSearch(q, limit)).catch((e: Error) => {
-        warnings.push(`YGOProDeck: ${e.message}`);
-        return [];
-      }),
-    );
-  }
-  const results = await Promise.all(remote);
-  for (const list of results) {
-    for (const c of list) {
-      if (lang !== "all" && c.language !== lang) continue;
-      if (!merged.has(c.id)) {
-        merged.set(c.id, c);
-        await upsertCard(c);
-      }
-    }
-  }
   const byPrinting = new Map<string, NormalizedCard>();
   for (const c of merged.values()) {
     const numKey = (c.cardNumber ?? "").split("/")[0].trim().replace(/^0+(?=\d)/, "").toLowerCase();
@@ -319,27 +254,18 @@ export async function searchCards(opts: SearchOpts): Promise<{ cards: CardSummar
   return { cards: cards.slice(0, Math.max(60, limit * 2)), warnings };
 }
 
-/** Price history: local daily snapshots merged with PokéWallet history when available. */
+/** Price history from local daily snapshots (recorded by the TCGCSV import). */
 export async function getPriceHistory(cardId: string, variant?: string) {
-  const local = await db
+  const rows = await db
     .select()
     .from(schema.priceHistory)
     .where(and(eq(schema.priceHistory.cardId, cardId), variant ? eq(schema.priceHistory.variantType, variant) : sql`1=1`))
     .orderBy(schema.priceHistory.date);
-  const byDate = new Map<string, { date: string; tcgplayerMarket: number | null; cardmarketAvg: number | null }>();
-  if (sourceOf(cardId) === "pw" && hasPokewalletKey()) {
-    const remote = await cached(`pw:history:${cardId}`, 24 * 3600, () => pwPriceHistory(cardId.slice(3)));
-    for (const r of remote) byDate.set(r.date, r);
-  }
-  for (const r of local) {
-    const prev = byDate.get(r.date);
-    byDate.set(r.date, {
-      date: r.date,
-      tcgplayerMarket: r.tcgplayerMarket ?? prev?.tcgplayerMarket ?? null,
-      cardmarketAvg: r.cardmarketAvg ?? prev?.cardmarketAvg ?? null,
-    });
-  }
-  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+  return rows.map((r) => ({
+    date: r.date,
+    tcgplayerMarket: r.tcgplayerMarket ?? null,
+    cardmarketAvg: r.cardmarketAvg ?? null,
+  }));
 }
 
 export async function listSets(tcg: Tcg | "all", lang: "eng" | "jap" | "all") {
@@ -353,35 +279,12 @@ export async function listSets(tcg: Tcg | "all", lang: "eng" | "jap" | "all") {
     .orderBy(sql`release_date desc`);
 }
 
+/** Sync sets from TCGCSV for all games. The nightly import also creates sets,
+ *  so this is only needed as a fallback when a TCG has zero sets in the DB. */
 export async function syncSets(tcg: Tcg | "all" = "all") {
+  const cats = TCGCSV_CATEGORIES.filter((c) => tcg === "all" || c.tcg === tcg);
   const jobs: Promise<void>[] = [];
-  if ((tcg === "all" || tcg === "pokemon") && hasPokewalletKey()) {
-    jobs.push(
-      cached("pw:sets", 7 * 86400, pwSets).then(async (list) => {
-        for (const s of list) {
-          await db.insert(schema.sets)
-            .values({ id: `pokemon:${s.code}:${s.language}`, tcg: "pokemon", code: s.code, name: s.name, language: s.language, total: s.total, releaseDate: s.releaseDate, imageUrl: null })
-            .onConflictDoUpdate({ target: schema.sets.id, set: { name: s.name, total: s.total, releaseDate: s.releaseDate } });
-        }
-      }).catch(() => undefined),
-    );
-  }
-  if (tcg === "all" || tcg === "mtg") {
-    jobs.push(
-      cached("sf:sets", 7 * 86400, sfSets).then(async (list) => {
-        for (const s of list) {
-          await db.insert(schema.sets)
-            .values({ id: `mtg:${s.code}:eng`, tcg: "mtg", code: s.code, name: s.name, language: "eng", total: s.total, releaseDate: s.releaseDate, imageUrl: s.imageUrl })
-            .onConflictDoUpdate({ target: schema.sets.id, set: { name: s.name, total: s.total, releaseDate: s.releaseDate } });
-        }
-      }).catch(() => undefined),
-    );
-  }
-  // Sync sets from TCGCSV for any TCG that doesn't have a dedicated API
-  const tcgcsvCats = TCGCSV_CATEGORIES.filter((c) =>
-    tcg === "all" ? !["pokemon", "mtg"].includes(c.tcg) : c.tcg === tcg && !["pokemon", "mtg"].includes(c.tcg),
-  );
-  for (const cat of tcgcsvCats) {
+  for (const cat of cats) {
     jobs.push(
       cached(`tcgcsv:sets:${cat.id}`, 7 * 86400, async () => {
         const res = await fetch(`https://tcgcsv.com/tcgplayer/${cat.id}/groups`, {

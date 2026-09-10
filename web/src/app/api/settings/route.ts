@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSetting, setSetting } from "@/lib/cache";
 import { getRates } from "@/lib/currency";
-import { hasPokewalletKey, pokewalletLimiter } from "@/lib/pokewallet";
 
 const Patch = z.object({
   currency: z.enum(["USD", "EUR", "GBP", "CAD", "JPY", "AUD"]).optional(),
@@ -23,8 +22,6 @@ export async function GET() {
       bulkCondition: await getSetting("bulkCondition", "NM"),
       bulkCurrency: await getSetting("bulkCurrency", "CAD"),
       bulkPortfolio: await getSetting("bulkPortfolio", "My Collection"),
-      pokewalletConfigured: hasPokewalletKey(),
-      pokewalletBudget: pokewalletLimiter.remaining,
       fxDate: fx.date,
     });
   } catch (err) {

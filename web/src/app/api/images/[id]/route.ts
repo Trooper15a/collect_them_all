@@ -3,13 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
 import { getCard } from "@/lib/cards";
 import { indexCard } from "@/lib/model-index";
-import { pwRawImage } from "@/lib/pokewallet";
 
 /**
  * Image proxy. GET /api/images/<cardId>?size=high|low&lang=fr
- * PokéWallet images need the API key header, so the browser can never load them directly;
- * every source goes through here so the phone gets one cacheable URL per card.
- * Vercel CDN caches via Cache-Control headers.
+ * Every source goes through here so the client gets one cacheable URL per card.
  */
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const id = decodeURIComponent((await ctx.params).id);
@@ -17,13 +14,11 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   const lang = req.nextUrl.searchParams.get("lang") ?? undefined;
   const [src, ...rest] = id.split(":");
   const sourceId = rest.join(":");
-  if (!sourceId || !["pw", "sf", "ygo", "tcgdex", "pcjp", "tp"].includes(src)) return new NextResponse("bad id", { status: 400 });
+  if (!sourceId || !["sf", "ygo", "tcgdex", "pcjp", "tp"].includes(src)) return new NextResponse("bad id", { status: 400 });
 
   try {
     let upstream: Response;
-    if (src === "pw") {
-      upstream = await pwRawImage(sourceId, size, lang);
-    } else if (src === "tcgdex" || src === "pcjp") {
+    if (src === "tcgdex" || src === "pcjp") {
       const img = indexCard(id)?.img;
       if (!img) return new NextResponse("no image", { status: 404 });
       const url = src === "tcgdex" ? `${img.replace(/\/(high|low)\.webp$/, "")}/${size}.webp` : img;

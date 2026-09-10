@@ -67,6 +67,6 @@ export class RateLimiter {
 
 export class RateLimitError extends Error {
   constructor(public window: "hourly" | "daily") {
-    super(`PokéWallet ${window} rate limit reached`);
+    super(`${window} rate limit reached`);
   }
 }

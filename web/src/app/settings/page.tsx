@@ -14,8 +14,6 @@ interface Settings {
   language: string;
   bulkCondition: string;
   bulkCurrency: string;
-  pokewalletConfigured: boolean;
-  pokewalletBudget: { hour: number; day: number };
   fxDate: string;
 }
 
@@ -136,7 +134,7 @@ export default function SettingsPage() {
       const r = await fetch("/api/prices/refresh", { method: "POST" });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error);
-      setRefreshMsg(`Refreshed ${d.refreshed} cards (${d.failed} failed, ${d.skipped} skipped for rate limit). PokéWallet budget: ${d.pokewalletBudget.hour}/hr, ${d.pokewalletBudget.day}/day left.`);
+      setRefreshMsg(`Refreshed ${d.refreshed} cards (${d.failed} failed, ${d.skipped} skipped).`);
       showToast("Prices refreshed ✓", "up");
     } catch (e) {
       setRefreshMsg(e instanceof Error ? e.message : "Failed");

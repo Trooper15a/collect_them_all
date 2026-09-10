@@ -38,7 +38,7 @@ export const verificationTokens = pgTable("verification_tokens", {
 
 /* ─── Card data ─── */
 
-/** Unified card ids: `pw:<pokewallet id>`, `sf:<scryfall id>`, `ygo:<ygoprodeck id>`. */
+/** Unified card ids: `tp:<tcgcsv product id>`. Legacy prefixes: `pw:`, `sf:`, `ygo:`. */
 export const cards = pgTable(
   "cards",
   {
