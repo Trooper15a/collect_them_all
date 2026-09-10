@@ -41,7 +41,7 @@ export const TCGCSV_CATEGORIES: TcgcsvCategory[] = [
 export function defaultCategoryIds(): number[] {
   const env = process.env.TCGCSV_CATEGORIES;
   if (env) return env.split(",").map((s) => Number(s.trim())).filter((n) => Number.isFinite(n));
-  return [3, 85];
+  return TCGCSV_CATEGORIES.map((c) => c.id);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
