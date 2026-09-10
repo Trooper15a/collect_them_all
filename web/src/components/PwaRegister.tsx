@@ -4,6 +4,9 @@ import { useEffect, useState, useCallback, useRef } from "react";
 
 const DISMISS_KEY = "rnp-install-dismissed";
 const DISMISS_MS = 14 * 24 * 60 * 60 * 1000; // 14 days
+const VIEWS_KEY = "rnp-install-pageviews";
+const FIRST_LOAD_DELAY_MS = 45_000; // never nag on the first-ever page load
+const HIDDEN_PATHS = ["/landing", "/faq", "/auth/error"];
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -36,6 +39,17 @@ function persistDismissal() {
   } catch { /* storage unavailable */ }
 }
 
+/** Count full page loads; returns the running total (1 = first-ever visit). */
+function bumpPageViews(): number {
+  try {
+    const n = Number(localStorage.getItem(VIEWS_KEY) ?? "0") + 1;
+    localStorage.setItem(VIEWS_KEY, String(n));
+    return n;
+  } catch {
+    return 1; // storage unavailable — treat as first visit, don't nag
+  }
+}
+
 export function PwaRegister() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [visible, setVisible] = useState(false);
@@ -62,10 +76,14 @@ export function PwaRegister() {
     window.addEventListener("appinstalled", onInstalled);
 
     // Deferred so server and first client render match (banner starts hidden).
-    // Hide on public landing pages — it overlaps content and distracts new visitors.
+    // Hide on public pages — it overlaps content and distracts new visitors.
+    // Engagement gate: show instantly from the second visit onward, but on the
+    // first-ever page load only after 45s on site.
+    const engaged = bumpPageViews() >= 2;
     const showTimer = window.setTimeout(() => {
-      if (!isInstalled() && !dismissedRecently() && !location.pathname.startsWith("/landing")) setVisible(true);
-    }, 0);
+      const hiddenPath = HIDDEN_PATHS.some((p) => location.pathname.startsWith(p));
+      if (!isInstalled() && !dismissedRecently() && !hiddenPath) setVisible(true);
+    }, engaged ? 0 : FIRST_LOAD_DELAY_MS);
 
     return () => {
       window.clearTimeout(showTimer);

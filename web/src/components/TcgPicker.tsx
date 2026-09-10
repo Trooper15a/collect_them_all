@@ -9,13 +9,29 @@ const PUBLIC_PATHS = ["/landing", "/login", "/privacy", "/terms"];
 const ALL_ACCENT = "conic-gradient(from 0deg, #facc15, #f87171, #c084fc, #60a5fa, #34d399, #facc15)";
 const POS_KEY = "tcgPickerPos";
 const DEFAULT_POS = { x: 12, y: 68 };
+const LG_BREAKPOINT = 1024;
+// App content is a centered max-w-3xl (768px) column; on desktop park the
+// trigger just left of it instead of the extreme viewport corner.
+const LG_COLUMN_HALF = 384;
+const LG_TRIGGER_OFFSET = 56;
+const DRAG_THRESHOLD = 5;
+
+function defaultPos(): { x: number; y: number } {
+  if (typeof window !== "undefined" && window.innerWidth >= LG_BREAKPOINT) {
+    return {
+      x: Math.max(DEFAULT_POS.x, Math.round(window.innerWidth / 2 - LG_COLUMN_HALF - LG_TRIGGER_OFFSET)),
+      y: DEFAULT_POS.y,
+    };
+  }
+  return DEFAULT_POS;
+}
 
 function loadPos(): { x: number; y: number } {
   try {
     const raw = localStorage.getItem(POS_KEY);
     if (raw) { const p = JSON.parse(raw); if (typeof p.x === "number" && typeof p.y === "number") return p; }
   } catch {}
-  return DEFAULT_POS;
+  return defaultPos();
 }
 function savePos(pos: { x: number; y: number }) {
   try { localStorage.setItem(POS_KEY, JSON.stringify(pos)); } catch {}
@@ -34,7 +50,10 @@ export function TcgPicker() {
   const dragStart = useRef({ px: 0, py: 0, ox: 0, oy: 0 });
   const didDrag = useRef(false);
 
-  useEffect(() => { setPos(loadPos()); }, []);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setPos(loadPos()));
+    return () => cancelAnimationFrame(id);
+  }, []);
 
   const clamp = useCallback((x: number, y: number) => {
     const w = window.innerWidth - 40;
@@ -42,36 +61,57 @@ export function TcgPicker() {
     return { x: Math.max(0, Math.min(x, w)), y: Math.max(0, Math.min(y, h)) };
   }, []);
 
-  useEffect(() => {
-    if (!dragging.current) return;
-    const onMove = (e: TouchEvent | MouseEvent) => {
+  const onDragMove = useCallback(
+    (e: TouchEvent | MouseEvent) => {
+      if (!dragging.current) return;
       const pt = "touches" in e ? e.touches[0] : e;
+      if (!pt) return;
       const dx = pt.clientX - dragStart.current.px;
       const dy = pt.clientY - dragStart.current.py;
-      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) didDrag.current = true;
+      // Gate movement behind a threshold: a plain click (with pointer micro-jitter)
+      // must open the sheet, not drag the button after the cursor.
+      if (!didDrag.current) {
+        if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
+        didDrag.current = true;
+      }
       setPos(clamp(dragStart.current.ox + dx, dragStart.current.oy + dy));
-    };
-    const onEnd = () => {
-      dragging.current = false;
-      setPos((p) => { savePos(p); return p; });
-    };
-    window.addEventListener("touchmove", onMove, { passive: true });
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("touchend", onEnd);
-    window.addEventListener("mouseup", onEnd);
-    return () => {
-      window.removeEventListener("touchmove", onMove);
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("touchend", onEnd);
-      window.removeEventListener("mouseup", onEnd);
-    };
-  });
+    },
+    [clamp],
+  );
 
-  const startDrag = useCallback((clientX: number, clientY: number) => {
-    dragging.current = true;
-    didDrag.current = false;
-    dragStart.current = { px: clientX, py: clientY, ox: pos.x, oy: pos.y };
-  }, [pos]);
+  const onDragEnd = useCallback(() => {
+    if (!dragging.current) return;
+    dragging.current = false;
+    window.removeEventListener("touchmove", onDragMove);
+    window.removeEventListener("mousemove", onDragMove);
+    if (didDrag.current) setPos((p) => { savePos(p); return p; });
+  }, [onDragMove]);
+
+  const startDrag = useCallback(
+    (clientX: number, clientY: number) => {
+      dragging.current = true;
+      didDrag.current = false;
+      dragStart.current = { px: clientX, py: clientY, ox: pos.x, oy: pos.y };
+      // Listeners live only for the duration of a press — the picker must never
+      // follow the mouse when the button isn't held down. End listeners are
+      // `once` so they detach themselves after firing.
+      window.addEventListener("touchmove", onDragMove, { passive: true });
+      window.addEventListener("mousemove", onDragMove);
+      window.addEventListener("touchend", onDragEnd, { once: true });
+      window.addEventListener("mouseup", onDragEnd, { once: true });
+    },
+    [pos, onDragMove, onDragEnd],
+  );
+
+  // Detach any in-progress drag listeners on unmount.
+  useEffect(() => {
+    return () => {
+      window.removeEventListener("touchmove", onDragMove);
+      window.removeEventListener("mousemove", onDragMove);
+      window.removeEventListener("touchend", onDragEnd);
+      window.removeEventListener("mouseup", onDragEnd);
+    };
+  }, [onDragMove, onDragEnd]);
 
   const activeMeta = active === "all" ? null : TCGS.find((t) => t.id === active) ?? null;
   const activeLabel = activeMeta?.label ?? "All games";

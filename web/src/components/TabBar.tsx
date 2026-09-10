@@ -13,7 +13,7 @@ const tabs = [
   { href: "/settings", label: "Settings", icon: GearIcon },
 ];
 
-const PUBLIC_PATHS = ["/landing", "/login", "/privacy", "/terms"];
+const PUBLIC_PATHS = ["/landing", "/login", "/privacy", "/terms", "/faq", "/auth/error"];
 
 export function TabBar() {
   const pathname = usePathname();

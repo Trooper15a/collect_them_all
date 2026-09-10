@@ -246,7 +246,10 @@ async function upsertGroup(cat: TcgcsvCategory, group: J, products: J[], prices:
           cardNumber: number,
           rarity: isSealed ? "Sealed" : (ext.Rarity ?? null),
           imageUrl: p.imageUrl ?? null,
-          pricesJson: pricesJson ? JSON.stringify(pricesJson) : sql`coalesce(${JSON.stringify(pricesJson)}, cards.prices_json)`,
+          // Keep any existing prices when this import has none — coalesce with the
+          // stringified value would store the literal text "null" (SQL string ≠ NULL),
+          // which later JSON.parses to null and crashes price reads.
+          pricesJson: pricesJson ? JSON.stringify(pricesJson) : sql`cards.prices_json`,
           priceUpdatedAt: pricesJson ? now : sql`cards.price_updated_at`,
           metaJson: JSON.stringify({
             sealed: isSealed,

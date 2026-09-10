@@ -16,7 +16,7 @@ export default function TermsPage() {
         <h1 className="text-3xl font-bold tracking-tight">Terms of Service</h1>
         <p className="mt-2 text-sm text-muted">Effective date: {EFFECTIVE_DATE}</p>
         <p className="mt-4 text-muted leading-relaxed">
-          These terms govern your use of {SITE.name} ({SITE.url}), a free,
+          These terms govern your use of {SITE.name} ({SITE.url}), an
           open-source TCG portfolio tracker operated from Canada. By signing in
           and using the service, you agree to them.
         </p>
@@ -29,7 +29,10 @@ export default function TermsPage() {
             {SITE.name} lets you track trading card collections across{" "}
             {SITE.tcgCount} games: catalog your cards, organize binders and
             portfolios, scan cards with on-device AI, and view daily market
-            prices. The service is free of charge.
+            prices. The service is free of charge during the beta period.
+            After beta, {SITE.name} will be offered as a one-time purchase of
+            $4.99 — no subscription, no recurring fees. Accounts created during
+            beta keep free access permanently.
           </p>
         </section>
 

@@ -16,7 +16,7 @@ export default function PrivacyPage() {
         <h1 className="text-3xl font-bold tracking-tight">Privacy Policy</h1>
         <p className="mt-2 text-sm text-muted">Effective date: {EFFECTIVE_DATE}</p>
         <p className="mt-4 text-muted leading-relaxed">
-          {SITE.name} ({SITE.url}) is a free, open-source TCG portfolio tracker
+          {SITE.name} ({SITE.url}) is an open-source TCG portfolio tracker
           operated from Canada. This policy explains, in plain language, what
           information we collect, why we collect it, and the choices you have.
         </p>
