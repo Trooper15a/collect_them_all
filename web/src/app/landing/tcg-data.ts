@@ -354,7 +354,7 @@ export const TCG_SEO: TcgSeo[] = [
     slug: "db-fusion-world",
     name: "DB Fusion World",
     shortName: "Fusion World",
-    title: "Free Dragon Ball Fusion World Card Tracker — Prices & Collection Manager",
+    title: "Free Dragon Ball Fusion World Card Tracker — Prices, Scanner & Collection Manager",
     description:
       "Track your Dragon Ball Super Card Game Fusion World collection — free during beta, then $4.99 one-time. Daily TCGPlayer prices, set completion tracking, wishlist alerts, and an AI card scanner (in beta for Fusion World).",
     h1: "Dragon Ball Fusion World Collection Tracker",
