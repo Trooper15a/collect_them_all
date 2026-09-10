@@ -52,12 +52,15 @@ export async function GET(req: NextRequest) {
     for (const r of ownedRows) if (r.code) owned[`${r.tcg}:${r.code}:${r.language}`] = Number(r.n);
     const enriched = sets
       .map((s) => {
-        const total = cardTotals[s.id.toLowerCase()];
-        return total !== undefined ? { ...s, total } : s;
+        const dbCount = cardTotals[s.id.toLowerCase()];
+        if (dbCount !== undefined && dbCount > 1) return { ...s, total: dbCount };
+        return s;
       })
       .filter((s) => {
         const key = s.id.toLowerCase();
-        return key in cardTotals || s.total != null;
+        const dbCount = cardTotals[key];
+        if (dbCount === undefined) return s.total != null;
+        return dbCount > 1;
       });
     return NextResponse.json({ sets: enriched, owned });
   } catch (err) {
