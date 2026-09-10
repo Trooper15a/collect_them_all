@@ -1,0 +1,3 @@
+# Thin wrapper — pulls the pre-built image from ghcr.io
+# The real build happens in GitHub Actions (see .github/workflows/build-and-deploy.yml)
+FROM ghcr.io/trooper15a/collectr:latest
