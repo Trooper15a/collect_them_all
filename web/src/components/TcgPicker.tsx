@@ -15,13 +15,21 @@ const LG_BREAKPOINT = 1024;
 const LG_COLUMN_HALF = 384;
 const LG_TRIGGER_OFFSET = 56;
 const DRAG_THRESHOLD = 5;
+// Mobile resting spot: right edge, clear of the header + search input row.
+const MOBILE_TRIGGER_SIZE = 40;
+const MOBILE_TOP_OFFSET = 112;
 
 function defaultPos(): { x: number; y: number } {
-  if (typeof window !== "undefined" && window.innerWidth >= LG_BREAKPOINT) {
-    return {
-      x: Math.max(DEFAULT_POS.x, Math.round(window.innerWidth / 2 - LG_COLUMN_HALF - LG_TRIGGER_OFFSET)),
-      y: DEFAULT_POS.y,
-    };
+  if (typeof window !== "undefined") {
+    if (window.innerWidth >= LG_BREAKPOINT) {
+      return {
+        x: Math.max(DEFAULT_POS.x, Math.round(window.innerWidth / 2 - LG_COLUMN_HALF - LG_TRIGGER_OFFSET)),
+        y: DEFAULT_POS.y,
+      };
+    }
+    // Small screens: park at the right edge, below the page header and search
+    // input, so the FAB never covers headings or makes the input untappable.
+    return { x: Math.max(8, window.innerWidth - MOBILE_TRIGGER_SIZE - 12), y: MOBILE_TOP_OFFSET };
   }
   return DEFAULT_POS;
 }
