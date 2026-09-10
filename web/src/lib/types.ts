@@ -11,7 +11,7 @@ export const TCGS: { id: Tcg; label: string; accent: string }[] = [
   { id: "fab", label: "Flesh and Blood", accent: "#ef4444" },
   { id: "swu", label: "Star Wars Unlimited", accent: "#93c5fd" },
   { id: "vanguard", label: "Vanguard", accent: "#a78bfa" },
-  { id: "weiss", label: "Weiss Schwarz", accent: "#e5e7eb" },
+  { id: "weiss", label: "Weiß Schwarz", accent: "#e5e7eb" },
   { id: "finalfantasy", label: "Final Fantasy", accent: "#67e8f9" },
   { id: "unionarena", label: "Union Arena", accent: "#34d399" },
 ];

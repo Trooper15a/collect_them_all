@@ -53,10 +53,7 @@ function LoginInner() {
           </button>
 
           <p className="text-xs text-muted text-center -mt-2">
-            We only read your name &amp; email — see{" "}
-            <Link href="/privacy" className="underline hover:text-fg transition-colors">
-              Privacy
-            </Link>
+            We only read your name, email &amp; profile picture.
           </p>
 
           <p className="text-xs text-muted text-center max-w-xs leading-relaxed">

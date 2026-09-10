@@ -7,6 +7,12 @@ export const metadata: Metadata = {
   description:
     "Common questions about RipnPull: pricing, supported TCGs, card scanner, offline mode, data privacy, and more.",
   alternates: { canonical: `${SITE.url}/faq` },
+  openGraph: {
+    title: "FAQ — Frequently Asked Questions",
+    description:
+      "Common questions about RipnPull: pricing, supported TCGs, card scanner, offline mode, data privacy, and more.",
+    url: `${SITE.url}/faq`,
+  },
 };
 
 const FAQS: { q: string; a: string }[] = [
@@ -76,7 +82,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "Will beta users have to pay $4.99 later?",
-    a: "Details on beta-to-paid transition will be announced before it happens. We want to reward early users who help us improve the app.",
+    a: "No. Everyone who joins during beta keeps free access forever — the $4.99 one-time price only applies to new accounts after beta ends.",
   },
 ];
 
@@ -116,7 +122,7 @@ export default function FaqPage() {
         </p>
       </section>
 
-      <section className="px-6 pb-20 max-w-3xl mx-auto w-full">
+      <section className="px-6 pb-20 max-w-5xl mx-auto w-full">
         <div className="divide-y divide-line">
           {FAQS.map((faq, i) => (
             <details key={i} className="group py-5">
