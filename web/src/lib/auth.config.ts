@@ -24,12 +24,21 @@ export default {
       ) {
         return true;
       }
+      // Public pages accessible without login.
+      if (pathname === "/scan" || pathname.startsWith("/scan/")) {
+        return true;
+      }
       // Public API endpoints (preserve existing public-API behavior).
       if (
         pathname.startsWith("/api/auth") ||
         pathname.startsWith("/api/prices") ||
         pathname.startsWith("/api/tcgcsv") ||
-        pathname.startsWith("/api/health")
+        pathname.startsWith("/api/health") ||
+        pathname.startsWith("/api/scan") ||
+        pathname.startsWith("/api/search") ||
+        pathname.startsWith("/api/resolve") ||
+        pathname.startsWith("/api/cards") ||
+        pathname.startsWith("/api/sets")
       ) {
         return true;
       }

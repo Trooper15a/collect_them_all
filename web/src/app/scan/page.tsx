@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AddToPortfolioSheet, type AddSheetCard } from "@/components/AddToPortfolioSheet";
 import { Scanner } from "@/components/Scanner";
@@ -17,6 +18,8 @@ type LangFilter = "all" | "eng" | "jap";
 type SearchSort = "relevance" | "price-desc" | "price-asc" | "name";
 
 export default function ScanPage() {
+  const { data: session } = useSession();
+  const isLoggedIn = !!session?.user;
   const [q, setQ] = useState("");
   const { tcg, hydrated: tcgHydrated } = useActiveTcgHydrated();
   const [lang, setLang] = useState<LangFilter>("all");
@@ -77,7 +80,7 @@ export default function ScanPage() {
       })
       .catch(() => setPortfoliosError("Couldn't load your binders."));
   }, []);
-  useEffect(() => { loadPortfolios(); }, [loadPortfolios]);
+  useEffect(() => { if (isLoggedIn) loadPortfolios(); }, [isLoggedIn, loadPortfolios]);
   useEffect(() => {
     try { localStorage.setItem("bulkQueue", JSON.stringify(bulkQueue)); } catch {}
   }, [bulkQueue]);
@@ -161,7 +164,9 @@ export default function ScanPage() {
         // eslint-disable-next-line react-hooks/purity -- event handler (tap on a match row), not render; rule false-positives through the .map() callback
         const scan: RecentScan = { id: card.id, name: card.name, setName: card.setName ?? null, ts: Date.now() };
         setRecentScans((prev) => [scan, ...prev.filter((s) => s.id !== card.id)].slice(0, 10));
-        if (bulkMode) {
+        if (!isLoggedIn) {
+          // Guest mode — just show the card page, nothing is saved
+        } else if (bulkMode) {
           setBulkQueue((prev) => [...prev, card]);
           setScanning(true);
         } else {
@@ -262,6 +267,7 @@ export default function ScanPage() {
                   <rect x="8" y="7" width="8" height="10" rx="1" />
                 </svg>
               </button>
+              {isLoggedIn && (
               <button onClick={() => { setBulkMode(true); setScanning(true); }} className="w-20 h-20 rounded-full border-rainbow bg-elev flex flex-col items-center justify-center active:scale-95 transition">
                 <svg viewBox="0 0 24 24" className="w-7 h-7 icon-rainbow" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                   <path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" />
@@ -269,6 +275,7 @@ export default function ScanPage() {
                 </svg>
                 <span className="text-[9px] font-bold mt-0.5 text-rainbow">BULK</span>
               </button>
+              )}
             </div>
             <div className="mt-4 font-semibold">Point your camera at a card</div>
             <div className="text-sm text-muted mt-1">English and Japanese cards. Or type a name above to search.</div>
@@ -322,9 +329,11 @@ export default function ScanPage() {
                         <span className="text-muted">—</span>
                       )}
                     </span>
+                    {isLoggedIn && (
                     <button onClick={() => setAdding({ id: c.id, name: c.name, setName: c.setName, prices: c.prices })} className="text-xs font-semibold text-accent px-2 py-1 rounded-lg bg-accent/10">
                       + Add
                     </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -382,7 +391,16 @@ export default function ScanPage() {
           </div>
         </div>
       )}
-      {bulkQueue.length > 0 && !scanning && (
+      {!isLoggedIn && !scanning && !q.trim() && (
+        <div className="card-surface rounded-2xl p-4 mt-4 flex items-center gap-3">
+          <div className="flex-1">
+            <div className="text-sm font-semibold">Scanning as guest</div>
+            <div className="text-xs text-muted">Sign in to save cards to your collection.</div>
+          </div>
+          <Link href="/login" className="text-xs font-semibold text-accent px-3 py-1.5 rounded-lg bg-accent/10">Sign in</Link>
+        </div>
+      )}
+      {isLoggedIn && bulkQueue.length > 0 && !scanning && (
         <div className="card-surface rounded-3xl p-4 mt-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold">Scanned cards ({bulkQueue.length})</h3>
@@ -482,6 +500,7 @@ export default function ScanPage() {
                     <div className="font-medium text-sm truncate">{s.name}</div>
                     <div className="text-xs text-muted truncate">{s.setName}</div>
                   </div>
+                  {isLoggedIn && (
                   <button
                     onClick={(e) => {
                       e.preventDefault();
@@ -492,13 +511,14 @@ export default function ScanPage() {
                   >
                     + Add
                   </button>
+                  )}
                 </Link>
               </li>
             ))}
           </ul>
         </div>
       )}
-      <AddToPortfolioSheet card={adding} onClose={() => setAdding(null)} onAdded={() => {
+      {isLoggedIn && <AddToPortfolioSheet card={adding} onClose={() => setAdding(null)} onAdded={() => {
         const addedId = adding?.id;
         setAdding(null);
         setBulkQueue((prev) => {
@@ -509,7 +529,7 @@ export default function ScanPage() {
           if (rest.length > 0) setTimeout(() => setAdding(rest[0]), 300);
           return rest;
         });
-      }} />
+      }} />}
     </div>
   );
 }
