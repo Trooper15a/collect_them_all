@@ -106,6 +106,12 @@ export default function OpensPage() {
       {showNew && (
         <div className="card-surface rounded-3xl p-4 mb-4">
           <div className="text-xs text-muted mb-3">Log a new sealed product opening</div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              create();
+            }}
+          >
           <div className="grid grid-cols-2 gap-3">
             <Field label="Product name">
               <input className={inputCls} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Surging Sparks BB" />
@@ -128,9 +134,10 @@ export default function OpensPage() {
               </select>
             </Field>
           </div>
-          <Button className="w-full mt-3" onClick={create} disabled={busy || !newName.trim() || !newCost}>
+          <Button className="w-full mt-3" type="submit" disabled={busy || !newName.trim() || !newCost}>
             {busy ? "Creating..." : "Create"}
           </Button>
+          </form>
         </div>
       )}
 

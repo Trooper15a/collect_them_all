@@ -1,4 +1,4 @@
-import { and, eq, like, or, sql } from "drizzle-orm";
+import { and, eq, ilike, or, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { cached, getSetting } from "./cache";
 import { convert, getRates } from "./currency";
@@ -62,7 +62,6 @@ export function toSummary(c: NormalizedCard): CardSummary {
     cardNumber: c.cardNumber,
     rarity: c.rarity,
     language: c.language,
-    imageUrl: c.imageUrl ?? null,
     price: bp ? { amount: bp.amount, currency: bp.currency, variant: bp.variant } : null,
     prices: c.prices,
   };
@@ -208,23 +207,17 @@ export async function searchCards(opts: SearchOpts): Promise<{ cards: CardSummar
       if (r) rarityWords.push(r);
       return !r;
     });
-  const conditions = words.map((w) => or(like(schema.cards.name, `%${w}%`), like(schema.cards.cardNumber, `${w}%`), like(schema.cards.setCode, w), like(schema.cards.setName, `%${w}%`)));
-  for (const r of rarityWords) conditions.push(like(schema.cards.rarity, `%${r}%`));
+  // Case-insensitive matching (ilike) so lowercase queries like "pikachu" still find cards.
+  const conditions = words.map((w) => or(ilike(schema.cards.name, `%${w}%`), ilike(schema.cards.cardNumber, `${w}%`), ilike(schema.cards.setCode, w), ilike(schema.cards.setName, `%${w}%`)));
+  for (const r of rarityWords) conditions.push(ilike(schema.cards.rarity, `%${r}%`));
   conditions.push(sql`${schema.cards.id} like 'tp:%'`);
   if (tcg !== "all") conditions.push(eq(schema.cards.tcg, tcg));
   if (lang !== "all") conditions.push(eq(schema.cards.language, lang));
-  // Name used for relevance ranking — the query minus any rarity-alias words.
-  const nameQuery = (words.length ? words.join(" ") : q).toLowerCase();
   const localRows = await db
     .select()
     .from(schema.cards)
     .where(and(...conditions))
-    // Relevance boost must happen in SQL so exact/prefix matches survive the
-    // 400-row cap: exact name → name prefix → word boundary → plain substring.
-    .orderBy(
-      sql`case when lower(name) = ${nameQuery} then 0 when lower(name) like ${nameQuery + "%"} then 1 when lower(name) like ${"% " + nameQuery + "%"} then 2 else 3 end`,
-      sql`case when prices_json is null then 1 else 0 end, length(name)`,
-    )
+    .orderBy(sql`case when prices_json is null then 1 else 0 end, length(name)`)
     .limit(400);
   const merged = new Map<string, NormalizedCard>(localRows.map((r) => [r.id, rowToCard(r)]));
 
@@ -259,20 +252,10 @@ export async function searchCards(opts: SearchOpts): Promise<{ cards: CardSummar
   });
   const ql = q.toLowerCase();
   const wantsSealed = /box|etb|bundle|pack|case|collection|tin|display/.test(ql);
-  // Same relevance tiers as the SQL boost, applied again after the per-printing
-  // merge so exact/prefix matches ("Agumon") outrank substrings ("Pagumon").
-  const wordBoundary = new RegExp(`\\b${nameQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`);
-  const nameRank = (name: string): number => {
-    const n = name.toLowerCase();
-    if (n === nameQuery) return 0;
-    if (n.startsWith(nameQuery)) return 1;
-    if (wordBoundary.test(n)) return 2;
-    return 3;
-  };
   cards.sort((a, b) => {
-    const ra = nameRank(a.name);
-    const rb = nameRank(b.name);
-    if (ra !== rb) return ra - rb;
+    const ea = a.name.toLowerCase().startsWith(ql) ? 1 : 0;
+    const eb = b.name.toLowerCase().startsWith(ql) ? 1 : 0;
+    if (ea !== eb) return eb - ea;
     const sa = !a.cardNumber && !wantsSealed ? 1 : 0;
     const sb = !b.cardNumber && !wantsSealed ? 1 : 0;
     if (sa !== sb) return sa - sb;

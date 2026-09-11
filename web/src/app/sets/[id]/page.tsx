@@ -38,7 +38,9 @@ interface Data {
 type Sort = "number" | "name" | "price-desc" | "price-asc";
 
 export default function SetPage() {
-  const { id } = useParams<{ id: string }>();
+  // Next 16 useParams() returns the RAW percent-encoded segment — decode before use.
+  const { id: rawId } = useParams<{ id: string }>();
+  const id = decodeURIComponent(rawId);
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "owned" | "missing">("all");

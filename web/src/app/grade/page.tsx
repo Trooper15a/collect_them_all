@@ -145,6 +145,14 @@ export default function CenteringCheckerPage() {
       setCentering(result);
       setOverlayUrl(canvas.toDataURL("image/png"));
     };
+    img.onerror = () => {
+      // broken/corrupt image file — reset instead of hanging in the "uploaded" state
+      showToast("Couldn't read that image — try another photo", "down");
+      URL.revokeObjectURL(url);
+      setPhotoUrl(null);
+      setOverlayUrl(null);
+      setCentering(null);
+    };
     img.src = url;
   }
 

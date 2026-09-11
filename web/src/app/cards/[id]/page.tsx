@@ -8,6 +8,7 @@ import { PriceChart } from "@/components/PriceChart";
 import { showToast } from "@/components/Toast";
 import { Button, CardImage, Empty, Money, Section, Segmented, Skeleton, TcgBadge } from "@/components/ui";
 import { RANGES, type Range, fmtMoney, rangeToDays } from "@/lib/format";
+import { GRADE_MULT } from "@/lib/grades";
 import { useHidePrices } from "@/lib/ui-prefs";
 import { convert, type Rates } from "@/lib/fx";
 import { marketplaceLinks } from "@/lib/marketplace";
@@ -19,12 +20,14 @@ interface HistoryPoint {
   cardmarketAvg: number | null;
 }
 
-const GRADE_MULT: Record<string, number> = { "PSA 10": 3.0, "PSA 9": 1.4, "PSA 8": 1.0, "BGS 10": 4.5, "BGS 9.5": 2.5, "BGS 9": 1.3, "CGC 10": 2.8, "CGC 9.5": 1.6 };
-
 export default function CardPage() {
   const hidePrices = useHidePrices();
   const fm = (n: number | null | undefined, c?: string | null) => (hidePrices ? "•••" : fmtMoney(n, c ?? undefined));
-  const { id } = useParams<{ id: string }>();
+  // Next 16 useParams() returns the RAW percent-encoded segment — card ids contain ":",
+  // so decode once and use the decoded `id` for all comparisons/DB-bound calls.
+  // (fetches re-encode with encodeURIComponent where needed.)
+  const { id: rawId } = useParams<{ id: string }>();
+  const id = decodeURIComponent(rawId);
   const [card, setCard] = useState<NormalizedCard | null>(null);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [error, setError] = useState<string | null>(null);
