@@ -11,7 +11,7 @@ export interface ScanEngine {
   error?: string;
   index?: EmbeddingIndex;
   embed(input: Float32Array): Promise<Float32Array>;
-  match(input: Float32Array, k?: number, tcg?: string): Promise<Match[]>;
+  match(input: Float32Array, k?: number, tcg?: string, lang?: string): Promise<Match[]>;
   backend?: string;
 }
 
@@ -50,12 +50,12 @@ async function load(): Promise<ScanEngine> {
       const out = await session.run({ [inputName]: tensor });
       return out[session.outputNames[0]].data as Float32Array;
     };
-    const match = async (input: Float32Array, k = 5, tcg?: string): Promise<Match[]> => {
+    const match = async (input: Float32Array, k = 5, tcg?: string, lang?: string): Promise<Match[]> => {
       const embedding = await embed(input);
       const res = await fetch("/api/scan/match", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ embedding: Array.from(embedding), k, tcg }),
+        body: JSON.stringify({ embedding: Array.from(embedding), k, tcg, lang }),
       });
       if (!res.ok) throw new Error("Match API failed");
       const data = await res.json();

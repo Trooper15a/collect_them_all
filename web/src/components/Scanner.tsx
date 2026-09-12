@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getScanEngine, type ScanEngine } from "@/lib/scanner/engine";
 import type { Match } from "@/lib/scanner/matcher";
-import { cardGuide, preprocess } from "@/lib/scanner/preprocess";
+import { cardGuide, isSharp, preprocess } from "@/lib/scanner/preprocess";
+import { haptic } from "@/lib/haptics";
 import { useActiveTcg } from "@/lib/ui-prefs";
 import { showToast } from "./Toast";
 import { Button } from "./ui";
 
 /** Map an ML index card id (pw:/sf:/ygo:) straight to the app's card id: they use the same scheme. */
-export function Scanner({ onMatches, onClose, bulkMode, bulkCount }: { onMatches: (m: Match[]) => void; onClose: () => void; bulkMode?: boolean; bulkCount?: number }) {
+export function Scanner({ onMatches, onClose, bulkMode, bulkCount, lang }: { onMatches: (m: Match[]) => void; onClose: () => void; bulkMode?: boolean; bulkCount?: number; lang?: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [engine, setEngine] = useState<ScanEngine | null>(null);
@@ -19,15 +20,33 @@ export function Scanner({ onMatches, onClose, bulkMode, bulkCount }: { onMatches
   const [auto, setAuto] = useState(true);
   const [live, setLive] = useState<Match[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const streakRef = useRef<{ id: string; count: number }>({ id: "", count: 0 });
+  const [torch, setTorch] = useState(false);
+  const [hasTorch, setHasTorch] = useState(false);
+  const blurCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [blurry, setBlurry] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     getScanEngine().then((e) => !cancelled && setEngine(e));
     (async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 1280 } }, audio: false });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1280 },
+            height: { ideal: 1280 },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            ...(({ focusMode: { ideal: "continuous" } }) as any),
+          },
+          audio: false,
+        });
         if (cancelled) return stream.getTracks().forEach((t) => t.stop());
         streamRef.current = stream;
+        const track = stream.getVideoTracks()[0];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const caps = track.getCapabilities?.() as any;
+        if (caps?.torch) setHasTorch(true);
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
@@ -42,15 +61,33 @@ export function Scanner({ onMatches, onClose, bulkMode, bulkCount }: { onMatches
     };
   }, []);
 
+  function toggleTorch() {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    const next = !torch;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    track.applyConstraints({ advanced: [{ torch: next } as any] }).catch(() => {});
+    setTorch(next);
+  }
+
   const scanOnce = useCallback(async () => {
     const v = videoRef.current;
     if (!v || !engine || engine.status !== "ready" || v.videoWidth === 0) return null;
     const guide = cardGuide(v.videoWidth, v.videoHeight);
+    if (!blurCanvasRef.current) blurCanvasRef.current = document.createElement("canvas");
+    if (!isSharp(v, guide, blurCanvasRef.current)) { setBlurry(true); return null; }
+    setBlurry(false);
     const input = preprocess(v, guide, canvasRef.current ?? undefined);
-    return engine.match(input, 5, activeTcg === "all" ? undefined : activeTcg);
-  }, [engine, activeTcg]);
+    return engine.match(input, 5, activeTcg === "all" ? undefined : activeTcg, lang === "all" ? undefined : lang);
+  }, [engine, activeTcg, lang]);
 
-  // Live preview: run a match ~3x/sec while auto mode is on.
+  // Live preview: run matches rapidly; only update the displayed result after
+  // the same top card wins 3 consecutive frames (stabilisation).
+  // In bulk mode, auto-accept after 5 consecutive high-confidence frames.
+  const REQUIRED_STREAK = 3;
+  const AUTO_ACCEPT_STREAK = 5;
+  const AUTO_ACCEPT_SCORE = 0.9;
+  const autoAcceptRef = useRef(false);
   useEffect(() => {
     if (!auto || !engine || engine.status !== "ready") return;
     let stop = false;
@@ -58,17 +95,35 @@ export function Scanner({ onMatches, onClose, bulkMode, bulkCount }: { onMatches
       if (stop) return;
       try {
         const m = await scanOnce();
-        if (m && !stop) setLive(m);
+        if (m && m.length > 0 && !stop) {
+          const topId = m[0].card.id;
+          const streak = streakRef.current;
+          if (topId === streak.id) {
+            streak.count++;
+          } else {
+            streak.id = topId;
+            streak.count = 1;
+          }
+          if (streak.count >= REQUIRED_STREAK) setLive(m);
+          if (bulkMode && streak.count >= AUTO_ACCEPT_STREAK && m[0].score >= AUTO_ACCEPT_SCORE && !autoAcceptRef.current) {
+            autoAcceptRef.current = true;
+            haptic("heavy");
+            onMatches(m);
+            streak.id = "";
+            streak.count = 0;
+            setTimeout(() => { autoAcceptRef.current = false; }, 1000);
+          }
+        }
       } catch {
         /* ignore transient */
       }
-      if (!stop) setTimeout(tick, 350);
+      if (!stop) setTimeout(tick, 150);
     };
     tick();
     return () => {
       stop = true;
     };
-  }, [auto, engine, scanOnce]);
+  }, [auto, engine, scanOnce, bulkMode, onMatches]);
 
   async function capture() {
     setBusy(true);
@@ -89,20 +144,30 @@ export function Scanner({ onMatches, onClose, bulkMode, bulkCount }: { onMatches
   }
 
   const top = live[0];
-  const confident = top && top.score > 0.8;
+  const confident = top && top.score > 0.85;
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
       <div className="relative flex-1 overflow-hidden">
         <video ref={videoRef} playsInline muted className="absolute inset-0 w-full h-full object-cover" />
         <canvas ref={canvasRef} className="hidden" />
-        <Guide />
+        <Guide locked={confident} blurry={blurry} />
         <div className="absolute top-0 inset-x-0 p-4 pt-[max(env(safe-area-inset-top),16px)] flex items-center justify-between">
           <button onClick={onClose} className="glass rounded-full px-3 py-1.5 text-sm">
             Close
           </button>
-          <div className="glass rounded-full px-3 py-1.5 text-xs text-muted">
-            {engine == null ? "Loading model…" : engine.status === "ready" ? `Model ready · ${engine.backend}` : engine.status}
+          <div className="flex items-center gap-2">
+            {hasTorch && (
+              <button onClick={toggleTorch} className={`glass rounded-full p-2 ${torch ? "text-yellow-400" : "text-muted"}`} aria-label="Toggle flashlight">
+                <svg viewBox="0 0 24 24" className="w-4 h-4" fill={torch ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M9 18h6M10 22h4M12 2v1M4.22 4.22l.71.71M1 12h1M20 12h1M18.36 4.22l-.71.71" />
+                  <path d="M15 9a3 3 0 1 1-6 0 5 5 0 0 1 6 0z" />
+                </svg>
+              </button>
+            )}
+            <div className="glass rounded-full px-3 py-1.5 text-xs text-muted">
+              {engine == null ? "Loading model…" : engine.status === "ready" ? `Model ready · ${engine.backend}` : engine.status}
+            </div>
           </div>
         </div>
         {top && (
@@ -149,8 +214,9 @@ export function Scanner({ onMatches, onClose, bulkMode, bulkCount }: { onMatches
   );
 }
 
-function Guide() {
-  const corner = "absolute w-6 h-6 border-white/90";
+function Guide({ locked, blurry }: { locked?: boolean; blurry?: boolean }) {
+  const borderColor = locked ? "border-green-400" : "border-white/90";
+  const corner = `absolute w-6 h-6 ${borderColor} transition-colors duration-300`;
   return (
     <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
       <div className="relative" style={{ width: "78%", aspectRatio: "63/88", maxHeight: "85%" }}>
@@ -168,8 +234,14 @@ function Guide() {
           <div className="h-px w-5 bg-white" />
         </div>
         {/* Label */}
-        <div className="absolute -bottom-7 inset-x-0 text-center text-[11px] text-white/60 font-medium">
-          Align card within frame
+        <div className="absolute -bottom-7 inset-x-0 text-center text-[11px] font-medium">
+          {blurry ? (
+            <span className="text-yellow-400">Hold steady…</span>
+          ) : locked ? (
+            <span className="text-green-400">Locked on</span>
+          ) : (
+            <span className="text-white/60">Align card within frame</span>
+          )}
         </div>
       </div>
     </div>

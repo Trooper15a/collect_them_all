@@ -47,10 +47,11 @@ function getIndex(): ServerIndex | null {
 
 export async function POST(req: NextRequest) {
   try {
-    const { embedding, k = 5, tcg } = (await req.json()) as {
+    const { embedding, k = 5, tcg, lang } = (await req.json()) as {
       embedding: number[];
       k?: number;
       tcg?: string;
+      lang?: string;
     };
     if (!Array.isArray(embedding) || embedding.length === 0) {
       return NextResponse.json({ error: "Missing embedding" }, { status: 400 });
@@ -62,19 +63,26 @@ export async function POST(req: NextRequest) {
     const query = new Float32Array(embedding);
     const { vectors, dim, cards } = idx;
     const n = vectors.length / dim;
-    const best: { i: number; s: number }[] = [];
+    const scores: { i: number; s: number }[] = [];
     for (let i = 0; i < n; i++) {
       if (tcg && cards[i].tcg !== tcg) continue;
       let s = 0;
       const off = i * dim;
       for (let d = 0; d < dim; d++) s += query[d] * vectors[off + d];
-      if (best.length < k) {
-        best.push({ i, s });
-        best.sort((a, b) => b.s - a.s);
-      } else if (s > best[k - 1].s) {
-        best[k - 1] = { i, s };
-        best.sort((a, b) => b.s - a.s);
+      scores.push({ i, s });
+    }
+    scores.sort((a, b) => b.s - a.s);
+
+    let best: { i: number; s: number }[];
+    if (lang && scores.length > 0) {
+      const sameLang = scores.filter((e) => cards[e.i].lang === lang);
+      if (sameLang.length > 0 && sameLang[0].s >= scores[0].s - 0.05) {
+        best = sameLang.slice(0, k);
+      } else {
+        best = scores.slice(0, k);
       }
+    } else {
+      best = scores.slice(0, k);
     }
     const matches = best.map((b) => ({ card: cards[b.i], score: b.s }));
     return NextResponse.json({ matches });

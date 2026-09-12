@@ -375,7 +375,7 @@ export default function ScanPage() {
         )}
       </div>
 
-      {scanning && !matches && <Scanner onClose={() => { setScanning(false); setBulkMode(false); }} onMatches={(m) => { haptic("heavy"); setShowAllGames(false); setMatches(m); }} bulkMode={bulkMode} bulkCount={bulkQueue.length} />}
+      {scanning && !matches && <Scanner onClose={() => { setScanning(false); setBulkMode(false); }} onMatches={(m) => { haptic("heavy"); setShowAllGames(false); setMatches(m); }} bulkMode={bulkMode} bulkCount={bulkQueue.length} lang={lang} />}
       {guestPrompt && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
           <button className="absolute inset-0 bg-black/70" onClick={() => setGuestPrompt(null)} aria-label="Close" />
