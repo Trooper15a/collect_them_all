@@ -49,8 +49,7 @@ export default {
         pathname.startsWith("/api/search") ||
         pathname.startsWith("/api/resolve") ||
         pathname.startsWith("/api/cards") ||
-        pathname.startsWith("/api/sets") ||
-        pathname.startsWith("/api/cleanup")
+        pathname.startsWith("/api/sets")
       ) {
         return true;
       }

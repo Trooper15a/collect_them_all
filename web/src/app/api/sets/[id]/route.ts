@@ -68,7 +68,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       if (qty > 0) ownedCount++;
       else if (price != null) missingCost += price;
       if (price != null) totalValue += price;
-      return { id: c.id, name: c.name, cardNumber: c.cardNumber, rarity: c.rarity, price, owned: qty };
+      const tcgpUrl = c.prices.tcgplayer?.url ?? null;
+      return { id: c.id, name: c.name, cardNumber: c.cardNumber, rarity: c.rarity, imageUrl: c.imageUrl ?? null, price, tcgplayerUrl: tcgpUrl, owned: qty };
     })
     .sort((a, b) => (a.cardNumber ?? "").localeCompare(b.cardNumber ?? "", undefined, { numeric: true }));
 
@@ -77,7 +78,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       const c = rowToCard(r);
       const bp = bestPrice(c.prices);
       // Include raw prices so the "+ Add" sheet can show the market price.
-      return { id: c.id, name: c.name, price: bp ? convert(bp.amount, bp.currency, currency, fx) : null, prices: c.prices, owned: owned.get(c.id) ?? 0 };
+      const tcgpUrl = c.prices.tcgplayer?.url ?? null;
+      return { id: c.id, name: c.name, imageUrl: c.imageUrl ?? null, price: bp ? convert(bp.amount, bp.currency, currency, fx) : null, tcgplayerUrl: tcgpUrl, prices: c.prices, owned: owned.get(c.id) ?? 0 };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
 

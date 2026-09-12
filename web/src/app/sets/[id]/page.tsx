@@ -17,13 +17,17 @@ interface SetCard {
   name: string;
   cardNumber: string | null;
   rarity: string | null;
+  imageUrl: string | null;
   price: number | null;
+  tcgplayerUrl: string | null;
   owned: number;
 }
 interface SealedProduct {
   id: string;
   name: string;
+  imageUrl: string | null;
   price: number | null;
+  tcgplayerUrl: string | null;
   prices?: CardPrices;
   owned: number;
 }
@@ -203,7 +207,7 @@ export default function SetPage() {
               </button>
               {card.owned === 0 && (
                 <div className="mt-0.5 flex gap-1">
-                  <a href={tcgplayerSearchUrl(card.name)} target="_blank" rel="noreferrer" className="flex flex-1 min-h-8 items-center justify-center text-center text-[11px] text-muted hover:text-accent">
+                  <a href={card.tcgplayerUrl ?? tcgplayerSearchUrl(card.name)} target="_blank" rel="noreferrer" className="flex flex-1 min-h-8 items-center justify-center text-center text-[11px] text-muted hover:text-accent">
                     Buy ↗
                   </a>
                   <button onClick={() => toggleWishlist(card.id)} className={`min-w-8 min-h-8 flex items-center justify-center text-sm rounded-md ${wishlistIds.has(card.id) ? "text-down" : "text-muted hover:text-down/60"}`} aria-label={wishlistIds.has(card.id) ? "Remove from wishlist" : "Add to wishlist"}>
@@ -238,7 +242,7 @@ export default function SetPage() {
                   </button>
                   {p.owned === 0 && (
                     <div className="mt-0.5 flex gap-1">
-                      <a href={tcgplayerSearchUrl(p.name)} target="_blank" rel="noreferrer" className="flex flex-1 min-h-8 items-center justify-center text-center text-[11px] text-muted hover:text-accent">
+                      <a href={p.tcgplayerUrl ?? tcgplayerSearchUrl(p.name)} target="_blank" rel="noreferrer" className="flex flex-1 min-h-8 items-center justify-center text-center text-[11px] text-muted hover:text-accent">
                         Buy ↗
                       </a>
                       <button onClick={() => toggleWishlist(p.id)} className={`min-w-8 min-h-8 flex items-center justify-center text-sm rounded-md ${wishlistIds.has(p.id) ? "text-down" : "text-muted hover:text-down/60"}`} aria-label={wishlistIds.has(p.id) ? "Remove from wishlist" : "Add to wishlist"}>
