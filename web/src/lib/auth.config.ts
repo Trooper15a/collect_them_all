@@ -39,6 +39,9 @@ export default {
       if (pathname === "/scan" || pathname.startsWith("/scan/")) {
         return true;
       }
+      if (pathname === "/decks" || pathname.startsWith("/decks/")) {
+        return true;
+      }
       // Public API endpoints (preserve existing public-API behavior).
       if (
         pathname.startsWith("/api/auth") ||
@@ -49,7 +52,8 @@ export default {
         pathname.startsWith("/api/search") ||
         pathname.startsWith("/api/resolve") ||
         pathname.startsWith("/api/cards") ||
-        pathname.startsWith("/api/sets")
+        pathname.startsWith("/api/sets") ||
+        pathname.startsWith("/api/decks/limitless")
       ) {
         return true;
       }

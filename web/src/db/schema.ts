@@ -238,6 +238,33 @@ export const wishlistItems = pgTable("wishlist_items", {
   index("wishlist_user_idx").on(t.userId),
 ]);
 
+/* ─── Deck builder ─── */
+
+export const decks = pgTable("decks", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+  tcg: text("tcg").notNull(),
+  name: text("name").notNull(),
+  source: text("source").notNull(), // limitless | ydk | manual
+  sourceUrl: text("source_url"),
+  format: text("format"),
+  author: text("author"),
+  placing: integer("placing"),
+  tournamentName: text("tournament_name"),
+  createdAt: text("created_at").notNull(),
+}, (t) => [index("decks_user_idx").on(t.userId), index("decks_tcg_idx").on(t.tcg)]);
+
+export const deckCards = pgTable("deck_cards", {
+  id: serial("id").primaryKey(),
+  deckId: integer("deck_id").notNull().references(() => decks.id, { onDelete: "cascade" }),
+  cardId: text("card_id").references(() => cards.id),
+  cardName: text("card_name").notNull(),
+  setCode: text("set_code"),
+  cardNumber: text("card_number"),
+  quantity: integer("quantity").notNull().default(1),
+  section: text("section").notNull().default("main"), // main | extra | side | pokemon | trainer | energy
+}, (t) => [index("deck_cards_deck_idx").on(t.deckId), index("deck_cards_card_idx").on(t.cardId)]);
+
 export type User = typeof users.$inferSelect;
 export type Card = typeof cards.$inferSelect;
 export type Portfolio = typeof portfolios.$inferSelect;
@@ -245,3 +272,5 @@ export type PortfolioItem = typeof portfolioItems.$inferSelect;
 export type SetRow = typeof sets.$inferSelect;
 export type BoxOpen = typeof boxOpens.$inferSelect;
 export type BoxOpenItem = typeof boxOpenItems.$inferSelect;
+export type Deck = typeof decks.$inferSelect;
+export type DeckCard = typeof deckCards.$inferSelect;
