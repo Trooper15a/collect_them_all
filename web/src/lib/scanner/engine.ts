@@ -52,14 +52,24 @@ async function load(): Promise<ScanEngine> {
     };
     const match = async (input: Float32Array, k = 5, tcg?: string, lang?: string): Promise<Match[]> => {
       const embedding = await embed(input);
-      const res = await fetch("/api/scan/match", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ embedding: Array.from(embedding), k, tcg, lang }),
-      });
-      if (!res.ok) throw new Error("Match API failed");
-      const data = await res.json();
-      return data.matches as Match[];
+      const body = JSON.stringify({ embedding: Array.from(embedding), k, tcg, lang });
+      let lastErr: unknown;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const res = await fetch("/api/scan/match", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body,
+            signal: AbortSignal.timeout(5000),
+          });
+          if (!res.ok) throw new Error("Match API failed");
+          const data = await res.json();
+          return data.matches as Match[];
+        } catch (err) {
+          lastErr = err;
+        }
+      }
+      throw lastErr;
     };
     return { status: "ready", index, backend, embed, match };
   } catch (err) {

@@ -25,6 +25,7 @@ export function Scanner({ onMatches, onClose, bulkMode, bulkCount, lang }: { onM
   const [hasTorch, setHasTorch] = useState(false);
   const blurCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [blurry, setBlurry] = useState(false);
+  const scanInFlight = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,12 +74,18 @@ export function Scanner({ onMatches, onClose, bulkMode, bulkCount, lang }: { onM
   const scanOnce = useCallback(async () => {
     const v = videoRef.current;
     if (!v || !engine || engine.status !== "ready" || v.videoWidth === 0) return null;
+    if (scanInFlight.current) return null;
     const guide = cardGuide(v.videoWidth, v.videoHeight);
     if (!blurCanvasRef.current) blurCanvasRef.current = document.createElement("canvas");
     if (!isSharp(v, guide, blurCanvasRef.current)) { setBlurry(true); return null; }
     setBlurry(false);
     const input = preprocess(v, guide, canvasRef.current ?? undefined);
-    return engine.match(input, 5, activeTcg === "all" ? undefined : activeTcg, lang === "all" ? undefined : lang);
+    scanInFlight.current = true;
+    try {
+      return await engine.match(input, 5, activeTcg === "all" ? undefined : activeTcg, lang === "all" ? undefined : lang);
+    } finally {
+      scanInFlight.current = false;
+    }
   }, [engine, activeTcg, lang]);
 
   // Live preview: run matches rapidly; only update the displayed result after
@@ -129,9 +136,15 @@ export function Scanner({ onMatches, onClose, bulkMode, bulkCount, lang }: { onM
     setBusy(true);
     try {
       const m = await scanOnce();
-      if (m) onMatches(m);
+      if (m && m.length > 0) {
+        onMatches(m);
+      } else if (blurry) {
+        showToast("Hold the card steady", "info");
+      } else {
+        showToast("No match found — reposition the card", "info");
+      }
     } catch {
-      showToast("Scan failed — try again", "down");
+      showToast("Scan failed — check your connection", "down");
     } finally {
       setBusy(false);
     }
