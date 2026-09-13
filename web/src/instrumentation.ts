@@ -20,13 +20,14 @@ async function ensureTables() {
         source_url TEXT,
         format TEXT,
         author TEXT,
-        placing INTEGER,
+        "placing" INTEGER,
         tournament_name TEXT,
         created_at TEXT NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS decks_user_idx ON decks(user_id);
-      CREATE INDEX IF NOT EXISTS decks_tcg_idx ON decks(tcg);
-
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS decks_user_idx ON decks(user_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS decks_tcg_idx ON decks(tcg)`);
+    await db.execute(sql`
       CREATE TABLE IF NOT EXISTS deck_cards (
         id SERIAL PRIMARY KEY,
         deck_id INTEGER NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
@@ -36,10 +37,10 @@ async function ensureTables() {
         card_number TEXT,
         quantity INTEGER NOT NULL DEFAULT 1,
         section TEXT NOT NULL DEFAULT 'main'
-      );
-      CREATE INDEX IF NOT EXISTS deck_cards_deck_idx ON deck_cards(deck_id);
-      CREATE INDEX IF NOT EXISTS deck_cards_card_idx ON deck_cards(card_id);
+      )
     `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS deck_cards_deck_idx ON deck_cards(deck_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS deck_cards_card_idx ON deck_cards(card_id)`);
     console.log("[startup] deck tables ensured");
   } catch (err) {
     console.error("[startup] failed to ensure deck tables:", err);
