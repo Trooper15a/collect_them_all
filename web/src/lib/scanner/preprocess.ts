@@ -23,7 +23,7 @@ export function preprocess(
   const sw = "videoWidth" in source ? source.videoWidth : source.width;
   const sh = "videoHeight" in source ? source.videoHeight : source.height;
   const raw = crop ?? { x: 0, y: 0, w: sw, h: sh };
-  const margin = 0.05;
+  const margin = 0.02;
   const c = {
     x: raw.x + raw.w * margin,
     y: raw.y + raw.h * margin,
@@ -34,14 +34,19 @@ export function preprocess(
   const { data } = ctx.getImageData(0, 0, IMAGE_SIZE, IMAGE_SIZE);
   const n = IMAGE_SIZE * IMAGE_SIZE;
 
-  // Find 95th-percentile luminance to detect glare threshold.
-  const lums = new Uint8Array(n);
+  // Fast glare threshold via histogram (O(n) vs O(n log n) sort).
+  const hist = new Uint32Array(256);
   for (let i = 0; i < n; i++) {
     const off = i * 4;
-    lums[i] = Math.round(0.299 * data[off] + 0.587 * data[off + 1] + 0.114 * data[off + 2]);
+    hist[Math.round(0.299 * data[off] + 0.587 * data[off + 1] + 0.114 * data[off + 2])]++;
   }
-  const sorted = lums.slice().sort();
-  const p95 = sorted[Math.floor(n * 0.95)];
+  const target = Math.floor(n * 0.95);
+  let cumul = 0;
+  let p95 = 255;
+  for (let b = 0; b < 256; b++) {
+    cumul += hist[b];
+    if (cumul >= target) { p95 = b; break; }
+  }
   const glareThresh = Math.max(p95, 200);
 
   const out = new Float32Array(3 * n);
@@ -66,7 +71,7 @@ export function isSharp(
   source: HTMLVideoElement,
   crop: { x: number; y: number; w: number; h: number },
   scratch?: HTMLCanvasElement,
-  threshold = 8,
+  threshold = 5,
 ): boolean {
   const size = 64;
   const canvas = scratch ?? document.createElement("canvas");

@@ -60,7 +60,7 @@ async function load(): Promise<ScanEngine> {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body,
-            signal: AbortSignal.timeout(5000),
+            signal: AbortSignal.timeout(3000),
           });
           if (!res.ok) throw new Error("Match API failed");
           const data = await res.json();

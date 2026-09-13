@@ -91,9 +91,9 @@ export function Scanner({ onMatches, onClose, bulkMode, bulkCount, lang }: { onM
   // Live preview: run matches rapidly; only update the displayed result after
   // the same top card wins 3 consecutive frames (stabilisation).
   // In bulk mode, auto-accept after 5 consecutive high-confidence frames.
-  const REQUIRED_STREAK = 3;
-  const AUTO_ACCEPT_STREAK = 5;
-  const AUTO_ACCEPT_SCORE = 0.9;
+  const REQUIRED_STREAK = 2;
+  const AUTO_ACCEPT_STREAK = 3;
+  const AUTO_ACCEPT_SCORE = 0.88;
   const autoAcceptRef = useRef(false);
   useEffect(() => {
     if (!auto || !engine || engine.status !== "ready") return;
