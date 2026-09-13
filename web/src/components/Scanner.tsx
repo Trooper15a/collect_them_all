@@ -25,6 +25,8 @@ export function Scanner({ onMatches, onClose, bulkMode, bulkCount, lang }: { onM
   const [hasTorch, setHasTorch] = useState(false);
   const blurCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [blurry, setBlurry] = useState(false);
+  const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lockedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scanInFlight = useRef(false);
 
   useEffect(() => {
@@ -77,7 +79,13 @@ export function Scanner({ onMatches, onClose, bulkMode, bulkCount, lang }: { onM
     if (scanInFlight.current) return null;
     const guide = cardGuide(v.videoWidth, v.videoHeight);
     if (!blurCanvasRef.current) blurCanvasRef.current = document.createElement("canvas");
-    if (!isSharp(v, guide, blurCanvasRef.current)) { setBlurry(true); return null; }
+    if (!isSharp(v, guide, blurCanvasRef.current)) {
+      if (!blurTimer.current) {
+        blurTimer.current = setTimeout(() => setBlurry(true), 400);
+      }
+      return null;
+    }
+    if (blurTimer.current) { clearTimeout(blurTimer.current); blurTimer.current = null; }
     setBlurry(false);
     const input = preprocess(v, guide, canvasRef.current ?? undefined);
     scanInFlight.current = true;
@@ -91,9 +99,9 @@ export function Scanner({ onMatches, onClose, bulkMode, bulkCount, lang }: { onM
   // Live preview: run matches rapidly; only update the displayed result after
   // the same top card wins 3 consecutive frames (stabilisation).
   // In bulk mode, auto-accept after 5 consecutive high-confidence frames.
-  const REQUIRED_STREAK = 2;
-  const AUTO_ACCEPT_STREAK = 3;
-  const AUTO_ACCEPT_SCORE = 0.88;
+  const REQUIRED_STREAK = 1;
+  const AUTO_ACCEPT_STREAK = 2;
+  const AUTO_ACCEPT_SCORE = 0.85;
   const autoAcceptRef = useRef(false);
   useEffect(() => {
     if (!auto || !engine || engine.status !== "ready") return;
@@ -157,7 +165,18 @@ export function Scanner({ onMatches, onClose, bulkMode, bulkCount, lang }: { onM
   }
 
   const top = live[0];
-  const confident = top && top.score > 0.85;
+  const rawConfident = top && top.score > 0.85;
+  const [confident, setConfident] = useState(false);
+  useEffect(() => {
+    if (rawConfident) {
+      if (lockedTimer.current) { clearTimeout(lockedTimer.current); lockedTimer.current = null; }
+      setConfident(true);
+    } else if (confident) {
+      if (!lockedTimer.current) {
+        lockedTimer.current = setTimeout(() => { setConfident(false); lockedTimer.current = null; }, 500);
+      }
+    }
+  }, [rawConfident, confident]);
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">

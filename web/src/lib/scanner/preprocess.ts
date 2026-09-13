@@ -71,7 +71,7 @@ export function isSharp(
   source: HTMLVideoElement,
   crop: { x: number; y: number; w: number; h: number },
   scratch?: HTMLCanvasElement,
-  threshold = 5,
+  threshold = 3,
 ): boolean {
   const size = 64;
   const canvas = scratch ?? document.createElement("canvas");
