@@ -170,17 +170,18 @@ export async function importTcgcsv(categoryIds = defaultCategoryIds(), opts: { o
       }
     }
     // Clean up stale sets that used abbreviation as ID (old: tcg:code:lang, new: tcg:groupId:lang).
-    // Delete any set whose ID equals tcg:code:lang when a different set with the same code exists.
-    await db.execute(sql`
-      DELETE FROM ${schema.sets} WHERE id IN (
-        SELECT s1.id FROM ${schema.sets} s1
-        WHERE EXISTS (
-          SELECT 1 FROM ${schema.sets} s2
-          WHERE s2.tcg = s1.tcg AND s2.code = s1.code AND s2.language = s1.language AND s2.id <> s1.id
-        )
-        AND s1.id = CONCAT(s1.tcg, ':', s1.code, ':', s1.language)
-      )
-    `);
+    // A stale entry's id equals tcg:code:lang; a correct entry's id uses the numeric groupId.
+    const allSets = await db.select({ id: schema.sets.id, tcg: schema.sets.tcg, code: schema.sets.code, language: schema.sets.language }).from(schema.sets);
+    const byKey = new Map<string, string[]>();
+    for (const s of allSets) {
+      const key = `${s.tcg}:${s.code}:${s.language}`;
+      byKey.set(key, [...(byKey.get(key) ?? []), s.id]);
+    }
+    for (const [abbrevId, ids] of byKey) {
+      if (ids.length > 1 && ids.includes(abbrevId)) {
+        await db.delete(schema.sets).where(eq(schema.sets.id, abbrevId));
+      }
+    }
   } finally {
     result.finishedAt = nowIso();
     status.running = false;
