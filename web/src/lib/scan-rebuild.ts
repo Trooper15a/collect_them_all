@@ -72,8 +72,19 @@ function float32ToFloat16(f32: Float32Array): Buffer {
   return buf;
 }
 
+async function ensureTable() {
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS card_embeddings (
+      card_id TEXT PRIMARY KEY REFERENCES cards(id) ON DELETE CASCADE,
+      embedding TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )
+  `);
+}
+
 export async function rebuildScanIndex(): Promise<{ added: number; skipped: number; errors: number }> {
   console.log("[scan-rebuild] checking for cards without embeddings...");
+  await ensureTable();
 
   const cardsWithoutEmbeddings = await db
     .select({
