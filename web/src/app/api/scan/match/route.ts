@@ -141,6 +141,7 @@ export async function POST(req: NextRequest) {
       const dbData = await getDbEmbeddings(dim);
       dbCards = dbData.cards;
       const dbN = dbData.vectors.length / dim;
+      console.log(`[scan/match] DB embeddings: ${dbN} cards, ${dbData.vectors.length} vector values, dim=${dim}`);
       for (let i = 0; i < dbN; i++) {
         if (tcg && dbCards[i].tcg !== tcg) continue;
         let s = 0;
