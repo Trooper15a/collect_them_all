@@ -147,10 +147,15 @@ export async function rebuildScanIndex(): Promise<{ added: number; skipped: numb
     }
 
     if (results.length > 0) {
-      await db.insert(schema.cardEmbeddings).values(
-        results.map((r) => ({ cardId: r.cardId, embedding: r.embedding, createdAt: now })),
-      ).onConflictDoNothing();
-      added += results.length;
+      try {
+        await db.insert(schema.cardEmbeddings).values(
+          results.map((r) => ({ cardId: r.cardId, embedding: r.embedding, createdAt: now })),
+        ).onConflictDoNothing();
+        added += results.length;
+      } catch (insertErr) {
+        console.error(`[scan-rebuild] DB insert failed for batch at ${i}:`, insertErr);
+        errors += results.length;
+      }
     }
 
     if (i + BATCH_SIZE < candidates.length) {
@@ -163,6 +168,8 @@ export async function rebuildScanIndex(): Promise<{ added: number; skipped: numb
   delete globalForScan.__scanIndex;
   delete globalForScan.__dbEmbeddings;
 
-  console.log(`[scan-rebuild] done: ${added} added, ${errors} errors, ${cardsWithoutEmbeddings.length - candidates.length} skipped`);
+  const countResult = await db.execute(sql`SELECT COUNT(*) as cnt FROM card_embeddings`);
+  const dbCount = (countResult as unknown as { rows: { cnt: string }[] }).rows?.[0]?.cnt ?? "?";
+  console.log(`[scan-rebuild] done: ${added} added, ${errors} errors, ${cardsWithoutEmbeddings.length - candidates.length} skipped (DB total: ${dbCount})`);
   return { added, skipped: cardsWithoutEmbeddings.length - candidates.length, errors };
 }
