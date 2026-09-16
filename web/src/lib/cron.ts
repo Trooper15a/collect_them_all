@@ -1,5 +1,6 @@
 import cron from "node-cron";
 import { refreshOwnedPrices, snapshotPortfolios } from "./portfolio";
+import { rebuildScanIndex } from "./scan-rebuild";
 import { importTcgcsv } from "./tcgcsv";
 import { checkWishlistTargets } from "./wishlist";
 
@@ -23,6 +24,13 @@ export function startCron() {
       console.log(`[cron] done: refreshed ${r.refreshed}, failed ${r.failed}, skipped ${r.skipped} of ${r.total}`);
     } catch (err) {
       console.error("[cron] refresh failed", err);
+    }
+    console.log("[cron] rebuilding scanner index for new cards...");
+    try {
+      const s = await rebuildScanIndex();
+      console.log(`[cron] scan index: ${s.added} added, ${s.errors} errors, ${s.skipped} skipped`);
+    } catch (err) {
+      console.error("[cron] scan index rebuild failed", err);
     }
     console.log("[cron] checking wishlist targets...");
     try {

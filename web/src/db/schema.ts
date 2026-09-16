@@ -8,6 +8,9 @@ export const users = pgTable("users", {
   email: text("email").unique(),
   emailVerified: timestamp("email_verified", { mode: "date" }),
   image: text("image"),
+  premium: boolean("premium").notNull().default(false),
+  stripeCustomerId: text("stripe_customer_id"),
+  premiumSince: text("premium_since"),
 });
 
 export const accounts = pgTable("accounts", {
@@ -264,6 +267,13 @@ export const deckCards = pgTable("deck_cards", {
   quantity: integer("quantity").notNull().default(1),
   section: text("section").notNull().default("main"), // main | extra | side | pokemon | trainer | energy
 }, (t) => [index("deck_cards_deck_idx").on(t.deckId), index("deck_cards_card_idx").on(t.cardId)]);
+
+/** Scanner embeddings: stores 512-d float16 vectors for server-side card matching. */
+export const cardEmbeddings = pgTable("card_embeddings", {
+  cardId: text("card_id").primaryKey().references(() => cards.id, { onDelete: "cascade" }),
+  embedding: text("embedding").notNull(), // base64-encoded float16 [512] = 1024 bytes
+  createdAt: text("created_at").notNull(),
+});
 
 export type User = typeof users.$inferSelect;
 export type Card = typeof cards.$inferSelect;
