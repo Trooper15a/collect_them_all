@@ -200,8 +200,8 @@ async function upsertGroup(cat: TcgcsvCategory, group: J, products: J[], prices:
     if (hasPrices && pricesJson) {
       const existing = await db.select({ pricesJson: schema.cards.pricesJson }).from(schema.cards).where(eq(schema.cards.id, id)).limit(1);
       if (existing[0]?.pricesJson) {
-        const prev = JSON.parse(existing[0].pricesJson) as CardPrices;
-        if (prev.cardmarket) pricesJson.cardmarket = prev.cardmarket;
+        const prev = JSON.parse(existing[0].pricesJson) as CardPrices | null;
+        if (prev?.cardmarket) pricesJson.cardmarket = prev.cardmarket;
       }
     }
     await db.insert(schema.cards)
