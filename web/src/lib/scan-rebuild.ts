@@ -169,7 +169,14 @@ export async function rebuildScanIndex(): Promise<{ added: number; skipped: numb
   delete globalForScan.__dbEmbeddings;
 
   const countResult = await db.execute(sql`SELECT COUNT(*) as cnt FROM card_embeddings`);
-  const dbCount = (countResult as unknown as { rows: { cnt: string }[] }).rows?.[0]?.cnt ?? "?";
+  const countRaw = countResult as unknown;
+  let dbCount = "?";
+  if (Array.isArray(countRaw) && countRaw.length > 0) dbCount = String(countRaw[0].cnt ?? countRaw[0].count ?? "?");
+  else if (countRaw && typeof countRaw === "object" && "rows" in countRaw) {
+    const rows = (countRaw as { rows: Record<string, unknown>[] }).rows;
+    if (rows?.[0]) dbCount = String(rows[0].cnt ?? rows[0].count ?? "?");
+  }
   console.log(`[scan-rebuild] done: ${added} added, ${errors} errors, ${cardsWithoutEmbeddings.length - candidates.length} skipped (DB total: ${dbCount})`);
+  console.log(`[scan-rebuild] count raw type: ${typeof countRaw}, isArray: ${Array.isArray(countRaw)}, keys: ${countRaw && typeof countRaw === "object" ? Object.keys(countRaw as object).join(",") : "N/A"}`);
   return { added, skipped: cardsWithoutEmbeddings.length - candidates.length, errors };
 }
