@@ -159,9 +159,9 @@ export async function rebuildScanIndex(): Promise<{ added: number; skipped: numb
   }
 
   // Invalidate the cached server index so the match endpoint picks up new embeddings
-  const globalForScan = globalThis as unknown as { __scanIndex?: unknown; __scanIndexWithDb?: unknown };
+  const globalForScan = globalThis as unknown as { __scanIndex?: unknown; __dbEmbeddings?: unknown };
   delete globalForScan.__scanIndex;
-  delete globalForScan.__scanIndexWithDb;
+  delete globalForScan.__dbEmbeddings;
 
   console.log(`[scan-rebuild] done: ${added} added, ${errors} errors, ${cardsWithoutEmbeddings.length - candidates.length} skipped`);
   return { added, skipped: cardsWithoutEmbeddings.length - candidates.length, errors };
