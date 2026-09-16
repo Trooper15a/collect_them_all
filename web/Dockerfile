@@ -4,7 +4,7 @@ FROM node:20-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci
+    npm install
 
 # ── Stage 2: Download model (cached unless tag changes) ──
 FROM node:20-slim AS model
