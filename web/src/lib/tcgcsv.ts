@@ -159,8 +159,10 @@ export async function importTcgcsv(categoryIds = defaultCategoryIds(), opts: { o
           result.products += counts.products;
           result.priced += counts.priced;
           result.historyRows += counts.history;
+          const setCode = String(group.abbreviation ?? group.groupId);
+          const setId = `${cat.tcg}:${group.groupId}:${cat.language}`;
           await db.insert(schema.sets)
-            .values({ id: `${cat.tcg}:${group.abbreviation ?? group.groupId}:${cat.language}`, tcg: cat.tcg, code: String(group.abbreviation ?? group.groupId), name: group.name, language: cat.language, total: products.length, releaseDate: group.publishedOn ? String(group.publishedOn).slice(0, 10) : null, imageUrl: null })
+            .values({ id: setId, tcg: cat.tcg, code: setCode, name: group.name, language: cat.language, total: products.length, releaseDate: group.publishedOn ? String(group.publishedOn).slice(0, 10) : null, imageUrl: null })
             .onConflictDoUpdate({ target: schema.sets.id, set: { name: group.name, total: products.length } });
         } catch (e) {
           result.errors.push(`group ${catId}/${group.groupId} ${group.name}: ${(e as Error).message}`);
