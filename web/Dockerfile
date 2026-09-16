@@ -1,14 +1,15 @@
 # ── Stage 1: Install dependencies ──
-FROM node:20-alpine AS deps
+# Use slim (Debian/glibc) — onnxruntime-node requires glibc, not musl.
+FROM node:20-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm \
-    npm install --ignore-scripts
+    npm ci
 
 # ── Stage 2: Download model (cached unless tag changes) ──
-FROM node:20-alpine AS model
+FROM node:20-slim AS model
 WORKDIR /model
-RUN apk add --no-cache curl jq
+RUN apt-get update && apt-get install -y --no-install-recommends curl jq ca-certificates && rm -rf /var/lib/apt/lists/*
 ARG GITHUB_TOKEN
 ARG MODEL_TAG=model-v1
 RUN RELEASE_JSON=$(curl -fsSL -H "Authorization: token ${GITHUB_TOKEN}" \
@@ -21,7 +22,7 @@ RUN RELEASE_JSON=$(curl -fsSL -H "Authorization: token ${GITHUB_TOKEN}" \
     ls -lh .
 
 # ── Stage 3: Build ──
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -33,19 +34,22 @@ RUN mkdir -p public/ort && \
 COPY --from=model /model/ public/model/
 RUN npm run build
 
-# ── Stage 3: Production ──
-FROM node:20-alpine AS runner
+# ── Stage 4: Production ──
+FROM node:20-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN apk add --no-cache 7zip
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN apt-get update && apt-get install -y --no-install-recommends 7zip && rm -rf /var/lib/apt/lists/*
+RUN groupadd --system --gid 1001 nodejs
+RUN useradd --system --uid 1001 nextjs
 
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# onnxruntime-node native binary (serverExternalPackages copies the JS, but the .so needs the full module)
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules/onnxruntime-node ./node_modules/onnxruntime-node
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules/onnxruntime-common ./node_modules/onnxruntime-common
 
 USER nextjs
 EXPOSE 3000
