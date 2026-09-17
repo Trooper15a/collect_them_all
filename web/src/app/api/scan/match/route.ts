@@ -172,6 +172,10 @@ export async function POST(req: NextRequest) {
       // Log top DB scores separately
       const dbScores = scores.filter(s => s.source === "db").sort((a, b) => b.s - a.s).slice(0, 3);
       console.log(`[scan/match] Top DB: ${dbScores.map(s => `${dbCards[s.i].name} (${s.s.toFixed(4)})`).join(', ')}`);
+
+      // Check if any 30th Celebration or Mewtwo cards exist in DB
+      const celebCards = dbCards.filter(c => c.setName?.includes('30th') || c.name?.toLowerCase().includes('mewtwo'));
+      console.log(`[scan/match] DB has ${celebCards.length} 30th/Mewtwo cards: ${celebCards.slice(0, 5).map(c => `${c.name} [${c.setName}]`).join(', ')}`);
     } catch (e) {
       console.error("[scan/match] DB embeddings lookup failed:", e);
     }
