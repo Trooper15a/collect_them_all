@@ -3,6 +3,16 @@ export async function register() {
     await ensureTables();
     const { startCron } = await import("./lib/cron");
     startCron();
+    // Run scan rebuild 30s after startup to process newly imported cards
+    setTimeout(async () => {
+      try {
+        const { rebuildScanIndex } = await import("./lib/scan-rebuild");
+        const r = await rebuildScanIndex();
+        console.log(`[startup] scan rebuild: ${r.added} added, ${r.errors} errors, ${r.skipped} skipped`);
+      } catch (e) {
+        console.error("[startup] scan rebuild failed:", e);
+      }
+    }, 30_000);
   }
 }
 

@@ -141,25 +141,7 @@ export async function POST(req: NextRequest) {
       const dbData = await getDbEmbeddings(dim);
       dbCards = dbData.cards;
       const dbN = dbData.vectors.length / dim;
-      console.log(`[scan/match] DB embeddings: ${dbN} cards, ${dbData.vectors.length} vector values, dim=${dim}`);
-
-      // Check L2 norms for debugging
-      let queryNorm = 0;
-      for (let d = 0; d < dim; d++) queryNorm += query[d] * query[d];
-      queryNorm = Math.sqrt(queryNorm);
-
-      let dbNorm0 = 0;
-      if (dbN > 0) {
-        for (let d = 0; d < dim; d++) dbNorm0 += dbData.vectors[d] * dbData.vectors[d];
-        dbNorm0 = Math.sqrt(dbNorm0);
-      }
-      console.log(`[scan/match] L2 norms — query: ${queryNorm.toFixed(4)}, first DB vec: ${dbNorm0.toFixed(4)}`);
-
-      // Sample first DB embedding values for debugging
-      if (dbN > 0) {
-        const sample = Array.from(dbData.vectors.slice(0, 8)).map(v => v.toFixed(4));
-        console.log(`[scan/match] First DB vec sample: [${sample.join(', ')}]`);
-      }
+      console.log(`[scan/match] DB embeddings: ${dbN} cards, dim=${dim}`);
 
       for (let i = 0; i < dbN; i++) {
         if (tcg && dbCards[i].tcg !== tcg) continue;
@@ -169,21 +151,8 @@ export async function POST(req: NextRequest) {
         scores.push({ i, s, source: "db" });
       }
 
-      // Log top DB scores separately
-      const dbScores = scores.filter(s => s.source === "db").sort((a, b) => b.s - a.s).slice(0, 3);
-      console.log(`[scan/match] Top DB: ${dbScores.map(s => `${dbCards[s.i].name} (${s.s.toFixed(4)})`).join(', ')}`);
-
-      // Check if any 30th Celebration or Mewtwo cards exist in DB
-      const celebCards = dbCards.filter(c => c.setName?.includes('30th') || c.name?.toLowerCase().includes('mewtwo'));
-      console.log(`[scan/match] DB has ${celebCards.length} 30th/Mewtwo cards: ${celebCards.slice(0, 5).map(c => `${c.name} [${c.setName}]`).join(', ')}`);
     } catch (e) {
       console.error("[scan/match] DB embeddings lookup failed:", e);
-    }
-
-    // Log top static scores
-    const staticScores = scores.filter(s => s.source === "static").sort((a, b) => b.s - a.s).slice(0, 3);
-    if (staticIdx) {
-      console.log(`[scan/match] Top static: ${staticScores.map(s => `${staticIdx!.cards[s.i].name} (${s.s.toFixed(4)})`).join(', ')}`);
     }
 
     if (scores.length === 0) {

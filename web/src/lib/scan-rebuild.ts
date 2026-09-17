@@ -3,7 +3,7 @@
  * and stores embeddings in the DB so new cards become scannable automatically.
  */
 import { db, schema } from "@/db";
-import { eq, isNull, sql } from "drizzle-orm";
+import { desc, eq, isNull, sql } from "drizzle-orm";
 import sharp from "sharp";
 import path from "node:path";
 
@@ -100,7 +100,8 @@ export async function rebuildScanIndex(): Promise<{ added: number; skipped: numb
     .from(schema.cards)
     .leftJoin(schema.cardEmbeddings, eq(schema.cards.id, schema.cardEmbeddings.cardId))
     .where(isNull(schema.cardEmbeddings.cardId))
-    .limit(2000);
+    .orderBy(desc(schema.cards.createdAt))
+    .limit(5000);
 
   const candidates = cardsWithoutEmbeddings.filter(
     (c) => c.imageUrl && !c.name.toLowerCase().includes("sealed") && !c.name.toLowerCase().includes("booster"),
@@ -177,6 +178,5 @@ export async function rebuildScanIndex(): Promise<{ added: number; skipped: numb
     if (rows?.[0]) dbCount = String(rows[0].cnt ?? rows[0].count ?? "?");
   }
   console.log(`[scan-rebuild] done: ${added} added, ${errors} errors, ${cardsWithoutEmbeddings.length - candidates.length} skipped (DB total: ${dbCount})`);
-  console.log(`[scan-rebuild] count raw type: ${typeof countRaw}, isArray: ${Array.isArray(countRaw)}, keys: ${countRaw && typeof countRaw === "object" ? Object.keys(countRaw as object).join(",") : "N/A"}`);
   return { added, skipped: cardsWithoutEmbeddings.length - candidates.length, errors };
 }
