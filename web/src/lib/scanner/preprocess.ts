@@ -98,6 +98,42 @@ export function isSharp(
   return (sum / count) >= threshold;
 }
 
+/**
+ * Compute a lightweight fingerprint of the frame inside the guide region.
+ * Returns a small Uint8Array (8x8 = 64 grayscale values) that can be compared
+ * between frames to detect scene changes (card swapped under the camera).
+ */
+export function frameFingerprint(
+  source: HTMLVideoElement,
+  crop: { x: number; y: number; w: number; h: number },
+  scratch?: HTMLCanvasElement,
+): Uint8Array {
+  const size = 8;
+  const canvas = scratch ?? document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+  ctx.drawImage(source, crop.x, crop.y, crop.w, crop.h, 0, 0, size, size);
+  const { data } = ctx.getImageData(0, 0, size, size);
+  const fp = new Uint8Array(size * size);
+  for (let i = 0; i < fp.length; i++) {
+    const off = i * 4;
+    fp[i] = Math.round(0.299 * data[off] + 0.587 * data[off + 1] + 0.114 * data[off + 2]);
+  }
+  return fp;
+}
+
+/**
+ * Compare two fingerprints. Returns a difference score (0 = identical, higher = more different).
+ * A score above ~15 typically means the card changed.
+ */
+export function fingerprintDiff(a: Uint8Array, b: Uint8Array): number {
+  if (a.length !== b.length) return 255;
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) sum += Math.abs(a[i] - b[i]);
+  return sum / a.length;
+}
+
 /** Card-shaped guide rectangle (63x88mm aspect) centred in a viewport. */
 export function cardGuide(viewW: number, viewH: number, fill = 0.78) {
   const aspect = 63 / 88;
@@ -108,4 +144,34 @@ export function cardGuide(viewW: number, viewH: number, fill = 0.78) {
     w = h * aspect;
   }
   return { x: (viewW - w) / 2, y: (viewH - h) / 2, w, h };
+}
+
+/**
+ * Capture a high-resolution still frame from the camera track using ImageCapture API.
+ * Falls back to drawing the video element if ImageCapture is unavailable.
+ * Returns a preprocessed Float32Array ready for the ONNX model.
+ */
+export async function captureStill(
+  video: HTMLVideoElement,
+  stream: MediaStream,
+): Promise<Float32Array> {
+  const track = stream.getVideoTracks()[0];
+  let source: HTMLVideoElement | ImageBitmap = video;
+
+  if (typeof globalThis.ImageCapture !== "undefined") {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ic = new (globalThis as any).ImageCapture(track);
+      source = await ic.grabFrame();
+    } catch {
+      // fallback to video element
+    }
+  }
+
+  const sw = source instanceof ImageBitmap ? source.width : source.videoWidth;
+  const sh = source instanceof ImageBitmap ? source.height : source.videoHeight;
+  const guide = cardGuide(sw, sh);
+  const result = preprocess(source, guide);
+  if (source instanceof ImageBitmap) source.close();
+  return result;
 }

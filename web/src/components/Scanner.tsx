@@ -3,14 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getScanEngine, type ScanEngine } from "@/lib/scanner/engine";
 import type { Match } from "@/lib/scanner/matcher";
-import { cardGuide, isSharp, preprocess } from "@/lib/scanner/preprocess";
+import { cardGuide, isSharp, preprocess, frameFingerprint, fingerprintDiff, captureStill } from "@/lib/scanner/preprocess";
 import { haptic } from "@/lib/haptics";
 import { useActiveTcg } from "@/lib/ui-prefs";
 import { showToast } from "./Toast";
 import { Button } from "./ui";
 
 /** Map an ML index card id (pw:/sf:/ygo:) straight to the app's card id: they use the same scheme. */
-export function Scanner({ onMatches, onClose, bulkMode, bulkCount, lang }: { onMatches: (m: Match[]) => void; onClose: () => void; bulkMode?: boolean; bulkCount?: number; lang?: string }) {
+export function Scanner({ onMatches, onClose, bulkMode, standMode, bulkCount, lang }: { onMatches: (m: Match[]) => void; onClose: () => void; bulkMode?: boolean; standMode?: boolean; bulkCount?: number; lang?: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [engine, setEngine] = useState<ScanEngine | null>(null);
@@ -28,6 +28,9 @@ export function Scanner({ onMatches, onClose, bulkMode, bulkCount, lang }: { onM
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lockedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scanInFlight = useRef(false);
+  const lastAcceptedFp = useRef<Uint8Array | null>(null);
+  const fpCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [standState, setStandState] = useState<"scanning" | "waiting">("scanning");
 
   useEffect(() => {
     let cancelled = false;
@@ -97,18 +100,39 @@ export function Scanner({ onMatches, onClose, bulkMode, bulkCount, lang }: { onM
   }, [engine, activeTcg, lang]);
 
   // Live preview: run matches rapidly; only update the displayed result after
-  // the same top card wins 3 consecutive frames (stabilisation).
-  // In bulk mode, auto-accept after 5 consecutive high-confidence frames.
+  // the same top card wins consecutive frames (stabilisation).
+  // In bulk mode, auto-accept after consecutive high-confidence frames.
+  // In stand mode, after auto-accept wait for scene change before resuming.
   const REQUIRED_STREAK = 1;
   const AUTO_ACCEPT_STREAK = 2;
   const AUTO_ACCEPT_SCORE = 0.85;
+  const SCENE_CHANGE_THRESHOLD = 15;
   const autoAcceptRef = useRef(false);
+  const isBatchMode = bulkMode || standMode;
   useEffect(() => {
     if (!auto || !engine || engine.status !== "ready") return;
     let stop = false;
     const tick = async () => {
       if (stop) return;
       try {
+        const v = videoRef.current;
+        // Stand mode: after accepting a card, wait for scene change before scanning again
+        if (standMode && lastAcceptedFp.current && v && v.videoWidth > 0) {
+          const guide = cardGuide(v.videoWidth, v.videoHeight);
+          if (!fpCanvasRef.current) fpCanvasRef.current = document.createElement("canvas");
+          const currentFp = frameFingerprint(v, guide, fpCanvasRef.current);
+          const diff = fingerprintDiff(lastAcceptedFp.current, currentFp);
+          if (diff < SCENE_CHANGE_THRESHOLD) {
+            // Same card still in frame, keep waiting
+            if (!stop) setTimeout(tick, 100);
+            return;
+          }
+          // Scene changed — card was swapped. Clear fingerprint and resume scanning.
+          lastAcceptedFp.current = null;
+          setStandState("scanning");
+          streakRef.current = { id: "", count: 0 };
+        }
+
         const m = await scanOnce();
         if (m && m.length > 0 && !stop) {
           const topId = m[0].card.id;
@@ -120,13 +144,19 @@ export function Scanner({ onMatches, onClose, bulkMode, bulkCount, lang }: { onM
             streak.count = 1;
           }
           if (streak.count >= REQUIRED_STREAK) setLive(m);
-          if (bulkMode && streak.count >= AUTO_ACCEPT_STREAK && m[0].score >= AUTO_ACCEPT_SCORE && !autoAcceptRef.current) {
+          if (isBatchMode && streak.count >= AUTO_ACCEPT_STREAK && m[0].score >= AUTO_ACCEPT_SCORE && !autoAcceptRef.current) {
             autoAcceptRef.current = true;
             haptic("heavy");
             onMatches(m);
             streak.id = "";
             streak.count = 0;
-            setTimeout(() => { autoAcceptRef.current = false; }, 1000);
+            if (standMode && v && v.videoWidth > 0) {
+              const guide = cardGuide(v.videoWidth, v.videoHeight);
+              if (!fpCanvasRef.current) fpCanvasRef.current = document.createElement("canvas");
+              lastAcceptedFp.current = frameFingerprint(v, guide, fpCanvasRef.current);
+              setStandState("waiting");
+            }
+            setTimeout(() => { autoAcceptRef.current = false; }, standMode ? 300 : 1000);
           }
         }
       } catch {
@@ -138,12 +168,19 @@ export function Scanner({ onMatches, onClose, bulkMode, bulkCount, lang }: { onM
     return () => {
       stop = true;
     };
-  }, [auto, engine, scanOnce, bulkMode, onMatches]);
+  }, [auto, engine, scanOnce, bulkMode, standMode, isBatchMode, onMatches]);
 
   async function capture() {
     setBusy(true);
     try {
-      const m = await scanOnce();
+      const v = videoRef.current;
+      const stream = streamRef.current;
+      if (!v || !stream || !engine || engine.status !== "ready" || v.videoWidth === 0) {
+        showToast("Camera not ready", "info");
+        return;
+      }
+      const input = await captureStill(v, stream);
+      const m = await engine.match(input, 5, activeTcg === "all" ? undefined : activeTcg, lang === "all" ? undefined : lang);
       if (m && m.length > 0) {
         onMatches(m);
       } else if (blurry) {
@@ -183,7 +220,7 @@ export function Scanner({ onMatches, onClose, bulkMode, bulkCount, lang }: { onM
       <div className="relative flex-1 overflow-hidden">
         <video ref={videoRef} playsInline muted className="absolute inset-0 w-full h-full object-cover" />
         <canvas ref={canvasRef} className="hidden" />
-        <Guide locked={confident} blurry={blurry} />
+        <Guide locked={confident} blurry={blurry} standMode={standMode} standState={standState} />
         <div className="absolute top-0 inset-x-0 p-4 pt-[max(env(safe-area-inset-top),16px)] flex items-center justify-between">
           <button onClick={onClose} className="glass rounded-full px-3 py-1.5 text-sm">
             Close
@@ -227,7 +264,7 @@ export function Scanner({ onMatches, onClose, bulkMode, bulkCount, lang }: { onM
       <div className="glass p-4 pb-[max(env(safe-area-inset-bottom),16px)]">
         {camError && <div className="text-sm text-down mb-3">{camError}</div>}
         {engine && engine.status !== "ready" && engine.error && <div className="text-sm text-down mb-3">{engine.error}</div>}
-        {bulkMode && (bulkCount ?? 0) > 0 && (
+        {isBatchMode && (bulkCount ?? 0) > 0 && (
           <div className="text-xs text-accent font-semibold mb-2 text-center">{bulkCount} card{bulkCount !== 1 ? "s" : ""} scanned</div>
         )}
         <div className="flex items-center gap-3">
@@ -237,7 +274,7 @@ export function Scanner({ onMatches, onClose, bulkMode, bulkCount, lang }: { onM
           <Button className="flex-1" onClick={capture} disabled={busy || !engine || engine.status !== "ready" || !!camError}>
             {busy ? "Identifying…" : "Identify card"}
           </Button>
-          {bulkMode && (
+          {isBatchMode && (
             <Button variant="ghost" onClick={onClose}>Done</Button>
           )}
         </div>
@@ -246,8 +283,9 @@ export function Scanner({ onMatches, onClose, bulkMode, bulkCount, lang }: { onM
   );
 }
 
-function Guide({ locked, blurry }: { locked?: boolean; blurry?: boolean }) {
-  const borderColor = locked ? "border-green-400" : "border-white/90";
+function Guide({ locked, blurry, standMode, standState }: { locked?: boolean; blurry?: boolean; standMode?: boolean; standState?: "scanning" | "waiting" }) {
+  const isWaiting = standMode && standState === "waiting";
+  const borderColor = isWaiting ? "border-blue-400" : locked ? "border-green-400" : "border-white/90";
   const corner = `absolute w-6 h-6 ${borderColor} transition-colors duration-300`;
   return (
     <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
@@ -267,10 +305,14 @@ function Guide({ locked, blurry }: { locked?: boolean; blurry?: boolean }) {
         </div>
         {/* Label */}
         <div className="absolute -bottom-7 inset-x-0 text-center text-[11px] font-medium">
-          {blurry ? (
+          {isWaiting ? (
+            <span className="text-blue-400">Place next card…</span>
+          ) : blurry ? (
             <span className="text-yellow-400">Hold steady…</span>
           ) : locked ? (
             <span className="text-green-400">Locked on</span>
+          ) : standMode ? (
+            <span className="text-white/60">Scanning…</span>
           ) : (
             <span className="text-white/60">Align card within frame</span>
           )}
