@@ -160,8 +160,11 @@ export async function valueSeries(portfolioId: number | null, range: Range, disp
   return rows.map((r) => ({ date: r.date, value: convert(r.valueUsd, "USD", displayCurrency, fx), cost: convert(r.costUsd, "USD", displayCurrency, fx) }));
 }
 
-export async function refreshOwnedPrices(opts: { maxCards?: number; onlyStale?: boolean } = {}) {
-  const itemRows = await db.select({ cardId: schema.portfolioItems.cardId }).from(schema.portfolioItems);
+export async function refreshOwnedPrices(opts: { userId?: string; maxCards?: number; onlyStale?: boolean } = {}) {
+  const baseQuery = db.select({ cardId: schema.portfolioItems.cardId }).from(schema.portfolioItems);
+  const itemRows = opts.userId
+    ? await baseQuery.innerJoin(schema.portfolios, eq(schema.portfolioItems.portfolioId, schema.portfolios.id)).where(eq(schema.portfolios.userId, opts.userId))
+    : await baseQuery;
   const ids = [...new Set(itemRows.map((r) => r.cardId))];
   const cards = ids.length ? await db.select().from(schema.cards).where(inArray(schema.cards.id, ids)) : [];
   const stale = opts.onlyStale === false ? cards : cards.filter((c) => !c.priceUpdatedAt || Date.now() - Date.parse(c.priceUpdatedAt) > 20 * 3600 * 1000);
