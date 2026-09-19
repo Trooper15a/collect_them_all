@@ -3,7 +3,7 @@ import { db, schema } from "@/db";
 import { cached, getSetting } from "./cache";
 import { convert, getRates } from "./currency";
 import { nowIso, today } from "./format";
-import { bestPrice, type CardPrices, type CardSummary, type NormalizedCard, type Tcg } from "./types";
+import { bestPrice, type CardPrices, type CardSummary, type NormalizedCard, type PriceVariant, type Tcg } from "./types";
 import { TCGCSV_CATEGORIES } from "./tcgcsv";
 
 /** Collector shorthand -> substring of the TCGPlayer rarity name. */
@@ -179,7 +179,59 @@ export async function getCard(cardId: string): Promise<NormalizedCard | null> {
 }
 
 export async function refreshCardPrices(cardId: string) {
-  return getCard(cardId);
+  const card = await getCard(cardId);
+  if (!card) return null;
+
+  if (cardId.startsWith("pw:")) {
+    const { pwCard } = await import("./pokewallet");
+    const fresh = await pwCard(cardId.slice(3));
+    await upsertCard(fresh);
+    return fresh;
+  }
+
+  if (cardId.startsWith("tp:")) {
+    const productId = cardId.slice(3);
+    const meta = card.meta as Record<string, unknown> | undefined;
+    const groupId = meta?.groupId;
+    if (!groupId) return card;
+    const cat = TCGCSV_CATEGORIES.find((c) => c.tcg === card.tcg && c.language === card.language);
+    if (!cat) return card;
+    const res = await fetch(`https://tcgcsv.com/tcgplayer/${cat.id}/${groupId}/prices`, {
+      headers: { "User-Agent": "ripnpull/0.1" },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) return card;
+    const data = await res.json();
+    const entries: { subTypeName?: string; marketPrice?: number; lowPrice?: number; midPrice?: number; highPrice?: number; directLowPrice?: number }[] = data.results ?? [];
+    const matching = entries.filter((p: Record<string, unknown>) => String(p.productId) === productId);
+    if (!matching.length) return card;
+    const variants: Record<string, PriceVariant> = {};
+    for (const pr of matching) {
+      const v: PriceVariant = {
+        market: pr.marketPrice ?? null,
+        low: pr.lowPrice ?? null,
+        mid: pr.midPrice ?? null,
+        high: pr.highPrice ?? null,
+        directLow: pr.directLowPrice ?? null,
+      };
+      if (Object.values(v).some((x) => x != null)) {
+        const key = (pr.subTypeName ?? "Normal").replace(/\s+(\w)/g, (_, c: string) => c.toUpperCase()).replace(/^\w/, (c) => c.toLowerCase());
+        variants[key] = v;
+      }
+    }
+    if (!Object.keys(variants).length) return card;
+    const now = nowIso();
+    const prices: CardPrices = {
+      tcgplayer: { currency: "USD", url: (card.meta as Record<string, unknown>)?.tcgplayerUrl as string ?? null, updatedAt: now, variants },
+      cardmarket: card.prices.cardmarket ?? null,
+    };
+    await db.update(schema.cards).set({ pricesJson: JSON.stringify(prices), priceUpdatedAt: now, updatedAt: now }).where(eq(schema.cards.id, cardId));
+    const updated = { ...card, prices };
+    await recordPriceSnapshot(updated);
+    return updated;
+  }
+
+  return card;
 }
 
 export interface SearchOpts {
