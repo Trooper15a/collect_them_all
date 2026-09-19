@@ -148,3 +148,13 @@ test("card discovery keeps relevance order and supports price sorting", () => {
   assert.deepEqual(Array.from(sortDiscoveryResults(cards, "relevance"), (card) => card.id), ["a", "b"]);
   assert.deepEqual(Array.from(sortDiscoveryResults(cards, "price-desc"), (card) => card.id), ["b", "a"]);
 });
+
+test("wizard composes shared discovery and add flow", () => {
+  const source = readText("src/app/onboarding/page.tsx");
+  assert.match(source, /CardDiscovery/);
+  assert.match(source, /AddToPortfolioSheet/);
+  assert.match(source, /Skip for now/);
+  assert.match(source, /Choose your game/);
+  assert.match(source, /Add your first card/);
+  assert.match(source, /View my binder/);
+});
