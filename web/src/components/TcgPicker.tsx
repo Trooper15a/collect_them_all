@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKe
 import { setActiveTcg, useActiveTcg, type ActiveTcg } from "@/lib/ui-prefs";
 import { TCGS } from "@/lib/types";
 
-const PUBLIC_PATHS = ["/landing", "/login", "/privacy", "/terms"];
+const PUBLIC_PATHS = ["/landing", "/login", "/privacy", "/terms", "/onboarding"];
 const ALL_ACCENT = "conic-gradient(from 0deg, #facc15, #f87171, #c084fc, #60a5fa, #34d399, #facc15)";
 const POS_KEY = "tcgPickerPos";
 const DEFAULT_POS = { x: 12, y: 68 };

@@ -115,3 +115,14 @@ test("onboarding API returns current account status and accepts bounded patches"
   assert.equal((await alice.PATCH(alice.request({ milestoneState: "opened" }))).status, 200);
   assert.equal((await alice.PATCH(alice.request({}))).status, 400);
 });
+
+function readText(relative) {
+  return fs.readFileSync(path.resolve(__dirname, "..", relative), "utf8");
+}
+
+test("onboarding is protected and hidden from the normal shell", () => {
+  assert.match(readText("src/middleware.ts"), /"\/onboarding\/:path\*"/);
+  for (const file of ["TabBar.tsx", "TcgPicker.tsx", "PwaRegister.tsx"]) {
+    assert.match(readText("src/components/" + file), /\/onboarding/);
+  }
+});
