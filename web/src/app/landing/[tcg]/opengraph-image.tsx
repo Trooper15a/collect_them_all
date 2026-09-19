@@ -75,7 +75,7 @@ export default async function Image(props: { params: Promise<{ tcg: string }> })
               marginTop: "16px",
             }}
           >
-            {["Prices", "Scanner", "Wishlist", "Offline"].map((tag) => (
+            {["Prices", "Scanner", "Wishlist", "Installable"].map((tag) => (
               <div
                 key={tag}
                 style={{

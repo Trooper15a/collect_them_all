@@ -6,12 +6,12 @@ import { TCG_SEO } from "./tcg-data";
 export const metadata: Metadata = {
   title: "Free TCG Portfolio Tracker — AI Scanner, Prices & Collection Tracking | RipnPull",
   description:
-    "Track your Pokémon, Magic, Yu-Gi-Oh! and 11 more TCG collections — free during beta, then $4.99 one-time. AI card scanner, daily TCGPlayer prices, wishlist alerts, grading support, and full offline mode. Open source.",
+    "Track your Pokémon, Magic, Yu-Gi-Oh! and 11 more TCG collections — free during beta, then $4.99 one-time. AI card scanner, daily TCGPlayer prices, wishlist alerts, grading support, and an installable app. Open source.",
   alternates: { canonical: `${SITE.url}/landing` },
   openGraph: {
     title: "RipnPull — Free TCG Portfolio Tracker with AI Card Scanner",
     description:
-      "The free, open-source TCG portfolio tracker. AI card scanning, daily prices across 14 games, wishlist price alerts, and offline support.",
+      "The free, open-source TCG portfolio tracker. AI card scanning, daily prices across 14 games, wishlist price alerts, and an installable app.",
     url: `${SITE.url}/landing`,
     images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "RipnPull — Free TCG Portfolio Tracker with AI Card Scanner" }],
   },
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 const FEATURES = [
   {
     title: "AI Card Scanner",
-    desc: "Point your camera at any card and instantly identify it with on-device AI recognition. Works offline.",
+    desc: "Point your camera at any card and instantly identify it with AI recognition. Image processing runs on your device; matching requires internet access.",
     emoji: "📸",
   },
   {
@@ -39,8 +39,8 @@ const FEATURES = [
     emoji: "📁",
   },
   {
-    title: "Works Offline",
-    desc: "Full PWA with offline caching. Browse your collection, scan cards, and queue changes — syncs when you're back online.",
+    title: "Install on Your Phone",
+    desc: "Install the PWA for quick access. Public assets are cached; collection access, card matching, and saving changes require internet access.",
     emoji: "📶",
   },
   {
@@ -56,7 +56,7 @@ const COMPARISON = [
   { label: "Price", paid: "$5–10/mo subscriptions", ripnpull: "$4.99 one-time (free during beta) — no subscription" },
   { label: "Price history", paid: "Paywalled", ripnpull: "Full price history included" },
   { label: "Source", paid: "Closed source", ripnpull: "Open source (MIT)" },
-  { label: "Offline", paid: "No offline mode", ripnpull: "Full offline mode" },
+  { label: "Offline", paid: "No offline mode", ripnpull: "Public assets only" },
   { label: "Games", paid: "Limited TCG support", ripnpull: "14 TCGs supported" },
 ];
 
@@ -70,7 +70,7 @@ const jsonLd = {
   description: SITE.description,
   url: SITE.url,
   screenshot: `${SITE.url}/og-image.png`,
-  featureList: "AI Card Scanner, Daily TCGPlayer Prices, 14 TCGs, Portfolio Tracking, Wishlist Price Alerts, Offline Mode, Open Source",
+  featureList: "AI Card Scanner, Daily TCGPlayer Prices, 14 TCGs, Portfolio Tracking, Wishlist Price Alerts, Installable App, Open Source",
 };
 
 export default function LandingPage() {
@@ -107,7 +107,7 @@ export default function LandingPage() {
             <span className="text-rainbow">Know their worth.</span>
           </h1>
           <p className="mt-6 text-lg text-muted max-w-lg mx-auto leading-relaxed">
-            The TCG portfolio tracker with AI card scanning, daily prices across 14 games, and offline support. Free during beta, then just $4.99 — once, forever.
+            The TCG portfolio tracker with AI card scanning, daily prices across 14 games, and an installable app. Free during beta, then just $4.99 — once, forever.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
             <Link

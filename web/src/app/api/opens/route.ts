@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
 import { requireUserId } from "@/lib/auth";
-import { getSetting } from "@/lib/cache";
+import { getUserSetting as getSetting } from "@/lib/user-settings";
 import { convert, getRates } from "@/lib/currency";
 import { bestPrice } from "@/lib/types";
 

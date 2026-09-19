@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { indexCard } from "@/lib/model-index";
 import { linkManually, resolveScanId } from "@/lib/resolve";
+import { requireAdmin } from "@/lib/admin";
 
 const Query = z.object({ id: z.string().min(3).max(200) });
 const LinkBody = z.object({ scanId: z.string().min(3).max(200), cardId: z.string().min(3).max(200) });
@@ -26,8 +27,10 @@ export async function GET(req: NextRequest) {
 
 /** POST /api/resolve { scanId, cardId } -> remember a manual link */
 export async function POST(req: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const parsed = LinkBody.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Validation failed" }, { status: 400 });
-  linkManually(parsed.data.scanId, parsed.data.cardId);
+  await linkManually(parsed.data.scanId, parsed.data.cardId);
   return NextResponse.json({ ok: true });
 }

@@ -26,7 +26,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "How does the card scanner work?",
-    a: "Point your phone camera at any card and the AI identifies it instantly. The scanner runs entirely on your device — no internet connection needed. It matches cards by image recognition and can identify set, variant, and card number.",
+    a: "Point your phone camera at any card and the AI identifies it instantly. Image processing runs on your device. An image embedding is sent to the server for matching, so an internet connection is required. It matches cards by image recognition and can identify set, variant, and card number.",
   },
   {
     q: "Where do the prices come from?",
@@ -34,7 +34,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "Does it work offline?",
-    a: "Yes. RipnPull is a Progressive Web App (PWA) with full offline support. You can browse your collection, scan cards, and queue changes while offline. Everything syncs automatically when you reconnect.",
+    a: "RipnPull caches public assets such as card images and scanner files. Accessing your private collection, matching cards, and saving changes requires an internet connection. Offline changes are not queued.",
   },
   {
     q: "How do I install RipnPull on my phone?",
@@ -42,7 +42,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "What is a PWA?",
-    a: "A Progressive Web App (PWA) is a website that can be installed on your phone and works like a native app. It loads fast, works offline, and doesn't take up much storage. No app store approval process means faster updates.",
+    a: "A Progressive Web App (PWA) is a website that can be installed on your phone and works like a native app. It caches public assets and doesn't take up much storage. Collection access and changes require internet access. No app store approval process means faster updates.",
   },
   {
     q: "Can I track graded cards?",

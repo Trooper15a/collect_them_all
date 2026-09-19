@@ -1,27 +1,12 @@
 import { NextResponse } from "next/server";
-import { eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { db } from "@/db";
-import { users } from "@/db/schema";
-import { auth } from "@/lib/auth";
-
-const ADMIN_EMAILS = ["isadin531@gmail.com"];
+import { requireAdmin } from "@/lib/admin";
 
 export async function GET() {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    }
-
-    const [user] = await db
-      .select({ email: users.email })
-      .from(users)
-      .where(eq(users.id, session.user.id))
-      .limit(1);
-
-    if (!user?.email || !ADMIN_EMAILS.includes(user.email)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    const denied = await requireAdmin();
+    if (denied) return denied;
 
     // Run all counts in a single query to avoid 11 round trips
     const [counts] = await db.execute<{

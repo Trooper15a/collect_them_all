@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { TCG_IDS } from "@/lib/types";
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { listSets } from "@/lib/cards";
 import { cached } from "@/lib/cache";
+import { auth } from "@/lib/auth";
+import { ownedPortfolioIds } from "@/lib/ownership";
 
 const Query = z.object({
   tcg: z.enum(["all", ...TCG_IDS]).default("all"),
@@ -24,6 +26,7 @@ const NORMALIZED_NUMBER = sql`case when ${schema.cards.cardNumber} is not null t
 const LOWER_CODE = sql<string>`lower(${schema.cards.setCode})`;
 
 export async function GET(req: NextRequest) {
+  const userId = (await auth())?.user?.id;
   const parsed = Query.safeParse(Object.fromEntries(req.nextUrl.searchParams));
   if (!parsed.success) return NextResponse.json({ error: "Invalid query" }, { status: 400 });
   try {
@@ -45,11 +48,12 @@ export async function GET(req: NextRequest) {
       // overriding the inflated TCGCSV product count is exactly what we want.
       cardTotals[`${r.tcg}:${r.code}:${r.language}`] = Number(r.n);
     }
-    const ownedRows = await db
+    const ownedRows = userId ? await db
       .select({ tcg: schema.cards.tcg, code: LOWER_CODE, language: schema.cards.language, n: sql<number>`count(distinct ${NORMALIZED_NUMBER})` })
       .from(schema.portfolioItems)
       .innerJoin(schema.cards, eq(schema.portfolioItems.cardId, schema.cards.id))
-      .groupBy(schema.cards.tcg, LOWER_CODE, schema.cards.language);
+      .where(inArray(schema.portfolioItems.portfolioId, ownedPortfolioIds(userId)))
+      .groupBy(schema.cards.tcg, LOWER_CODE, schema.cards.language) : [];
     const owned: Record<string, number> = {};
     for (const r of ownedRows) if (r.code) owned[`${r.tcg}:${r.code}:${r.language}`] = Number(r.n);
     const enriched = sets
@@ -64,7 +68,7 @@ export async function GET(req: NextRequest) {
         if (dbCount === undefined) return s.total != null;
         return dbCount > 1;
       });
-    return NextResponse.json({ sets: enriched, owned });
+    return NextResponse.json({ sets: enriched, owned }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Failed" }, { status: 500 });
   }

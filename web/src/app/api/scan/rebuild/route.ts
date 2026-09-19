@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { rebuildScanIndex } from "@/lib/scan-rebuild";
+import { requireAdmin } from "@/lib/admin";
 
 export async function POST() {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const result = await rebuildScanIndex();
     return NextResponse.json(result);

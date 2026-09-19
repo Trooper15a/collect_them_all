@@ -32,6 +32,7 @@ export function UserMenu() {
                 localStorage.removeItem("bulkQueue");
                 localStorage.removeItem("bulkMode");
                 localStorage.removeItem("rnp-trade");
+                localStorage.removeItem("guestQueue");
               } catch {}
               signOut();
             }}

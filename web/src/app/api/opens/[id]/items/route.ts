@@ -1,11 +1,15 @@
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
+import { requireUserId } from "@/lib/auth";
+import { ownedOpenIds } from "@/lib/ownership";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
   const { id } = await params;
   const openId = Number(id);
-  const opens = await db.select().from(schema.boxOpens).where(eq(schema.boxOpens.id, openId)).limit(1);
+  const opens = await db.select().from(schema.boxOpens).where(and(eq(schema.boxOpens.id, openId), eq(schema.boxOpens.userId, userId))).limit(1);
   if (!opens[0]) return NextResponse.json({ error: "Box open not found" }, { status: 404 });
 
   try {
@@ -31,8 +35,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
+  const openId = Number((await params).id);
   const itemId = Number(req.nextUrl.searchParams.get("itemId"));
   if (!itemId) return NextResponse.json({ error: "itemId required" }, { status: 400 });
-  await db.delete(schema.boxOpenItems).where(eq(schema.boxOpenItems.id, itemId));
+  await db.delete(schema.boxOpenItems).where(and(
+    eq(schema.boxOpenItems.id, itemId),
+    eq(schema.boxOpenItems.boxOpenId, openId),
+    inArray(schema.boxOpenItems.boxOpenId, ownedOpenIds(userId)),
+  ));
   return NextResponse.json({ ok: true });
 }

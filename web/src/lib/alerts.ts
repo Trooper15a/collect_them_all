@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { rowToCard } from "./cards";
 import { nowIso } from "./format";
@@ -19,11 +19,12 @@ export interface AlertView {
   acknowledgedAt: string | null;
 }
 
-export async function listAlerts(): Promise<AlertView[]> {
+export async function listAlerts(userId: string): Promise<AlertView[]> {
   const rows = await db
     .select({ alert: schema.alerts, card: schema.cards })
     .from(schema.alerts)
-    .innerJoin(schema.cards, eq(schema.alerts.cardId, schema.cards.id));
+    .innerJoin(schema.cards, eq(schema.alerts.cardId, schema.cards.id))
+    .where(eq(schema.alerts.userId, userId));
   const views = await Promise.all(rows.map(async ({ alert, card: row }) => {
     const card = rowToCard(row);
     const bp = bestPrice(card.prices, alert.variantType);
@@ -31,7 +32,7 @@ export async function listAlerts(): Promise<AlertView[]> {
     const changePct = current != null && alert.basePrice ? ((current - alert.basePrice) / alert.basePrice) * 100 : null;
     const triggered = changePct != null && Math.abs(changePct) >= alert.thresholdPct;
     if (triggered && !alert.lastTriggeredAt) {
-      await db.update(schema.alerts).set({ lastTriggeredAt: nowIso() }).where(eq(schema.alerts.id, alert.id));
+      await db.update(schema.alerts).set({ lastTriggeredAt: nowIso() }).where(and(eq(schema.alerts.id, alert.id), eq(schema.alerts.userId, userId)));
     }
     return {
       id: alert.id,
@@ -51,12 +52,13 @@ export async function listAlerts(): Promise<AlertView[]> {
   return views.sort((a, b) => Number(b.triggered) - Number(a.triggered) || Math.abs(b.changePct ?? 0) - Math.abs(a.changePct ?? 0));
 }
 
-export async function upsertAlert(cardId: string, thresholdPct: number, variantType?: string) {
+export async function upsertAlert(userId: string, cardId: string, thresholdPct: number, variantType?: string) {
   const rows = await db.select().from(schema.cards).where(eq(schema.cards.id, cardId)).limit(1);
   if (!rows[0]) throw new Error("Card not found");
   const card = rowToCard(rows[0]);
   const bp = bestPrice(card.prices, variantType);
   const values = {
+    userId,
     cardId,
     thresholdPct,
     variantType: bp?.variant ?? variantType ?? "normal",
@@ -69,13 +71,13 @@ export async function upsertAlert(cardId: string, thresholdPct: number, variantT
   const result = await db
     .insert(schema.alerts)
     .values(values)
-    .onConflictDoUpdate({ target: schema.alerts.cardId, set: values })
+    .onConflictDoUpdate({ target: [schema.alerts.userId, schema.alerts.cardId], set: values })
     .returning();
   return result[0];
 }
 
-export async function acknowledgeAlert(id: number) {
-  const alerts = await db.select().from(schema.alerts).where(eq(schema.alerts.id, id)).limit(1);
+export async function acknowledgeAlert(userId: string, id: number) {
+  const alerts = await db.select().from(schema.alerts).where(and(eq(schema.alerts.id, id), eq(schema.alerts.userId, userId))).limit(1);
   const alert = alerts[0];
   if (!alert) return null;
   const cards = await db.select().from(schema.cards).where(eq(schema.cards.id, alert.cardId)).limit(1);
@@ -84,16 +86,16 @@ export async function acknowledgeAlert(id: number) {
   const result = await db
     .update(schema.alerts)
     .set({ basePrice: bp?.amount ?? alert.basePrice, baseCurrency: bp?.currency ?? alert.baseCurrency, acknowledgedAt: nowIso(), lastTriggeredAt: null })
-    .where(eq(schema.alerts.id, id))
+    .where(and(eq(schema.alerts.id, id), eq(schema.alerts.userId, userId)))
     .returning();
   return result[0];
 }
 
-export async function deleteAlert(id: number) {
-  await db.delete(schema.alerts).where(eq(schema.alerts.id, id));
+export async function deleteAlert(userId: string, id: number) {
+  await db.delete(schema.alerts).where(and(eq(schema.alerts.id, id), eq(schema.alerts.userId, userId)));
 }
 
-export async function alertForCard(cardId: string) {
-  const rows = await db.select().from(schema.alerts).where(eq(schema.alerts.cardId, cardId)).limit(1);
+export async function alertForCard(userId: string, cardId: string) {
+  const rows = await db.select().from(schema.alerts).where(and(eq(schema.alerts.cardId, cardId), eq(schema.alerts.userId, userId))).limit(1);
   return rows[0] ?? null;
 }

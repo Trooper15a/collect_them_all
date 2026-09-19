@@ -11,10 +11,11 @@ RUN --mount=type=cache,target=/root/.npm \
 FROM node:20-slim AS model
 WORKDIR /model
 RUN apt-get update && apt-get install -y --no-install-recommends curl jq ca-certificates && rm -rf /var/lib/apt/lists/*
-ARG GITHUB_TOKEN
 ARG MODEL_TAG=model-v1
 ARG MODEL_CACHE_BUST=2026-09-17
-RUN RELEASE_JSON=$(curl -fsSL -H "Authorization: token ${GITHUB_TOKEN}" \
+RUN --mount=type=secret,id=github_token,required=true \
+    GITHUB_TOKEN=$(cat /run/secrets/github_token) && \
+    RELEASE_JSON=$(curl -fsSL -H "Authorization: token ${GITHUB_TOKEN}" \
       "https://api.github.com/repos/Trooper15a/collect_them_all/releases/tags/${MODEL_TAG}") && \
     for FILE in card_embedder.onnx embeddings.bin index.json; do \
       ASSET_URL=$(echo "$RELEASE_JSON" | jq -r ".assets[] | select(.name==\"$FILE\") | .url") && \

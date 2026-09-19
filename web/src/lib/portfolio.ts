@@ -150,12 +150,15 @@ export async function snapshotPortfolios() {
   for (const p of portfolios) await write(p.id, byPortfolio.get(p.id) ?? []);
 }
 
-export async function valueSeries(portfolioId: number | null, range: Range, displayCurrency: string, fx: Rates) {
+export async function valueSeries(portfolioId: number | null, range: Range, displayCurrency: string, fx: Rates, userId: string) {
+  if (!userId) throw new Error("Unauthorized");
   const days = rangeToDays(range);
   const rows = await db
-    .select()
+    .select({ date: schema.portfolioSnapshots.date, valueUsd: sql<number>`sum(${schema.portfolioSnapshots.valueUsd})`, costUsd: sql<number>`sum(${schema.portfolioSnapshots.costUsd})` })
     .from(schema.portfolioSnapshots)
-    .where(and(eq(schema.portfolioSnapshots.portfolioId, portfolioId ?? 0), days ? gte(schema.portfolioSnapshots.date, daysAgo(days)) : sql`1=1`))
+    .innerJoin(schema.portfolios, eq(schema.portfolioSnapshots.portfolioId, schema.portfolios.id))
+    .where(and(eq(schema.portfolios.userId, userId), portfolioId != null ? eq(schema.portfolioSnapshots.portfolioId, portfolioId) : undefined, days ? gte(schema.portfolioSnapshots.date, daysAgo(days)) : undefined))
+    .groupBy(schema.portfolioSnapshots.date)
     .orderBy(schema.portfolioSnapshots.date);
   return rows.map((r) => ({ date: r.date, value: convert(r.valueUsd, "USD", displayCurrency, fx), cost: convert(r.costUsd, "USD", displayCurrency, fx) }));
 }

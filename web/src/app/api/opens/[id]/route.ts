@@ -1,14 +1,17 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
-import { getSetting } from "@/lib/cache";
+import { getUserSetting as getSetting } from "@/lib/user-settings";
 import { convert, getRates } from "@/lib/currency";
 import { bestPrice } from "@/lib/types";
+import { requireUserId } from "@/lib/auth";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
   const { id } = await params;
   const openId = Number(id);
-  const opens = await db.select().from(schema.boxOpens).where(eq(schema.boxOpens.id, openId)).limit(1);
+  const opens = await db.select().from(schema.boxOpens).where(and(eq(schema.boxOpens.id, openId), eq(schema.boxOpens.userId, userId))).limit(1);
   const open = opens[0];
   if (!open) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -60,7 +63,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
   const { id } = await params;
-  await db.delete(schema.boxOpens).where(eq(schema.boxOpens.id, Number(id)));
+  await db.delete(schema.boxOpens).where(and(eq(schema.boxOpens.id, Number(id)), eq(schema.boxOpens.userId, userId)));
   return NextResponse.json({ ok: true });
 }

@@ -61,11 +61,6 @@ export function PwaRegister() {
     if (process.env.NODE_ENV !== "production" && !location.protocol.startsWith("https")) return;
     navigator.serviceWorker.register("/sw.js").catch((e) => console.warn("sw register failed", e));
 
-    const syncOnReconnect = () => {
-      navigator.serviceWorker.controller?.postMessage("SYNC_QUEUE");
-    };
-    window.addEventListener("online", syncOnReconnect);
-
     const handler = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
@@ -87,7 +82,6 @@ export function PwaRegister() {
 
     return () => {
       window.clearTimeout(showTimer);
-      window.removeEventListener("online", syncOnReconnect);
       window.removeEventListener("beforeinstallprompt", handler);
       window.removeEventListener("appinstalled", onInstalled);
     };
@@ -142,7 +136,7 @@ export function PwaRegister() {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold">Install RipnPull</p>
-          <p className="text-xs text-muted">Track your collection offline</p>
+          <p className="text-xs text-muted">Quick access to your collection</p>
           {showFallback && (
             <p className="text-xs text-muted mt-1">
               Use your browser menu &rarr; &quot;Install app&quot; / &quot;Add to Home Screen&quot;

@@ -193,7 +193,7 @@ export const alerts = pgTable("alerts", {
   createdAt: text("created_at").notNull(),
   lastTriggeredAt: text("last_triggered_at"),
   acknowledgedAt: text("acknowledged_at"),
-}, (t) => [uniqueIndex("alerts_card_unique").on(t.cardId)]);
+}, (t) => [uniqueIndex("alerts_user_card_unique").on(t.userId, t.cardId)]);
 
 export const cardLinks = pgTable("card_links", {
   scanId: text("scan_id").primaryKey(),

@@ -4,12 +4,10 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: collectr
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-collectr_dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a strong POSTGRES_PASSWORD}
       POSTGRES_DB: collectr
     volumes:
       - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U collectr"]
       interval: 5s
@@ -19,7 +17,7 @@ services:
   app:
     image: ghcr.io/trooper15a/collectr:latest
     pull_policy: always
-    # To build locally instead: docker compose build --build-arg GITHUB_TOKEN=...
+    # For local builds, supply the github_token BuildKit secret (see SECURITY-FIXES.md).
     # build:
     #   context: ./web
     #   dockerfile: Dockerfile
@@ -27,7 +25,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://collectr:${POSTGRES_PASSWORD:-collectr_dev}@db:5432/collectr
+      DATABASE_URL: postgresql://collectr:${POSTGRES_PASSWORD:?Set a strong POSTGRES_PASSWORD}@db:5432/collectr
       AUTH_SECRET: ${AUTH_SECRET}
       AUTH_URL: ${AUTH_URL:-http://localhost:3000}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}

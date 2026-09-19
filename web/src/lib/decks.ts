@@ -1,5 +1,6 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
+import { ownedPortfolioIds } from "./ownership";
 
 /* ─── Limitless TCG (Pokemon tournaments) ─── */
 
@@ -194,7 +195,7 @@ export interface DeckOwnership {
   price: number | null;
 }
 
-export async function checkDeckOwnership(deckId: number): Promise<{ cards: DeckOwnership[]; owned: number; total: number; missingCost: number }> {
+export async function checkDeckOwnership(deckId: number, userId: string): Promise<{ cards: DeckOwnership[]; owned: number; total: number; missingCost: number }> {
   const deckCardRows = await db
     .select()
     .from(schema.deckCards)
@@ -209,7 +210,7 @@ export async function checkDeckOwnership(deckId: number): Promise<{ cards: DeckO
     const items = await db
       .select({ cardId: schema.portfolioItems.cardId, qty: schema.portfolioItems.quantity })
       .from(schema.portfolioItems)
-      .where(inArray(schema.portfolioItems.cardId, cardIds));
+      .where(and(inArray(schema.portfolioItems.cardId, cardIds), inArray(schema.portfolioItems.portfolioId, ownedPortfolioIds(userId))));
     for (const it of items) ownedMap.set(it.cardId, (ownedMap.get(it.cardId) ?? 0) + it.qty);
 
     const cardRows = await db

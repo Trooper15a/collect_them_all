@@ -8,7 +8,7 @@ const COMPARISON = [
   { label: "Price", paid: "$5–10/mo subscriptions", ripnpull: "$4.99 one-time (free during beta) — no subscription" },
   { label: "Price history", paid: "Paywalled", ripnpull: "Full price history included, plus wishlist price alerts" },
   { label: "Source", paid: "Closed source", ripnpull: "Open source (MIT)" },
-  { label: "Offline", paid: "No offline scanning", ripnpull: "Offline AI scanner" },
+  { label: "Offline", paid: "No offline scanning", ripnpull: "Public assets only" },
   { label: "Games", paid: "Limited TCG support", ripnpull: "14 TCGs in one app" },
 ];
 

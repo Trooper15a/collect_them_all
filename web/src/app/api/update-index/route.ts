@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStatus, runUpdate } from "@/lib/update-index";
+import { requireAdmin } from "@/lib/admin";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // 5 minutes (Vercel limit)
@@ -8,6 +9,8 @@ export const maxDuration = 300; // 5 minutes (Vercel limit)
  * GET /api/update-index — poll for status of a running (or last completed) update.
  */
 export async function GET() {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   return NextResponse.json(getStatus());
 }
 
@@ -20,6 +23,8 @@ export async function GET() {
  * Returns immediately; poll GET for progress.
  */
 export async function POST(req: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const current = getStatus();
   if (current.running) {
     return NextResponse.json(

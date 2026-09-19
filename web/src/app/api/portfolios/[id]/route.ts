@@ -4,7 +4,7 @@ import { z } from "zod";
 import { TCG_IDS } from "@/lib/types";
 import { db, schema } from "@/db";
 import { requireUserId } from "@/lib/auth";
-import { getSetting } from "@/lib/cache";
+import { getUserSetting as getSetting } from "@/lib/user-settings";
 import { getRates } from "@/lib/currency";
 import { RANGES, type Range } from "@/lib/format";
 import { summarize, valuedItems, valueSeries } from "@/lib/portfolio";
@@ -34,7 +34,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   try {
     const fx = await getRates();
     const items = await valuedItems(id, currency, fx, userId);
-    return NextResponse.json({ portfolio, items, summary: summarize(items), series: await valueSeries(id, range, currency, fx), currency });
+    return NextResponse.json({ portfolio, items, summary: summarize(items), series: await valueSeries(id, range, currency, fx, userId), currency });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Failed" }, { status: 500 });
   }

@@ -1,6 +1,7 @@
 import { and, eq, ilike, or, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { cached, getSetting } from "./cache";
+import { cached } from "./cache";
+import { getUserSetting as getSetting } from "./user-settings";
 import { convert, getRates } from "./currency";
 import { nowIso, today } from "./format";
 import { bestPrice, type CardPrices, type CardSummary, type NormalizedCard, type PriceVariant, type Tcg } from "./types";

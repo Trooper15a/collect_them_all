@@ -82,7 +82,17 @@ async function ensureTable() {
   `);
 }
 
-export async function rebuildScanIndex(): Promise<{ added: number; skipped: number; errors: number }> {
+type RebuildResult = { added: number; skipped: number; errors: number };
+const rebuildState = globalThis as unknown as { __scanRebuild?: Promise<RebuildResult> };
+
+export function rebuildScanIndex(): Promise<RebuildResult> {
+  if (!rebuildState.__scanRebuild) {
+    rebuildState.__scanRebuild = performRebuildScanIndex().finally(() => { delete rebuildState.__scanRebuild; });
+  }
+  return rebuildState.__scanRebuild;
+}
+
+async function performRebuildScanIndex(): Promise<RebuildResult> {
   console.log("[scan-rebuild] checking for cards without embeddings...");
   await ensureTable();
 

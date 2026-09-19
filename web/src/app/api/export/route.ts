@@ -1,19 +1,23 @@
-import { NextRequest } from "next/server";
-import { getSetting } from "@/lib/cache";
+import { NextRequest, NextResponse } from "next/server";
+import { getUserSetting as getSetting } from "@/lib/user-settings";
+import { requireUserId } from "@/lib/auth";
 import { getRates } from "@/lib/currency";
 import { valuedItems } from "@/lib/portfolio";
 import { bestPrice } from "@/lib/types";
 
 function csvCell(v: unknown) {
   if (v == null) return "";
-  const s = String(v);
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  const raw = String(v);
+  const s = /^[\s]*[=+@-]|^[\t\r\n]/.test(raw) ? `'${raw}` : raw;
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
 export async function GET(req: NextRequest) {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
   const currency = req.nextUrl.searchParams.get("currency") ?? await getSetting("currency", "USD");
   const fx = await getRates();
-  const items = await valuedItems(null, currency, fx);
+  const items = await valuedItems(null, currency, fx, userId);
   const header = [
     "portfolio", "card_id", "tcg", "name", "set", "set_code", "card_number", "language", "rarity", "variant", "quantity",
     "condition", "graded", "grading_company", "grade", "cert_number", "cost_basis", "cost_currency",
@@ -39,6 +43,7 @@ export async function GET(req: NextRequest) {
   return new Response(body, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
+      "Cache-Control": "private, no-store",
       "Content-Disposition": `attachment; filename="collection-${new Date().toISOString().slice(0, 10)}.csv"`,
     },
   });

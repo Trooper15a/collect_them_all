@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getSetting, setSetting } from "@/lib/cache";
+import { getUserSetting as getSetting, setUserSetting as setSetting } from "@/lib/user-settings";
+import { requireUserId } from "@/lib/auth";
 import { getRates } from "@/lib/currency";
 
 const Patch = z.object({
@@ -13,6 +14,7 @@ const Patch = z.object({
 });
 
 export async function GET() {
+  try { await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
   try {
     const fx = await getRates();
     return NextResponse.json({
@@ -30,8 +32,9 @@ export async function GET() {
 }
 
 export async function PATCH(req: NextRequest) {
+  try { await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
   const parsed = Patch.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
-  for (const [k, v] of Object.entries(parsed.data)) if (v) setSetting(k, v);
+  for (const [k, v] of Object.entries(parsed.data)) if (v) await setSetting(k, v);
   return GET();
 }

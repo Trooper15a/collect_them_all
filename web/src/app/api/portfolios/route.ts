@@ -4,7 +4,7 @@ import { z } from "zod";
 import { TCG_IDS } from "@/lib/types";
 import { db, schema } from "@/db";
 import { requireUserId } from "@/lib/auth";
-import { getSetting } from "@/lib/cache";
+import { getUserSetting as getSetting } from "@/lib/user-settings";
 import { getRates } from "@/lib/currency";
 import { nowIso } from "@/lib/format";
 import { summarize, valuedItems } from "@/lib/portfolio";

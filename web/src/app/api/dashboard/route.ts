@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
 import { requireUserId } from "@/lib/auth";
-import { getSetting } from "@/lib/cache";
+import { getUserSetting as getSetting } from "@/lib/user-settings";
 import { convert, getRates, type Rates } from "@/lib/currency";
 import { RANGES, type Range } from "@/lib/format";
 import { summarize, valuedItems, valueSeries, type ValuedItem } from "@/lib/portfolio";
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
     const fx = await getRates();
     const items = await valuedItems(null, currency, fx, userId);
     const summary = summarize(items);
-    const series = await valueSeries(null, range, currency, fx);
+    const series = await valueSeries(null, range, currency, fx, userId);
     const mostValuable = [...items].sort((a, b) => b.value - a.value).slice(0, 10).map(slim);
     const movers = items.filter((i) => i.change24hPct != null);
     const trending = [...movers].sort((a, b) => Math.abs(b.change24hPct ?? 0) - Math.abs(a.change24hPct ?? 0)).slice(0, 10).map(slim);

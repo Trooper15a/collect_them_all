@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { sql } from "drizzle-orm";
 import { db, schema } from "@/db";
+import { requireAdmin } from "@/lib/admin";
 
 /**
  * POST /api/cleanup — remove legacy non-TCGCSV data from the database.
@@ -9,6 +10,8 @@ import { db, schema } from "@/db";
  * Safe to run multiple times.
  */
 export async function POST() {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const legacyFilter = sql`card_id NOT LIKE 'tp:%'`;
 

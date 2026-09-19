@@ -17,12 +17,12 @@ export const TCG_SEO: TcgSeo[] = [
     shortName: "Pokémon",
     title: "Free Pokémon Card Tracker — Prices, Scanner & Collection Manager",
     description:
-      "Track your Pokémon card collection — free during beta, then $4.99 one-time. AI card scanner identifies cards instantly, daily TCGPlayer prices, set completion tracking, and wishlist price alerts. Works offline.",
+      "Track your Pokémon card collection — free during beta, then $4.99 one-time. AI card scanner identifies cards instantly, daily TCGPlayer prices, set completion tracking, and wishlist price alerts. Install it on your phone.",
     h1: "Pokémon Card Collection Tracker",
     intro:
       "RipnPull is the open-source Pokémon card tracker with AI-powered scanning, daily TCGPlayer market prices, and full set completion tracking. Free during beta, then $4.99 one-time — no subscription.",
     features: [
-      "Scan any Pokémon card with your camera — AI identifies it instantly, even without internet",
+      "Scan any Pokémon card with your camera — AI identifies it instantly, with an internet connection",
       "Daily prices from TCGPlayer for every card, including reverse holos, full arts, and alt arts",
       "Track set completion with progress bars — see exactly what you're missing and the cost to complete",
       "Wishlist cards you want and get alerts when prices drop to your target",
@@ -73,7 +73,7 @@ export const TCG_SEO: TcgSeo[] = [
     shortName: "Yu-Gi-Oh!",
     title: "Free Yu-Gi-Oh! Card Tracker — Prices, Scanner & Collection Manager",
     description:
-      "Track your Yu-Gi-Oh! card collection — free during beta, then $4.99 one-time. AI card scanner, daily TCGPlayer prices, set completion tracking, wishlist alerts, and offline support. No subscription.",
+      "Track your Yu-Gi-Oh! card collection — free during beta, then $4.99 one-time. AI card scanner, daily TCGPlayer prices, set completion tracking, wishlist alerts, and an installable app. No subscription.",
     h1: "Yu-Gi-Oh! Card Collection Tracker",
     intro:
       "RipnPull is the open-source Yu-Gi-Oh! card tracker with AI-powered scanning, daily TCGPlayer prices, and full set completion tracking. Free during beta, then $4.99 one-time — no subscription.",

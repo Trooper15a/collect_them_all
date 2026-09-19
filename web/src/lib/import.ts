@@ -1,4 +1,4 @@
-import { and, eq, isNull, like, or, sql } from "drizzle-orm";
+import { and, eq, like, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { rowToCard } from "./cards";
 import { nowIso } from "./format";
@@ -196,12 +196,11 @@ export async function commitImport(rows: ImportRow[], defaultPortfolio: string, 
   const getPortfolio = async (name: string) => {
     const key = name.trim() || defaultPortfolio;
     if (portfolioIds.has(key)) return portfolioIds.get(key)!;
-    // Reuse the caller's own portfolio, or a legacy orphan (userId NULL — still
-    // claimable via claimOrphanData, but attaching to it now keeps one binder).
+    // Legacy ownerless portfolios require an explicit operator migration.
     const existing = await db
       .select()
       .from(schema.portfolios)
-      .where(and(eq(schema.portfolios.name, key), or(eq(schema.portfolios.userId, userId), isNull(schema.portfolios.userId))))
+      .where(and(eq(schema.portfolios.name, key), eq(schema.portfolios.userId, userId)))
       .limit(1);
     if (existing[0]) {
       portfolioIds.set(key, existing[0].id);

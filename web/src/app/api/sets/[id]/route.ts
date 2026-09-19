@@ -1,12 +1,15 @@
-import { and, eq, or, sql } from "drizzle-orm";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
-import { getSetting } from "@/lib/cache";
+import { getUserSetting as getSetting } from "@/lib/user-settings";
+import { auth } from "@/lib/auth";
+import { ownedPortfolioIds } from "@/lib/ownership";
 import { rowToCard } from "@/lib/cards";
 import { convert, getRates } from "@/lib/currency";
 import { bestPrice } from "@/lib/types";
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const userId = (await auth())?.user?.id;
   const id = decodeURIComponent((await ctx.params).id);
   const sets = await db.select().from(schema.sets).where(eq(schema.sets.id, id)).limit(1);
   const set = sets[0];
@@ -48,12 +51,13 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   const cards = [...byNumber.values()];
   const ids = cards.map((c) => c.id);
   const owned = new Map<string, number>();
-  if (ids.length || sealedRows.length) {
-    const items = await db.select({ cardId: schema.portfolioItems.cardId, qty: schema.portfolioItems.quantity }).from(schema.portfolioItems);
+  if (userId && (ids.length || sealedRows.length)) {
+    const items = await db.select({ cardId: schema.portfolioItems.cardId, qty: schema.portfolioItems.quantity }).from(schema.portfolioItems)
+      .where(inArray(schema.portfolioItems.portfolioId, ownedPortfolioIds(userId)));
     for (const it of items) owned.set(it.cardId, (owned.get(it.cardId) ?? 0) + it.qty);
   }
   const ownedNumbers = new Set<string>();
-  const allOwnedCards = await db.select({ card: schema.cards }).from(schema.portfolioItems).innerJoin(schema.cards, eq(schema.portfolioItems.cardId, schema.cards.id)).where(and(eq(schema.cards.tcg, set.tcg), eq(schema.cards.language, set.language), eq(schema.cards.setCode, set.code)));
+  const allOwnedCards = userId ? await db.select({ card: schema.cards }).from(schema.portfolioItems).innerJoin(schema.cards, eq(schema.portfolioItems.cardId, schema.cards.id)).where(and(inArray(schema.portfolioItems.portfolioId, ownedPortfolioIds(userId)), eq(schema.cards.tcg, set.tcg), eq(schema.cards.language, set.language), eq(schema.cards.setCode, set.code))) : [];
   for (const { card } of allOwnedCards) ownedNumbers.add((card.cardNumber ?? "").trim().toLowerCase());
 
   let missingCost = 0;
@@ -89,5 +93,5 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     cards: list,
     sealed,
     completion: { owned: ownedCount, total: list.length, pct: list.length ? (ownedCount / list.length) * 100 : 0, missingCost, totalValue },
-  });
+  }, { headers: { "Cache-Control": "private, no-store" } });
 }

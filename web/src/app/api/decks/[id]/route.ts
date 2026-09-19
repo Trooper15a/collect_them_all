@@ -14,7 +14,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const ownership = await checkDeckOwnership(id);
+  const ownership = await checkDeckOwnership(id, session.user.id);
   return NextResponse.json({ deck, ...ownership });
 }
 

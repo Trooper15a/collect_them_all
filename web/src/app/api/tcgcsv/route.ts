@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { defaultCategoryIds, importStatus, importTcgcsv, TCGCSV_CATEGORIES } from "@/lib/tcgcsv";
+import { requireAdmin } from "@/lib/admin";
 
 const Body = z.object({
   categories: z.array(z.number().int().positive()).min(1).max(20).optional(),
@@ -14,6 +15,8 @@ export async function GET() {
 
 /** POST /api/tcgcsv { categories?: [3,85] } -> starts an import in the background and returns immediately */
 export async function POST(req: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const parsed = Body.safeParse((await req.json().catch(() => ({}))) ?? {});
   if (!parsed.success) return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
   const status = await importStatus();

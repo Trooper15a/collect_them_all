@@ -23,6 +23,8 @@ const nextConfig: NextConfig = {
       },
       { source: "/model/(.*)", headers: [{ key: "Cache-Control", value: "public, max-age=604800" }] },
       { source: "/icons/(.*)", headers: [{ key: "Cache-Control", value: "public, max-age=604800" }] },
+      // APIs may contain owner-specific fields even on public catalog routes.
+      { source: "/api/(.*)", headers: [{ key: "Cache-Control", value: "private, no-store" }] },
     ];
   },
 };

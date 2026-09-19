@@ -1,10 +1,14 @@
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
 import { snapshotPortfolios } from "@/lib/portfolio";
 import { ItemPatch } from "@/lib/validation";
+import { requireUserId } from "@/lib/auth";
+import { ownedPortfolioIds } from "@/lib/ownership";
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
   const id = Number((await ctx.params).id);
   if (!Number.isInteger(id)) return NextResponse.json({ error: "Bad id" }, { status: 400 });
   const parsed = ItemPatch.safeParse(await req.json().catch(() => null));
@@ -31,7 +35,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       ...(d.costCurrency !== undefined ? { costCurrency: d.costCurrency } : {}),
       ...(d.notes !== undefined ? { notes: d.notes } : {}),
     })
-    .where(eq(schema.portfolioItems.id, id))
+    .where(and(eq(schema.portfolioItems.id, id), inArray(schema.portfolioItems.portfolioId, ownedPortfolioIds(userId))))
     .returning();
   if (!result[0]) return NextResponse.json({ error: "Not found" }, { status: 404 });
   snapshotPortfolios().catch(() => undefined);
@@ -39,9 +43,11 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 }
 
 export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
   const id = Number((await ctx.params).id);
   if (!Number.isInteger(id)) return NextResponse.json({ error: "Bad id" }, { status: 400 });
-  await db.delete(schema.portfolioItems).where(eq(schema.portfolioItems.id, id));
+  await db.delete(schema.portfolioItems).where(and(eq(schema.portfolioItems.id, id), inArray(schema.portfolioItems.portfolioId, ownedPortfolioIds(userId))));
   snapshotPortfolios().catch(() => undefined);
   return NextResponse.json({ ok: true });
 }

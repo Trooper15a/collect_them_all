@@ -35,11 +35,21 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          build-args: |
-            GITHUB_TOKEN=${{ secrets.MODEL_TOKEN }}
+          secrets: |
+            github_token=${{ secrets.MODEL_TOKEN }}
 
       - name: Trigger Coolify deploy
+        env:
+          COOLIFY_BASE_URL: ${{ vars.COOLIFY_BASE_URL }}
+          COOLIFY_APP_UUID: ${{ secrets.COOLIFY_APP_UUID }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
         run: |
-          curl -fsSL -X POST \
-            "http://62.238.17.137:8000/api/v1/deploy?uuid=${{ secrets.COOLIFY_APP_UUID }}&force=true" \
-            -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}" || echo "Coolify deploy failed (non-fatal)"
+          case "$COOLIFY_BASE_URL" in
+            https://*) ;;
+            *) echo "Set COOLIFY_BASE_URL to the verified HTTPS deployment endpoint" >&2; exit 1 ;;
+          esac
+          curl --fail --silent --show-error --proto '=https' --proto-redir '=https' \
+            --connect-timeout 10 --max-time 60 -X POST \
+            "${COOLIFY_BASE_URL%/}/api/v1/deploy" \
+            --url-query "uuid=$COOLIFY_APP_UUID" --url-query 'force=true' \
+            -H "Authorization: Bearer $COOLIFY_TOKEN"
