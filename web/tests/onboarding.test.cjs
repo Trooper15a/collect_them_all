@@ -126,3 +126,10 @@ test("onboarding is protected and hidden from the normal shell", () => {
     assert.match(readText("src/components/" + file), /\/onboarding/);
   }
 });
+
+test("add sheet reports the created item and binder destination", () => {
+  const source = readText("src/components/AddToPortfolioSheet.tsx");
+  assert.match(source, /export interface AddedPortfolioItem/);
+  assert.match(source, /onAdded\?: \(result: AddedPortfolioItem\) => void/);
+  assert.match(source, /portfolioName: selectedPortfolioName/);
+});

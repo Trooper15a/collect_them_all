@@ -21,13 +21,20 @@ export interface AddSheetCard {
   sealed?: boolean;
 }
 
-export function AddToPortfolioSheet(props: { card: AddSheetCard | null; onClose: () => void; onAdded?: () => void }) {
+export interface AddedPortfolioItem {
+  itemId: number;
+  portfolioId: number;
+  portfolioName: string;
+  card: AddSheetCard;
+}
+
+export function AddToPortfolioSheet(props: { card: AddSheetCard | null; onClose: () => void; onAdded?: (result: AddedPortfolioItem) => void }) {
   // Keyed on the card id so every open starts with fresh form state.
   if (!props.card) return null;
   return <Sheet key={props.card.id} {...props} card={props.card} />;
 }
 
-function Sheet({ card, onClose, onAdded }: { card: AddSheetCard; onClose: () => void; onAdded?: () => void }) {
+function Sheet({ card, onClose, onAdded }: { card: AddSheetCard; onClose: () => void; onAdded?: (result: AddedPortfolioItem) => void }) {
   const hidePrices = useHidePrices();
   const fm = (n: number, c: string) => (hidePrices ? "•••" : fmtMoney(n, c));
   const sealed = !!card.sealed;
@@ -86,11 +93,15 @@ function Sheet({ card, onClose, onAdded }: { card: AddSheetCard; onClose: () => 
     setError(null);
     try {
       let pid = portfolioId;
+      let selectedPortfolioName = pid === "new"
+        ? newName.trim() || "My Collection"
+        : portfolios.find((portfolio) => portfolio.id === pid)?.name ?? "My Collection";
       if (pid === "new") {
-        const r = await fetch("/api/portfolios", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: newName || "My Collection" }) });
+        const r = await fetch("/api/portfolios", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: selectedPortfolioName }) });
         const body = await r.json();
         if (!r.ok) throw new Error(body.error ?? "Could not create portfolio");
         pid = body.id as number;
+        selectedPortfolioName = body.name ?? selectedPortfolioName;
       }
       const r = await fetch(`/api/portfolios/${pid}/items`, {
         method: "POST",
@@ -109,9 +120,10 @@ function Sheet({ card, onClose, onAdded }: { card: AddSheetCard; onClose: () => 
           notes: notes || null,
         }),
       });
-      if (!r.ok) throw new Error((await r.json()).error ?? "Could not add card");
+      const item = await r.json();
+      if (!r.ok) throw new Error(item.error ?? "Could not add card");
       setDone(true);
-      onAdded?.();
+      onAdded?.({ itemId: item.id, portfolioId: Number(pid), portfolioName: selectedPortfolioName, card });
       setTimeout(onClose, 700);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed");
