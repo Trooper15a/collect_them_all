@@ -9,7 +9,7 @@ function load(relative, overrides = {}) {
   const filename = path.resolve(__dirname, "..", relative);
   const source = fs.readFileSync(filename, "utf8");
   const code = ts.transpileModule(source, {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true, jsx: ts.JsxEmit.ReactJSX },
   }).outputText;
   const module = { exports: {} };
   const localRequire = (id) => {
@@ -132,4 +132,19 @@ test("add sheet reports the created item and binder destination", () => {
   assert.match(source, /export interface AddedPortfolioItem/);
   assert.match(source, /onAdded\?: \(result: AddedPortfolioItem\) => void/);
   assert.match(source, /portfolioName: selectedPortfolioName/);
+});
+
+test("card discovery keeps relevance order and supports price sorting", () => {
+  const { sortDiscoveryResults } = load("src/components/CardDiscovery.tsx", {
+    "@/components/Scanner": { Scanner: () => null },
+    "@/components/ui": { Button: () => null, CardImage: () => null, Empty: () => null, Money: () => null, Segmented: () => null, Skeleton: () => null, TcgBadge: () => null, inputCls: "" },
+    "@/lib/haptics": { haptic: () => undefined },
+    "@/lib/scanner/matcher": { isScanIndexId: () => false },
+    "@/lib/types": { TCGS: [] },
+    "@/lib/ui-prefs": { useActiveTcgHydrated: () => ({ tcg: "all", hydrated: true }) },
+    "@/components/AddToPortfolioSheet": {},
+  });
+  const cards = [{ id: "a", name: "A", display: { amount: 2 } }, { id: "b", name: "B", display: { amount: 5 } }];
+  assert.deepEqual(Array.from(sortDiscoveryResults(cards, "relevance"), (card) => card.id), ["a", "b"]);
+  assert.deepEqual(Array.from(sortDiscoveryResults(cards, "price-desc"), (card) => card.id), ["b", "a"]);
 });

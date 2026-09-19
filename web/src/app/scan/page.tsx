@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AddToPortfolioSheet, type AddSheetCard } from "@/components/AddToPortfolioSheet";
+import { sortDiscoveryResults } from "@/components/CardDiscovery";
 import { Scanner } from "@/components/Scanner";
 import { showToast } from "@/components/Toast";
 import { Button, CardImage, Empty, Money, Segmented, Skeleton, TcgBadge, inputCls } from "@/components/ui";
@@ -132,15 +133,7 @@ export default function ScanPage() {
     }, 350);
   }, [q, tcg, lang, tcgHydrated]);
 
-  const sortedResults = useMemo(() => {
-    if (!results) return null;
-    if (searchSort === "relevance") return results;
-    const sorted = [...results];
-    if (searchSort === "price-desc") sorted.sort((a, b) => ((b.display?.amount ?? b.price?.amount ?? 0) - (a.display?.amount ?? a.price?.amount ?? 0)));
-    else if (searchSort === "price-asc") sorted.sort((a, b) => ((a.display?.amount ?? a.price?.amount ?? 0) - (b.display?.amount ?? b.price?.amount ?? 0)));
-    else if (searchSort === "name") sorted.sort((a, b) => a.name.localeCompare(b.name));
-    return sorted;
-  }, [results, searchSort]);
+  const sortedResults = useMemo(() => results ? sortDiscoveryResults(results, searchSort) : null, [results, searchSort]);
 
   // Scanner matches follow the global game picker: filter hard to the active
   // game, with a fallback to all games when nothing matches it.
