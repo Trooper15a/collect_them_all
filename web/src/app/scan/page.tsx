@@ -2,34 +2,23 @@
 
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AddToPortfolioSheet, type AddSheetCard } from "@/components/AddToPortfolioSheet";
-import { sortDiscoveryResults } from "@/components/CardDiscovery";
+import { CardDiscovery, type DiscoveryCard } from "@/components/CardDiscovery";
 import { Scanner } from "@/components/Scanner";
 import { showToast } from "@/components/Toast";
-import { Button, CardImage, Empty, Money, Segmented, Skeleton, TcgBadge, inputCls } from "@/components/ui";
+import { Button, CardImage, Money, inputCls } from "@/components/ui";
 import { haptic } from "@/lib/haptics";
 import { isScanIndexId, type Match } from "@/lib/scanner/matcher";
-import { TCGS, type CardSummary } from "@/lib/types";
+import { TCGS } from "@/lib/types";
 import { useActiveTcgHydrated } from "@/lib/ui-prefs";
 
 interface RecentScan { id: string; name: string; setName: string | null; ts: number; }
 
-type LangFilter = "all" | "eng" | "jap";
-type SearchSort = "relevance" | "price-desc" | "price-asc" | "name";
-
 export default function ScanPage() {
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
   const isLoggedIn = !!session?.user;
-  // Only "unauthenticated" counts as guest — during "loading" keep normal links
-  // (middleware protects /cards/* anyway) so authed users never see the interstitial.
-  const isGuest = status === "unauthenticated";
-  const [q, setQ] = useState("");
-  const { tcg, hydrated: tcgHydrated } = useActiveTcgHydrated();
-  const [lang, setLang] = useState<LangFilter>("all");
-  const [results, setResults] = useState<CardSummary[] | null>(null);
-  const [warnings, setWarnings] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { tcg } = useActiveTcgHydrated();
   const [scanning, setScanning] = useState(false);
   const [bulkMode, setBulkMode] = useState(false);
   const [bulkQueue, setBulkQueue] = useState<AddSheetCard[]>([]);
@@ -37,7 +26,6 @@ export default function ScanPage() {
   const [matches, setMatches] = useState<Match[] | null>(null);
   const [adding, setAdding] = useState<AddSheetCard | null>(null);
   const [resolveError, setResolveError] = useState<string | null>(null);
-  const [searchSort, setSearchSort] = useState<SearchSort>("relevance");
   const [bulkAdding, setBulkAdding] = useState(false);
   const [bulkProgress, setBulkProgress] = useState(0);
   const [portfolios, setPortfolios] = useState<{ id: number; name: string }[]>([]);
@@ -45,7 +33,6 @@ export default function ScanPage() {
   const [bulkPortfolioId, setBulkPortfolioId] = useState<number | null>(null);
   const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
-  const [guestPrompt, setGuestPrompt] = useState<CardSummary | null>(null);
   const [showAllGames, setShowAllGames] = useState(false);
   const [guestQueue, setGuestQueue] = useState<AddSheetCard[]>([]);
   const GUEST_QUEUE_LIMIT = 10;
@@ -103,38 +90,6 @@ export default function ScanPage() {
     try { localStorage.setItem("bulkMode", bulkMode ? "1" : "0"); } catch {}
   }, [bulkMode]);
 
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const abort = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    if (timer.current) clearTimeout(timer.current);
-    // Wait for the tcg pref to hydrate so a saved game choice doesn't fire a
-    // throwaway tcg=all search first.
-    if (!tcgHydrated || !q.trim()) return;
-    timer.current = setTimeout(async () => {
-      abort.current?.abort();
-      const ac = new AbortController();
-      abort.current = ac;
-      setLoading(true);
-      try {
-        const r = await fetch(`/api/search?q=${encodeURIComponent(q.trim())}&tcg=${tcg}&lang=${lang}`, { signal: ac.signal });
-        const d = await r.json();
-        if (!r.ok) throw new Error(d.error ?? "Search failed");
-        setResults(d.cards);
-        setWarnings(d.warnings ?? []);
-      } catch (e) {
-        if ((e as Error).name !== "AbortError") {
-          setResults([]);
-          setWarnings([(e as Error).message]);
-        }
-      } finally {
-        if (!ac.signal.aborted) setLoading(false);
-      }
-    }, 350);
-  }, [q, tcg, lang, tcgHydrated]);
-
-  const sortedResults = useMemo(() => results ? sortDiscoveryResults(results, searchSort) : null, [results, searchSort]);
-
   // Scanner matches follow the global game picker: filter hard to the active
   // game, with a fallback to all games when nothing matches it.
   const activeTcgLabel = tcg === "all" ? null : TCGS.find((t) => t.id === tcg)?.label ?? tcg;
@@ -150,13 +105,6 @@ export default function ScanPage() {
     const d = r.ok ? await r.json() : null;
     if (d?.card) return { id: d.card.id, name: d.card.name, setName: d.card.setName, prices: d.card.prices };
     return null;
-  }
-
-  function clearSearch() {
-    setQ("");
-    abort.current?.abort();
-    setResults(null);
-    setLoading(false);
   }
 
   async function chooseMatch(m: Match) {
@@ -186,7 +134,6 @@ export default function ScanPage() {
         }
       } else {
         setResolveError(`No priced listing found for ${m.card.name ?? m.card.id}. Try searching by name.`);
-        setQ(m.card.name ?? "");
       }
     } catch {
       showToast("Couldn't add that card — try again", "down");
@@ -195,204 +142,44 @@ export default function ScanPage() {
     }
   }
 
+  function handleDiscoveryCard(card: DiscoveryCard) {
+    if (isLoggedIn) {
+      setAdding(card);
+      return;
+    }
+    if (guestQueue.some((queued) => queued.id === card.id)) {
+      showToast("That card is already in your guest queue.", "info");
+      return;
+    }
+    if (guestQueue.length >= GUEST_QUEUE_LIMIT) {
+      showToast("Guest limit reached (" + GUEST_QUEUE_LIMIT + "). Sign in to save more!", "info");
+      return;
+    }
+    haptic("medium");
+    setGuestQueue((previous) => [...previous, card]);
+  }
   return (
     <div>
       <header className="pt-2 pb-3 anim-widget d1">
         <h1 className="text-xl font-bold uppercase tracking-wider">Find a Card</h1>
       </header>
 
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <input
-            className={`${inputCls} pr-9`}
-            placeholder="Card name, number, or set code…"
-            value={q}
-            onChange={(e) => {
-              setQ(e.target.value);
-              if (!e.target.value.trim()) {
-                abort.current?.abort();
-                setResults(null);
-                setLoading(false);
-              }
-            }}
-            autoFocus
-            autoCapitalize="off"
-            autoCorrect="off"
-            enterKeyHint="search"
-          />
-          {q && (
-            <button
-              type="button"
-              onClick={clearSearch}
-              aria-label="Clear search"
-              className="absolute right-1 top-1/2 -translate-y-1/2 min-w-8 min-h-8 flex items-center justify-center text-muted hover:text-fg"
-            >
-              ✕
-            </button>
-          )}
+      <CardDiscovery initialTcg={tcg} allowCamera onSelect={handleDiscoveryCard} />
+
+      {isLoggedIn && (
+        <div className="mt-3 flex justify-end">
+          <Button variant="ghost" onClick={() => { setBulkMode(true); setScanning(true); }}>
+            Bulk scan
+          </Button>
         </div>
-        <Button onClick={() => setScanning(true)} aria-label="Open camera scanner" className="px-3">
-          <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" />
-            <rect x="8" y="7" width="8" height="10" rx="1" />
-          </svg>
-        </Button>
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-2 items-center">
-        {activeTcgLabel && (
-          <span className="text-[11px] text-muted">Game: <span className="font-semibold text-fg">{activeTcgLabel}</span></span>
-        )}
-        <Segmented
-          value={lang}
-          onChange={setLang}
-          size="xs"
-          options={[
-            { value: "all", label: "EN + JP" },
-            { value: "eng", label: "English" },
-            { value: "jap", label: "Japanese" },
-          ]}
-        />
-      </div>
-
-      {resolveError && (
-        <div className="mt-3 text-xs text-down flex justify-between gap-2">
+      )}
+Cannot overwrite variable Error because it is read-only or constant.       {resolveError && (
+        <div className="mt-3 flex items-center justify-between gap-2 text-xs text-down" role="alert">
           <span>{resolveError}</span>
-          <button onClick={() => setResolveError(null)}>✕</button>
+          <button type="button" onClick={() => setResolveError(null)} aria-label="Dismiss error">✕</button>
         </div>
       )}
-      {warnings.length > 0 && (
-        <div className="mt-3 text-xs text-muted space-y-1">
-          {warnings.map((w) => (
-            <div key={w}>⚠ {w}</div>
-          ))}
-        </div>
-      )}
-
-      <div className="mt-4">
-        {!q.trim() && (
-          <div className="card-surface rounded-3xl p-6 text-center">
-            <div className="flex justify-center gap-4">
-              <button onClick={() => setScanning(true)} className="btn-rainbow w-20 h-20 rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(167,139,250,0.35)] active:scale-95 transition">
-                <svg viewBox="0 0 24 24" className="w-9 h-9" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                  <path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" />
-                  <rect x="8" y="7" width="8" height="10" rx="1" />
-                </svg>
-              </button>
-              {isLoggedIn && (
-              <button onClick={() => { setBulkMode(true); setScanning(true); }} className="w-20 h-20 rounded-full border-rainbow bg-elev flex flex-col items-center justify-center active:scale-95 transition">
-                <svg viewBox="0 0 24 24" className="w-7 h-7 icon-rainbow" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                  <path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" />
-                  <rect x="8" y="7" width="8" height="10" rx="1" />
-                </svg>
-                <span className="text-[9px] font-bold mt-0.5 text-rainbow">BULK</span>
-              </button>
-              )}
-            </div>
-            <div className="mt-4 font-semibold">Point your camera at a card</div>
-            <div className="text-sm text-muted mt-1">English and Japanese cards. Or type a name above to search.</div>
-          </div>
-        )}
-        {loading && results === null && (
-          <div className="grid grid-cols-2 gap-3">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="aspect-[63/88]" />
-            ))}
-          </div>
-        )}
-        {sortedResults && sortedResults.length === 0 && !loading && <Empty>No cards found for &quot;{q}&quot;.</Empty>}
-        {sortedResults && sortedResults.length > 0 && (
-          <>
-          <div className="flex items-center justify-between mb-3">
-            <Segmented value={searchSort} onChange={setSearchSort} size="xs" options={[
-              { value: "relevance", label: "Best" },
-              { value: "price-desc", label: "$↓" },
-              { value: "price-asc", label: "$↑" },
-              { value: "name", label: "A-Z" },
-            ]} />
-            <span className="text-xs text-muted">{sortedResults.length} results</span>
-          </div>
-          <div className={`grid grid-cols-2 sm:grid-cols-3 gap-3 stagger-children ${loading ? "opacity-60" : ""}`}>
-            {sortedResults.map((c) => (
-              <div key={c.id} className="card-surface rounded-2xl overflow-hidden flex flex-col tap-scale hover-lift">
-                {isGuest ? (
-                  // Card detail is auth-gated — show an interstitial instead of bouncing to /login.
-                  <button type="button" onClick={() => { haptic("light"); setGuestPrompt(c); }} aria-label={`Sign in to view ${c.name}`}>
-                    <CardImage id={c.id} className="w-full" alt={c.name} directUrl={c.imageUrl} />
-                  </button>
-                ) : (
-                <Link href={`/cards/${encodeURIComponent(c.id)}`}>
-                  <CardImage id={c.id} className="w-full" alt={c.name} directUrl={c.imageUrl} />
-                </Link>
-                )}
-                <div className="p-2.5 flex-1 flex flex-col gap-1">
-                  <div className="font-medium text-sm leading-tight line-clamp-2">{c.name}</div>
-                  <div className="text-[11px] text-muted truncate">
-                    {c.setName} {c.cardNumber && `#${c.cardNumber}`}
-                  </div>
-                  <TcgBadge tcg={c.tcg} lang={c.language} />
-                  <div className="mt-auto flex items-center justify-between pt-1">
-                    <span className="text-sm leading-tight">
-                      {c.price ? (
-                        <>
-                          <span className="font-semibold">
-                            <Money amount={c.display?.amount ?? c.price.amount} currency={c.display?.currency ?? c.price.currency} />
-                          </span>
-                          {c.display && c.display.currency !== c.price.currency && (
-                            <span className="block text-[10px] text-muted">
-                              <Money amount={c.price.amount} currency={c.price.currency} />
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-muted">—</span>
-                      )}
-                    </span>
-                    {isLoggedIn ? (
-                    <button onClick={() => setAdding({ id: c.id, name: c.name, setName: c.setName, prices: c.prices })} className="text-xs font-semibold text-accent px-2 py-1 rounded-lg bg-accent/10">
-                      + Add
-                    </button>
-                    ) : guestQueue.length < GUEST_QUEUE_LIMIT && !guestQueue.some((g) => g.id === c.id) ? (
-                    <button onClick={() => { setGuestQueue((prev) => [...prev, { id: c.id, name: c.name, setName: c.setName, prices: c.prices }]); haptic("medium"); }} className="text-xs font-semibold text-accent px-2 py-1 rounded-lg bg-accent/10">
-                      + Queue
-                    </button>
-                    ) : guestQueue.some((g) => g.id === c.id) ? (
-                    <span className="text-[10px] text-muted">Queued</span>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          </>
-        )}
-      </div>
-
-      {scanning && !matches && <Scanner onClose={() => { setScanning(false); setBulkMode(false); }} onMatches={(m) => { haptic("heavy"); setShowAllGames(false); setMatches(m); }} bulkMode={bulkMode} bulkCount={bulkQueue.length} lang={lang} />}
-      {guestPrompt && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center">
-          <button className="absolute inset-0 bg-black/70" onClick={() => setGuestPrompt(null)} aria-label="Close" />
-          <div className="relative glass w-full max-w-lg rounded-t-3xl p-5 pb-[max(env(safe-area-inset-bottom),20px)] anim-widget d1" style={{ animationName: "slide-up-sheet" }}>
-            <div className="flex items-center gap-4">
-              <CardImage id={guestPrompt.id} className="w-14 rounded-md" alt="" directUrl={guestPrompt.imageUrl} />
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold truncate">{guestPrompt.name}</div>
-                <div className="text-xs text-muted truncate">{guestPrompt.setName}</div>
-              </div>
-            </div>
-            <p className="text-sm text-muted mt-4">Sign in to see full price history and save cards.</p>
-            <Link
-              href={`/login?callbackUrl=${encodeURIComponent(`/cards/${guestPrompt.id}`)}`}
-              className="btn-rainbow w-full mt-4 inline-flex items-center justify-center rounded-xl px-6 py-3 font-semibold shadow-lg hover:brightness-110 transition"
-            >
-              Sign in
-            </Link>
-            <Button variant="ghost" className="w-full mt-2" onClick={() => setGuestPrompt(null)}>
-              Not now
-            </Button>
-          </div>
-        </div>
-      )}
+      {scanning && !matches && <Scanner onClose={() => { setScanning(false); setBulkMode(false); }} onMatches={(m) => { haptic("heavy"); setShowAllGames(false); setMatches(m); }} bulkMode={bulkMode} bulkCount={bulkQueue.length} lang="all" />}
       {matches && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
           <button className="absolute inset-0 bg-black/70" onClick={() => setMatches(null)} aria-label="Close" />
@@ -580,7 +367,7 @@ export default function ScanPage() {
           </ul>
         </div>
       )}
-      {recentScans.length > 0 && !q.trim() && !scanning && bulkQueue.length === 0 && (
+      {recentScans.length > 0 && !scanning && bulkQueue.length === 0 && (
         <div className="mt-4">
           <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">Recently scanned</div>
           <ul className="card-surface rounded-2xl divide-y divide-line overflow-hidden stagger-children">
