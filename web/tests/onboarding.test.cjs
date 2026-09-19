@@ -166,3 +166,9 @@ test("dashboard and settings expose first-binder guidance", () => {
   assert.match(milestone, /Your binder is taking shape/);
   assert.match(readText("src/app/settings/page.tsx"), /restartIntroduction/);
 });
+
+test("client milestone does not import the server onboarding runtime", () => {
+  const source = readText("src/components/FirstBinderMilestone.tsx");
+  assert.doesNotMatch(source, /import \{[^}]*milestoneView[^}]*\} from "@\/lib\/onboarding"/);
+  assert.match(source, /import type \{ MilestoneState \} from "@\/lib\/onboarding"/);
+});

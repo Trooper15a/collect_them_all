@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { milestoneView, type MilestoneState } from "@/lib/onboarding";
+import type { MilestoneState } from "@/lib/onboarding";
+
+export function milestoneView(itemCount: number, state: MilestoneState): "progress" | "sets" | null {
+  if (state !== "active") return null;
+  if (itemCount >= 1 && itemCount <= 4) return "progress";
+  if (itemCount >= 5) return "sets";
+  return null;
+}
 
 export function FirstBinderMilestone({ itemCount }: { itemCount: number }) {
   const router = useRouter();
