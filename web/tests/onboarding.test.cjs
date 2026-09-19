@@ -158,3 +158,11 @@ test("wizard composes shared discovery and add flow", () => {
   assert.match(source, /Add your first card/);
   assert.match(source, /View my binder/);
 });
+
+test("dashboard and settings expose first-binder guidance", () => {
+  assert.match(readText("src/app/page.tsx"), /FirstBinderMilestone/);
+  const milestone = readText("src/components/FirstBinderMilestone.tsx");
+  assert.match(milestone, /Build your first binder/);
+  assert.match(milestone, /Your binder is taking shape/);
+  assert.match(readText("src/app/settings/page.tsx"), /restartIntroduction/);
+});
