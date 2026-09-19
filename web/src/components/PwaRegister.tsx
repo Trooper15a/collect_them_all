@@ -6,7 +6,7 @@ const DISMISS_KEY = "rnp-install-dismissed";
 const DISMISS_MS = 14 * 24 * 60 * 60 * 1000; // 14 days
 const VIEWS_KEY = "rnp-install-pageviews";
 const FIRST_LOAD_DELAY_MS = 45_000; // never nag on the first-ever page load
-const HIDDEN_PATHS = ["/landing", "/faq", "/auth/error"];
+const HIDDEN_PATHS = ["/landing", "/faq", "/auth/error", "/onboarding"];
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;

@@ -8,6 +8,7 @@ import { ThemeScript } from "@/components/ThemeScript";
 import { OfflineBanner } from "@/components/OfflineStatus";
 import { AuthProvider } from "@/components/AuthProvider";
 import { ToastContainer } from "@/components/Toast";
+import { OnboardingGate } from "@/components/OnboardingGate";
 import { SITE } from "@/lib/site";
 import "./globals.css";
 
@@ -77,14 +78,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-full flex flex-col">
         <AuthProvider>
-          <main className="flex-1 w-full max-w-3xl mx-auto px-4 pt-[max(env(safe-area-inset-top),12px)] safe-bottom">
-            <OfflineBanner />
-            {children}
-          </main>
-          <TabBar />
-          <TcgPicker />
-          <ToastContainer />
-          <PwaRegister />
+          <OnboardingGate>
+            <main className="flex-1 w-full max-w-3xl mx-auto px-4 pt-[max(env(safe-area-inset-top),12px)] safe-bottom">
+              <OfflineBanner />
+              {children}
+            </main>
+            <TabBar />
+            <TcgPicker />
+            <ToastContainer />
+            <PwaRegister />
+          </OnboardingGate>
         </AuthProvider>
         {process.env.NEXT_PUBLIC_CF_BEACON && (
           <Script

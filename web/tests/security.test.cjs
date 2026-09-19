@@ -162,13 +162,17 @@ test('preferences stay per-account while operational settings remain global', as
   const prefs = h.load('src/lib/user-settings.ts');
   const operational = h.load('src/lib/cache.ts');
   await prefs.setUserSetting('bulkPortfolio', 'Alice private binder');
+  await prefs.setUserSetting('onboardingState', 'dismissed');
   await operational.setSetting('tcgcsv:last', 'import status');
   h.setUser('bob');
   assert.equal(await prefs.getUserSetting('bulkPortfolio', 'Default'), 'Default');
+  assert.equal(await prefs.getUserSetting('onboardingState', 'pending'), 'pending');
   await prefs.setUserSetting('bulkPortfolio', 'Bob binder');
+  await prefs.setUserSetting('onboardingState', 'completed');
   assert.equal(await operational.getSetting('tcgcsv:last', ''), 'import status');
   h.setUser('alice');
   assert.equal(await prefs.getUserSetting('bulkPortfolio', ''), 'Alice private binder');
+  assert.equal(await prefs.getUserSetting('onboardingState', ''), 'dismissed');
   h.setUser(null);
   assert.equal(await prefs.getUserSetting('bulkPortfolio', 'Default'), 'Default');
   await assert.rejects(prefs.setUserSetting('currency', 'CAD'), /Unauthorized/);

@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { PriceChart } from "@/components/PriceChart";
 import { PullToRefresh } from "@/components/PullToRefresh";
-import { CardImage, Delta, Empty, Money, Segmented, Skeleton, TcgBadge } from "@/components/ui";
+import { FirstBinderMilestone } from "@/components/FirstBinderMilestone";
+import { CardImage, Delta, Empty, Money, Segmented, Skeleton } from "@/components/ui";
 import { RANGES, type Range } from "@/lib/format";
 import { useHidePrices } from "@/lib/ui-prefs";
 
@@ -154,6 +155,8 @@ export default function HomePage() {
         <GlowStat icon="cost" label="Cost Basis" value={<Money amount={s.cost} currency={c} />} sub={s.cost > 0 ? <><Delta amount={s.gain} currency={c} /> gain</> : "No cost data"} color="blue" />
         <GlowStat icon="roi" label="All Time" value={<Delta pct={s.gainPct} />} sub={s.change24h !== 0 ? <><Delta amount={s.change24h} currency={c} /> today</> : "No change today"} color="green" />
       </div>
+
+      <FirstBinderMilestone itemCount={s.itemCount} />
 
       {/* ── Widget: Ring Stats ── */}
       {data.stats && (data.stats.tcgCount > 0 || data.stats.avgCardValue > 0) && (

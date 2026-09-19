@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button, Field, Skeleton, inputCls } from "@/components/ui";
 import { OfflineStatus } from "@/components/OfflineStatus";
 import { showToast } from "@/components/Toast";
@@ -63,6 +64,8 @@ function Box({ title, children }: { title: string; children: React.ReactNode }) 
 }
 
 export default function SettingsPage() {
+  const router = useRouter();
+  const [introductionBusy, setIntroductionBusy] = useState(false);
   const [s, setS] = useState<Settings | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshMsg, setRefreshMsg] = useState<string | null>(null);
@@ -127,6 +130,22 @@ export default function SettingsPage() {
     }
   }
 
+  async function restartIntroduction() {
+    if (introductionBusy) return;
+    setIntroductionBusy(true);
+    try {
+      const response = await fetch("/api/onboarding", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ state: "pending", milestoneState: "active" }),
+      });
+      if (!response.ok) throw new Error("Failed");
+      router.push("/onboarding");
+    } catch {
+      setIntroductionBusy(false);
+      showToast("Couldn't start the introduction — try again", "down");
+    }
+  }
   async function refreshNow() {
     setBusy(true);
     setRefreshMsg(null);
@@ -253,6 +272,15 @@ export default function SettingsPage() {
         </section>
 
         <Box title="Account">
+          <div className="mb-4 flex items-center justify-between gap-4 rounded-2xl border border-line bg-elev p-3">
+            <div>
+              <div className="text-sm font-semibold">Introduction</div>
+              <div className="text-xs text-muted">Choose a game and walk through adding a card again.</div>
+            </div>
+            <Button variant="ghost" onClick={() => void restartIntroduction()} disabled={introductionBusy} className="shrink-0">
+              {introductionBusy ? "Opening…" : "Restart"}
+            </Button>
+          </div>
           <UserMenu />
         </Box>
       </div>
