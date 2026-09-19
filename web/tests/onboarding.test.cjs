@@ -17,7 +17,7 @@ function load(relative, overrides = {}) {
     if (id === "drizzle-orm") return { eq: (left, right) => ({ left, right }), sql: () => "count" };
     return require(id);
   };
-  vm.runInNewContext(`(function(require,module,exports){${code}\n})`, { console }, { filename })(localRequire, module, module.exports);
+  vm.runInNewContext(`(function(require,module,exports){${code}\n})`, { console, Request, Response }, { filename })(localRequire, module, module.exports);
   return module.exports;
 }
 
@@ -58,4 +58,60 @@ test("milestone presentation follows count and dismissal state", () => {
   assert.equal(milestoneView(5, "active"), "sets");
   assert.equal(milestoneView(3, "dismissed"), null);
   assert.equal(milestoneView(7, "opened"), null);
+});
+
+function onboardingRoute(userId = "alice") {
+  const status = {
+    state: "pending",
+    milestoneState: "active",
+    itemCount: 0,
+    eligible: true,
+  };
+  const service = {
+    getOnboardingStatus: async (requestedUserId) => {
+      assert.equal(requestedUserId, userId);
+      return { ...status };
+    },
+    setOnboardingState: async (state) => {
+      status.state = state;
+      status.eligible = state === "pending" && status.itemCount === 0;
+    },
+    setMilestoneState: async (milestoneState) => {
+      status.milestoneState = milestoneState;
+    },
+  };
+  const route = load("src/app/api/onboarding/route.ts", {
+    "next/server": { NextResponse: Response },
+    "@/lib/auth": {
+      requireUserId: async () => {
+        if (!userId) throw new Error("Unauthorized");
+        return userId;
+      },
+    },
+    "@/lib/onboarding": service,
+  });
+  const request = (body) => new Request("https://example.test/api/onboarding", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return { ...route, request };
+}
+
+test("onboarding API rejects anonymous reads and writes", async () => {
+  const anonymous = onboardingRoute(null);
+  assert.equal((await anonymous.GET()).status, 401);
+  assert.equal((await anonymous.PATCH(anonymous.request({ state: "dismissed" }))).status, 401);
+});
+
+test("onboarding API returns current account status and accepts bounded patches", async () => {
+  const alice = onboardingRoute();
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(await (await alice.GET()).json())),
+    { state: "pending", milestoneState: "active", itemCount: 0, eligible: true },
+  );
+  assert.equal((await alice.PATCH(alice.request({ state: "dismissed" }))).status, 200);
+  assert.equal((await alice.PATCH(alice.request({ state: "invalid" }))).status, 400);
+  assert.equal((await alice.PATCH(alice.request({ milestoneState: "opened" }))).status, 200);
+  assert.equal((await alice.PATCH(alice.request({}))).status, 400);
 });
