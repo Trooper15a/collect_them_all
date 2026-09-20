@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
 import { requireUserId } from "@/lib/auth";
@@ -58,22 +58,39 @@ async function collectionStats(items: ValuedItem[], currency: string, fx: Rates)
   const uniqueCards = new Set(items.map((i) => i.card.id)).size;
   const portfolioCount = new Set(items.map((i) => i.portfolioId)).size;
 
-  const setOwnership = new Map<string, { owned: Set<string>; total: number; name: string }>();
+  const setOwnership = new Map<string, { owned: Set<string>; total: number; name: string; tcg: string; code: string; language: string }>();
   for (const i of items) {
     const code = i.card.setCode;
     if (!code) continue;
     const key = `${i.card.tcg}:${code}:${i.card.language}`;
     let entry = setOwnership.get(key);
     if (!entry) {
-      entry = { owned: new Set(), total: 0, name: i.card.setName ?? code };
+      entry = { owned: new Set(), total: 0, name: i.card.setName ?? code, tcg: i.card.tcg, code, language: i.card.language };
       setOwnership.set(key, entry);
     }
     entry.owned.add(i.card.id);
   }
-  for (const [key, entry] of setOwnership) {
-    const [tcg, code, lang] = key.split(":");
-    const rows = await db.select({ cnt: sql<number>`count(*)` }).from(schema.cards).where(sql`tcg = ${tcg} AND set_code = ${code} AND language = ${lang} AND card_number IS NOT NULL`);
-    entry.total = rows[0]?.cnt ?? 0;
+  if (setOwnership.size > 0) {
+    const filters = [...setOwnership.values()].map((entry) => and(
+      eq(schema.cards.tcg, entry.tcg),
+      eq(schema.cards.setCode, entry.code),
+      eq(schema.cards.language, entry.language),
+    ));
+    const totals = await db
+      .select({
+        tcg: schema.cards.tcg,
+        code: schema.cards.setCode,
+        language: schema.cards.language,
+        cnt: sql<number>`count(*)`,
+      })
+      .from(schema.cards)
+      .where(and(or(...filters), sql`card_number IS NOT NULL`))
+      .groupBy(schema.cards.tcg, schema.cards.setCode, schema.cards.language);
+    for (const row of totals) {
+      if (!row.code) continue;
+      const entry = setOwnership.get(`${row.tcg}:${row.code}:${row.language}`);
+      if (entry) entry.total = Number(row.cnt);
+    }
   }
 
   let closestSet: { name: string; owned: number; total: number; pct: number; missing: number } | null = null;

@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { getCard, recordPriceSnapshot, refreshCardPrices, rowToCard } from "./cards";
 import { convert, getRates, type Rates } from "./currency";
@@ -43,14 +43,23 @@ export function unitValue(card: NormalizedCard, variant: string, condition: stri
   return { amount: bp.amount * mult, currency: bp.currency, variant: bp.variant, raw: bp.amount };
 }
 
-async function yesterdayPrice(cardId: string, variant: string): Promise<{ tcgplayerMarket: number | null; cardmarketAvg: number | null } | null> {
+type PreviousPrice = { tcgplayerMarket: number | null; cardmarketAvg: number | null };
+
+async function previousPrices(cardVariants: { cardId: string; variant: string }[]): Promise<Map<string, PreviousPrice>> {
+  if (cardVariants.length === 0) return new Map();
+  const cardIds = [...new Set(cardVariants.map((item) => item.cardId))];
+  const variants = [...new Set(cardVariants.map((item) => item.variant))];
   const rows = await db
-    .select()
+    .selectDistinctOn([schema.priceHistory.cardId, schema.priceHistory.variantType], {
+      cardId: schema.priceHistory.cardId,
+      variantType: schema.priceHistory.variantType,
+      tcgplayerMarket: schema.priceHistory.tcgplayerMarket,
+      cardmarketAvg: schema.priceHistory.cardmarketAvg,
+    })
     .from(schema.priceHistory)
-    .where(and(eq(schema.priceHistory.cardId, cardId), eq(schema.priceHistory.variantType, variant), sql`date < ${today()}`))
-    .orderBy(sql`date desc`)
-    .limit(1);
-  return rows[0] ?? null;
+    .where(and(inArray(schema.priceHistory.cardId, cardIds), inArray(schema.priceHistory.variantType, variants), lt(schema.priceHistory.date, today())))
+    .orderBy(schema.priceHistory.cardId, schema.priceHistory.variantType, desc(schema.priceHistory.date));
+  return new Map(rows.map((row) => [`${row.cardId}\0${row.variantType}`, row]));
 }
 
 export async function valuedItems(portfolioId: number | null, displayCurrency: string, rates?: Rates, userId?: string | null): Promise<ValuedItem[]> {
@@ -65,10 +74,15 @@ export async function valuedItems(portfolioId: number | null, displayCurrency: s
     .innerJoin(schema.portfolios, eq(schema.portfolioItems.portfolioId, schema.portfolios.id))
     .where(conditions.length ? and(...conditions) : sql`1=1`);
 
-  const result: ValuedItem[] = [];
-  for (const { item, card: cardRow, portfolioName } of rows) {
+  const prepared = rows.map(({ item, card: cardRow, portfolioName }) => {
     const card = rowToCard(cardRow);
     const uv = unitValue(card, item.variantType, item.condition, item.isGraded, item.gradingCompany, item.grade);
+    return { item, card, portfolioName, uv };
+  });
+  const previous = await previousPrices(prepared.flatMap(({ card, uv }) => uv ? [{ cardId: card.id, variant: uv.variant }] : []));
+
+  const result: ValuedItem[] = [];
+  for (const { item, card, portfolioName, uv } of prepared) {
     const unitDisplay = uv ? convert(uv.amount, uv.currency, displayCurrency, fx) : 0;
     const value = unitDisplay * item.quantity;
     const cost = item.costBasis != null ? convert(item.costBasis, item.costCurrency, displayCurrency, fx) * item.quantity : null;
@@ -78,7 +92,7 @@ export async function valuedItems(portfolioId: number | null, displayCurrency: s
     let change24h: number | null = null;
     let change24hPct: number | null = null;
     if (uv) {
-      const prev = await yesterdayPrice(card.id, uv.variant);
+      const prev = previous.get(`${card.id}\0${uv.variant}`) ?? null;
       const prevAmount = prev ? (uv.currency === "USD" ? prev.tcgplayerMarket : prev.cardmarketAvg) : null;
       if (prevAmount != null && prevAmount > 0) {
         const delta = uv.raw - prevAmount;
