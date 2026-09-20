@@ -4,6 +4,7 @@ import path from "node:path";
 import type { IndexCard } from "@/lib/scanner/matcher";
 import { db, schema } from "@/db";
 import { eq } from "drizzle-orm";
+import { insertTopMatch, selectPreferredMatches } from "@/lib/scanner/top-matches";
 
 const MODEL_DIR = path.join(process.cwd(), "public", "model");
 const INDEX_PATH = path.join(MODEL_DIR, "index.json");
@@ -119,19 +120,29 @@ export async function POST(req: NextRequest) {
 
     const query = new Float32Array(embedding);
     const dim = query.length;
-    const scores: { i: number; s: number; source: "static" | "db" }[] = [];
+    const limit = Math.max(1, Math.min(Number(k) || 5, 20));
+    const best: { card: IndexCard; score: number }[] = [];
+    const preferred: { card: IndexCard; score: number }[] = [];
+
+    const offer = (card: IndexCard, score: number) => {
+      insertTopMatch(best, { card, score }, limit);
+      if (lang && card.lang === lang) insertTopMatch(preferred, { card, score }, limit);
+    };
 
     // Search static index
     const staticIdx = getStaticIndex();
     if (staticIdx) {
       const { vectors, cards } = staticIdx;
+      if (staticIdx.dim !== dim) {
+        return NextResponse.json({ error: "Embedding dimensions do not match the scanner index" }, { status: 400 });
+      }
       const n = vectors.length / staticIdx.dim;
       for (let i = 0; i < n; i++) {
         if (tcg && cards[i].tcg !== tcg) continue;
         let s = 0;
         const off = i * staticIdx.dim;
         for (let d = 0; d < staticIdx.dim; d++) s += query[d] * vectors[off + d];
-        scores.push({ i, s, source: "static" });
+        offer(cards[i], s);
       }
     }
 
@@ -148,38 +159,17 @@ export async function POST(req: NextRequest) {
         let s = 0;
         const off = i * dim;
         for (let d = 0; d < dim; d++) s += query[d] * dbData.vectors[off + d];
-        scores.push({ i, s, source: "db" });
+        offer(dbCards[i], s);
       }
 
     } catch (e) {
       console.error("[scan/match] DB embeddings lookup failed:", e);
     }
 
-    if (scores.length === 0) {
+    if (best.length === 0) {
       return NextResponse.json({ error: "No index available" }, { status: 503 });
     }
-
-    scores.sort((a, b) => b.s - a.s);
-
-    const allCards = (source: "static" | "db", i: number) =>
-      source === "static" ? staticIdx!.cards[i] : dbCards[i];
-
-    let best: typeof scores;
-    if (lang && scores.length > 0) {
-      const sameLang = scores.filter((e) => allCards(e.source, e.i).lang === lang);
-      if (sameLang.length > 0 && sameLang[0].s >= scores[0].s - 0.05) {
-        best = sameLang.slice(0, k);
-      } else {
-        best = scores.slice(0, k);
-      }
-    } else {
-      best = scores.slice(0, k);
-    }
-
-    const matches = best.map((b) => ({
-      card: allCards(b.source, b.i),
-      score: b.s,
-    }));
+    const matches = lang ? selectPreferredMatches(best, preferred) : best;
     return NextResponse.json({ matches });
   } catch (err) {
     return NextResponse.json(

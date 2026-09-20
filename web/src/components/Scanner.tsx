@@ -188,8 +188,14 @@ export function Scanner({ onMatches, onClose, bulkMode, standMode, bulkCount, la
       } else {
         showToast("No match found — reposition the card", "info");
       }
-    } catch {
-      showToast("Scan failed — check your connection", "down");
+    } catch (error) {
+      const timedOut = error instanceof DOMException && error.name === "TimeoutError";
+      const message = !navigator.onLine
+        ? "You're offline — reconnect and try again"
+        : timedOut
+          ? "Card matching is taking longer than expected — try again"
+          : "Scan failed — try again";
+      showToast(message, "down");
     } finally {
       setBusy(false);
     }
