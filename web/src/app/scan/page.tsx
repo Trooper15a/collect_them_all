@@ -173,7 +173,7 @@ export default function ScanPage() {
           </Button>
         </div>
       )}
-Cannot overwrite variable Error because it is read-only or constant.       {resolveError && (
+      {resolveError && (
         <div className="mt-3 flex items-center justify-between gap-2 text-xs text-down" role="alert">
           <span>{resolveError}</span>
           <button type="button" onClick={() => setResolveError(null)} aria-label="Dismiss error">✕</button>
