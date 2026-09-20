@@ -28,6 +28,7 @@ export function Scanner({ onMatches, onClose, bulkMode, standMode, bulkCount, la
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lockedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scanInFlight = useRef(false);
+  const captureRequestRef = useRef(0);
   const lastAcceptedFp = useRef<Uint8Array | null>(null);
   const fpCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [standState, setStandState] = useState<"scanning" | "waiting">("scanning");
@@ -171,6 +172,11 @@ export function Scanner({ onMatches, onClose, bulkMode, standMode, bulkCount, la
   }, [auto, engine, scanOnce, bulkMode, standMode, isBatchMode, onMatches]);
 
   async function capture() {
+    if (live.length > 0) {
+      acceptLive();
+      return;
+    }
+    const requestId = ++captureRequestRef.current;
     setBusy(true);
     try {
       const v = videoRef.current;
@@ -181,6 +187,7 @@ export function Scanner({ onMatches, onClose, bulkMode, standMode, bulkCount, la
       }
       const input = await captureStill(v, stream);
       const m = await engine.match(input, 5, activeTcg === "all" ? undefined : activeTcg, lang === "all" ? undefined : lang);
+      if (requestId !== captureRequestRef.current) return;
       if (m && m.length > 0) {
         onMatches(m);
       } else if (blurry) {
@@ -189,6 +196,7 @@ export function Scanner({ onMatches, onClose, bulkMode, standMode, bulkCount, la
         showToast("No match found — reposition the card", "info");
       }
     } catch (error) {
+      if (requestId !== captureRequestRef.current) return;
       const timedOut = error instanceof DOMException && error.name === "TimeoutError";
       const message = !navigator.onLine
         ? "You're offline — reconnect and try again"
@@ -197,13 +205,16 @@ export function Scanner({ onMatches, onClose, bulkMode, standMode, bulkCount, la
           : "Scan failed — try again";
       showToast(message, "down");
     } finally {
-      setBusy(false);
+      if (requestId === captureRequestRef.current) setBusy(false);
     }
   }
 
   // Accepting the live match takes the same path as "Identify card".
   function acceptLive() {
-    if (busy || live.length === 0) return;
+    if (live.length === 0) return;
+    // Invalidate a slower manual request so it cannot deliver a second result.
+    captureRequestRef.current++;
+    setBusy(false);
     onMatches(live);
   }
 
@@ -277,8 +288,8 @@ export function Scanner({ onMatches, onClose, bulkMode, standMode, bulkCount, la
           <label className="flex items-center gap-2 text-xs text-muted">
             <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} className="accent-accent" /> Live
           </label>
-          <Button className="flex-1" onClick={capture} disabled={busy || !engine || engine.status !== "ready" || !!camError}>
-            {busy ? "Identifying…" : "Identify card"}
+          <Button className="flex-1" onClick={capture} disabled={(busy && live.length === 0) || !engine || engine.status !== "ready" || !!camError}>
+            {live.length > 0 ? "Accept match" : busy ? "Identifying…" : "Identify card"}
           </Button>
           {isBatchMode && (
             <Button variant="ghost" onClick={onClose}>Done</Button>
