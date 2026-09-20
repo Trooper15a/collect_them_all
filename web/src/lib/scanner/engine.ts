@@ -1,7 +1,7 @@
 "use client";
 
 import type { InferenceSession } from "onnxruntime-web";
-import type { EmbeddingIndex, Match } from "./matcher";
+import type { Match } from "./matcher";
 import { IMAGE_SIZE } from "./preprocess";
 
 export type EngineStatus = "idle" | "loading" | "ready" | "missing" | "error";
@@ -9,14 +9,12 @@ export type EngineStatus = "idle" | "loading" | "ready" | "missing" | "error";
 export interface ScanEngine {
   status: EngineStatus;
   error?: string;
-  index?: EmbeddingIndex;
   embed(input: Float32Array): Promise<Float32Array>;
   match(input: Float32Array, k?: number, tcg?: string, lang?: string): Promise<Match[]>;
   backend?: string;
 }
 
 const MODEL_URL = "/model/card_embedder.onnx";
-const INDEX_URL = "/model/index.json";
 
 let enginePromise: Promise<ScanEngine> | null = null;
 
@@ -43,7 +41,6 @@ async function load(): Promise<ScanEngine> {
     } catch {
       session = await ort.InferenceSession.create(MODEL_URL, { executionProviders: ["wasm"], graphOptimizationLevel: "all" });
     }
-    const index = await fetch(INDEX_URL).then((r) => r.json() as Promise<EmbeddingIndex>);
     const inputName = session.inputNames[0];
     const embed = async (input: Float32Array) => {
       const tensor = new ort.Tensor("float32", input, [1, 3, IMAGE_SIZE, IMAGE_SIZE]);
@@ -60,9 +57,12 @@ async function load(): Promise<ScanEngine> {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body,
-            signal: AbortSignal.timeout(3000),
+            signal: AbortSignal.timeout(30000),
           });
-          if (!res.ok) throw new Error("Match API failed");
+          if (!res.ok) {
+            const detail = await res.json().catch(() => null) as { error?: string } | null;
+            throw new Error(detail?.error || `Card matching failed (${res.status})`);
+          }
           const data = await res.json();
           return data.matches as Match[];
         } catch (err) {
@@ -71,7 +71,7 @@ async function load(): Promise<ScanEngine> {
       }
       throw lastErr;
     };
-    return { status: "ready", index, backend, embed, match };
+    return { status: "ready", backend, embed, match };
   } catch (err) {
     return { status: "error", error: err instanceof Error ? err.message : String(err), embed: fail, match: fail };
   }
