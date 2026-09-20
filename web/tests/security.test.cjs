@@ -16,7 +16,7 @@ function harness(userId = 'alice') {
     boxOpenItems: [{ id: 11, boxOpenId: 1, cardId: 'tp:1', quantity: 1 }, { id: 22, boxOpenId: 2, cardId: 'tp:1', quantity: 7 }],
     cards: [{ id: 'tp:1', name: 'Card', pricesJson: '{}' }],
     alerts: [{ id: 1, userId: 'alice', cardId: 'tp:1', thresholdPct: 10 }, { id: 2, userId: 'bob', cardId: 'tp:1', thresholdPct: 20 }],
-    settings: [], sets: [], cardLinks: [], portfolioSnapshots: [], deckCards: [], decks: [],
+    settings: [], sets: [], cardLinks: [], portfolioSnapshots: [], priceHistory: [], deckCards: [], decks: [],
   };
   const schema = new Proxy({}, { get(_, table) {
     return new Proxy({ table }, { get(obj, key) { return key === 'table' ? obj.table : key === 'column' ? undefined : { table, column: key }; } });
@@ -28,6 +28,7 @@ function harness(userId = 'alice') {
     or: (...p) => row => p.filter(f => typeof f === 'function').some(f => f(row)),
     gte: (a, b) => row => val(a, row) >= val(b, row),
     lt: (a, b) => row => val(a, row) < val(b, row),
+    desc: a => a,
     isNull: a => row => val(a, row) == null,
     inArray: (a, b) => row => (Array.isArray(b) ? b : b.run().map(x => Object.values(x)[0])).includes(val(a, row)),
     sql: Object.assign((strings, ...args) => ({ strings, args }), { raw: text => ({ text }) }),
@@ -59,16 +60,19 @@ function harness(userId = 'alice') {
         if (this.max != null) rows = rows.slice(0, this.max);
         if (this.mode === 'update') rows.forEach(r => Object.assign(r[this.table], this.patch));
         if (this.mode === 'delete') data[this.table] = data[this.table].filter(r => !rows.some(x => x[this.table] === r));
-        const groups = this.groups ? [...Map.groupBy(rows, r => JSON.stringify(this.groups.map(c => val(c, r)))).values()] : rows.map(r => [r]);
+        const hasAggregate = Object.values(this.selection || {}).some(v => Array.isArray(v?.strings) && /^(sum|count)\(/.test(v.strings.join('')));
+        const groups = this.groups ? [...Map.groupBy(rows, r => JSON.stringify(this.groups.map(c => val(c, r)))).values()] : hasAggregate ? [rows] : rows.map(r => [r]);
         return groups.map(group => {
           const r = group[0];
           return !this.selection ? r[this.table] : Object.fromEntries(Object.entries(this.selection).map(([k, v]) => [k,
-            Array.isArray(v?.strings) && v.strings.join('').startsWith('sum(') ? group.reduce((s, row) => s + val(v.args[0], row), 0) : v?.column ? val(v, r) : v?.table ? r[v.table] : v]));
+            Array.isArray(v?.strings) && v.strings.join('').startsWith('sum(') ? group.reduce((s, row) => s + val(v.args[0], row), 0) :
+            Array.isArray(v?.strings) && v.strings.join('').startsWith('count(') ? group.length :
+            v?.column ? val(v, r) : v?.table ? r[v.table] : v]));
         });
       }, then(resolve, reject) { return Promise.resolve().then(() => this.run()).then(resolve, reject); },
     }; return q;
   }
-  const db = { select: s => query('select', null, s), update: t => query('update', t), delete: t => query('delete', t), insert: t => query('insert', t), execute: () => { throw new Error('Unexpected SQL execution'); } };
+  const db = { select: s => query('select', null, s), selectDistinctOn: (_cols, s) => query('select', null, s), update: t => query('update', t), delete: t => query('delete', t), insert: t => query('insert', t), execute: () => { throw new Error('Unexpected SQL execution'); } };
   const auth = { auth: async () => userId ? { user: { id: userId } } : null, requireUserId: async () => { if (!userId) throw new Error('Unauthorized'); return userId; } };
   const stubs = {
     '@/db': { db, schema }, 'drizzle-orm': orm,
@@ -307,6 +311,71 @@ test('history sums owned portfolio snapshots and excludes global and foreign sna
   const own = await portfolio.valueSeries(1, 'ALL', 'USD', {}, 'alice');
   assert.equal(own[0].value, 10);
   assert.equal((await portfolio.valueSeries(2, 'ALL', 'USD', {}, 'alice')).length, 0);
+});
+
+test('portfolio valuation batches previous prices into one database query', async () => {
+  const h = harness();
+  Object.assign(h.data.portfolioItems[0], { variantType: 'normal', condition: 'NM', isGraded: false, costBasis: null, costCurrency: 'USD' });
+  h.data.cards[0] = { id: 'tp:1', name: 'One', pricesJson: '{}' };
+  h.data.cards.push({ id: 'tp:2', name: 'Two', pricesJson: '{}' });
+  h.data.portfolioItems.push({ id: 12, portfolioId: 1, cardId: 'tp:2', quantity: 1, variantType: 'normal', condition: 'NM', isGraded: false, costBasis: null, costCurrency: 'USD' });
+  h.data.priceHistory.push(
+    { id: 1, cardId: 'tp:1', variantType: 'normal', date: '2026-01-01', tcgplayerMarket: 8, cardmarketAvg: null },
+    { id: 2, cardId: 'tp:2', variantType: 'normal', date: '2026-01-01', tcgplayerMarket: 9, cardmarketAvg: null },
+  );
+  const portfolio = h.load('src/lib/portfolio.ts', {
+    '@/lib/types': { bestPrice: () => ({ amount: 10, currency: 'USD', variant: 'normal' }) },
+  });
+
+  const items = await portfolio.valuedItems(null, 'USD', {}, 'alice');
+
+  assert.equal(items.length, 2);
+  assert.deepEqual(Array.from(items, item => item.change24h), [2, 1]);
+  assert.equal(h.queries.filter(q => q.table === 'priceHistory').length, 1);
+});
+
+test('dashboard batches set totals instead of querying each started set', async () => {
+  const h = harness();
+  h.data.cards = ['alpha', 'beta'].flatMap(setCode => Array.from({ length: 6 }, (_, index) => ({
+    id: `tp:${setCode}:${index}`,
+    name: `${setCode} ${index}`,
+    tcg: 'pokemon',
+    setCode,
+    setName: setCode,
+    language: 'eng',
+    cardNumber: String(index + 1),
+    pricesJson: '{}',
+  })));
+  const item = (id, setCode) => ({
+    id,
+    portfolioId: 1,
+    portfolioName: 'Alice',
+    card: h.data.cards.find(card => card.setCode === setCode),
+    quantity: 1,
+    variantType: 'normal',
+    value: 1,
+    gain: null,
+    gainPct: null,
+    change24h: null,
+    change24hPct: null,
+  });
+  const items = [item(1, 'alpha'), item(2, 'beta')];
+  const route = h.load('src/app/api/dashboard/route.ts', {
+    '@/lib/portfolio': {
+      valuedItems: async () => items,
+      valueSeries: async () => [],
+      summarize: () => ({ value: 2, cost: 0, gain: 0, gainPct: null, itemCount: 2, uniqueCount: 2, change24h: 0, change24hPct: null }),
+    },
+    '@/lib/user-settings': { getUserSetting: async () => 'USD' },
+    '@/lib/types': { bestPrice: () => ({ amount: 1, currency: 'USD', variant: 'normal' }) },
+  });
+
+  const response = await route.GET(h.request('/api/dashboard'));
+  assert.equal(response.status, 200);
+  const dashboard = await response.json();
+  assert.equal(dashboard.stats.setsStarted, 2);
+  assert.equal(dashboard.stats.overallPct, 17);
+  assert.equal(h.queries.filter(q => q.table === 'cards').length, 2);
 });
 
 test('anonymous set catalog never queries private holdings; signed-in queries enforce portfolio owner', async () => {
