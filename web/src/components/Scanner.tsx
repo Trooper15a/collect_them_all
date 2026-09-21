@@ -176,6 +176,9 @@ export function Scanner({ onMatches, onClose, bulkMode, standMode, bulkCount, la
       acceptLive();
       return;
     }
+    // Live mode already owns the scan loop. Starting a second match here can
+    // queue behind a cold server request and leave the control looking stuck.
+    if (auto) return;
     const requestId = ++captureRequestRef.current;
     setBusy(true);
     try {
@@ -288,8 +291,8 @@ export function Scanner({ onMatches, onClose, bulkMode, standMode, bulkCount, la
           <label className="flex items-center gap-2 text-xs text-muted">
             <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} className="accent-accent" /> Live
           </label>
-          <Button className="flex-1" onClick={capture} disabled={(busy && live.length === 0) || !engine || engine.status !== "ready" || !!camError}>
-            {live.length > 0 ? "Accept match" : busy ? "Identifying…" : "Identify card"}
+          <Button className="flex-1" onClick={capture} disabled={(busy && live.length === 0) || (auto && live.length === 0) || !engine || engine.status !== "ready" || !!camError}>
+            {live.length > 0 ? "Accept match" : busy ? "Identifying…" : auto ? "Scanning…" : "Identify card"}
           </Button>
           {isBatchMode && (
             <Button variant="ghost" onClick={onClose}>Done</Button>
