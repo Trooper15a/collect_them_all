@@ -17,3 +17,10 @@ test("the identify button reuses a visible live result instead of starting anoth
   assert.match(captureBody, /if \(live\.length > 0\)/);
   assert.ok(captureBody.indexOf("if (live.length > 0)") < captureBody.indexOf("setBusy(true)"));
 });
+
+test("live mode waits for its background result instead of starting a duplicate manual scan", () => {
+  const captureBody = scanner.slice(scanner.indexOf("async function capture()"), scanner.indexOf("function acceptLive()"));
+  assert.match(captureBody, /if \(auto\) return/);
+  assert.ok(captureBody.indexOf("if (auto) return") < captureBody.indexOf("setBusy(true)"));
+  assert.match(scanner, /auto \? "Scanning…"/);
+});
