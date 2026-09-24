@@ -146,32 +146,30 @@ export function cardGuide(viewW: number, viewH: number, fill = 0.78) {
   return { x: (viewW - w) / 2, y: (viewH - h) / 2, w, h };
 }
 
+/** Map the visible guide through the preview's centered object-fit: cover crop. */
+export function videoGuide(video: HTMLVideoElement) {
+  const viewW = video.clientWidth || video.videoWidth;
+  const viewH = video.clientHeight || video.videoHeight;
+  const guide = cardGuide(viewW, viewH);
+  const scale = Math.max(viewW / video.videoWidth, viewH / video.videoHeight);
+  return {
+    x: (guide.x + (video.videoWidth * scale - viewW) / 2) / scale,
+    y: (guide.y + (video.videoHeight * scale - viewH) / 2) / scale,
+    w: guide.w / scale,
+    h: guide.h / scale,
+  };
+}
+
 /**
- * Capture a high-resolution still frame from the camera track using ImageCapture API.
- * Falls back to drawing the video element if ImageCapture is unavailable.
+ * Capture the current video frame, just like live detection. ImageCapture.grabFrame
+ * can remain pending indefinitely on some cameras and offers no extra resolution.
  * Returns a preprocessed Float32Array ready for the ONNX model.
  */
 export async function captureStill(
   video: HTMLVideoElement,
-  stream: MediaStream,
 ): Promise<Float32Array> {
-  const track = stream.getVideoTracks()[0];
-  let source: HTMLVideoElement | ImageBitmap = video;
-
-  if (typeof globalThis.ImageCapture !== "undefined") {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const ic = new (globalThis as any).ImageCapture(track);
-      source = await ic.grabFrame();
-    } catch {
-      // fallback to video element
-    }
+  if (!video.videoWidth || !video.videoHeight) {
+    throw new Error("Camera not ready");
   }
-
-  const sw = source instanceof ImageBitmap ? source.width : source.videoWidth;
-  const sh = source instanceof ImageBitmap ? source.height : source.videoHeight;
-  const guide = cardGuide(sw, sh);
-  const result = preprocess(source, guide);
-  if (source instanceof ImageBitmap) source.close();
-  return result;
+  return preprocess(video, videoGuide(video));
 }
