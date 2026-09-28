@@ -6,11 +6,11 @@ import {
   estimatePregrade, inspectPhoto, normalizeCrop, suggestCardCrop,
   type CropRect, type PhotoCheck, type PixelImage,
 } from "@/lib/grading/analysis";
+import { parsePiPhotoMessage, PI_CAMERA_ORIGIN } from "@/lib/grading/handoff";
 
 type Side = "front" | "back";
 type Photo = { file: File; url: string; pixels: PixelImage; crop: CropRect; check: PhotoCheck };
 type Photos = Partial<Record<Side, Photo>>;
-const PI_ORIGIN = "http://10.12.194.1:8000";
 
 function centeringScore(check: PhotoCheck): number | null {
   if (check.centering.confidence !== "measured") return null;
@@ -99,14 +99,8 @@ export default function GradePage() {
 
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
-      if (event.origin !== PI_ORIGIN || event.source !== popup.current) return;
-      const data = event.data as { type?: string; session?: string; side?: string; bytes?: unknown } | null;
-      if (data?.type !== "rnp-photo" || data.session !== session.current ||
-          (data.side !== "front" && data.side !== "back") || !(data.bytes instanceof ArrayBuffer) ||
-          data.bytes.byteLength < 4 || data.bytes.byteLength > 30_000_000) return;
-      const bytes = new Uint8Array(data.bytes);
-      if (bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes.at(-2) !== 0xff || bytes.at(-1) !== 0xd9) return;
-      void acceptPhoto(data.side, new File([data.bytes], `${data.side}.jpg`, { type: "image/jpeg" }), true);
+      const photo = parsePiPhotoMessage(event, popup.current, session.current);
+      if (photo) void acceptPhoto(photo.side, new File([photo.bytes], `${photo.side}.jpg`, { type: "image/jpeg" }), true);
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
@@ -114,7 +108,7 @@ export default function GradePage() {
 
   function openPi() {
     session.current = crypto.randomUUID();
-    const url = new URL(PI_ORIGIN);
+    const url = new URL(PI_CAMERA_ORIGIN);
     url.searchParams.set("gradeOrigin", window.location.origin);
     url.searchParams.set("session", session.current);
     popup.current = window.open(url.toString(), "rnp-pi-camera");
@@ -167,7 +161,7 @@ export default function GradePage() {
       <p className="text-sm text-muted">Connect your Pi Zero 2 W through its USB data port. Chrome opens the Pi camera page to take front and back photos.</p>
       <div className="flex flex-wrap gap-2 items-center">
         <Button onClick={openPi}>Open Pi camera</Button>
-        <a href={PI_ORIGIN} target="_blank" rel="noreferrer" className="text-sm text-accent underline">Open camera page directly</a>
+        <a href={PI_CAMERA_ORIGIN} target="_blank" rel="noreferrer" className="text-sm text-accent underline">Open camera page directly</a>
       </div>
       {error && <p className="text-sm text-down" role="alert">{error}</p>}
     </section>
