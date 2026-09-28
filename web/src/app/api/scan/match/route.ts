@@ -17,9 +17,27 @@ interface ServerIndex {
   vectors: Float32Array;
 }
 
+interface DbIndex {
+  cards: IndexCard[];
+  vectors: Float32Array;
+  loadedAt: number;
+}
+
+const halfToFloat = new Float32Array(65536);
+for (let h = 0; h < halfToFloat.length; h++) {
+  const sign = h & 0x8000 ? -1 : 1;
+  const exponent = (h & 0x7c00) >> 10;
+  const fraction = h & 0x03ff;
+  halfToFloat[h] = sign * (exponent === 0
+    ? (fraction / 1024) * 2 ** -14
+    : exponent === 0x1f ? (fraction ? NaN : Infinity)
+    : (1 + fraction / 1024) * 2 ** (exponent - 15));
+}
+
 const globalForScan = globalThis as unknown as {
   __scanIndex?: ServerIndex;
-  __dbEmbeddings?: { cards: IndexCard[]; vectors: Float32Array; loadedAt: number } | null;
+  __dbEmbeddingsByKey?: Map<string, DbIndex>;
+  __dbEmbeddingsPendingByKey?: Map<string, Promise<DbIndex>>;
 };
 
 function getStaticIndex(): ServerIndex | null {
@@ -33,17 +51,7 @@ function getStaticIndex(): ServerIndex | null {
     const embBuf = fs.readFileSync(EMB_PATH);
     const u16 = new Uint16Array(embBuf.buffer, embBuf.byteOffset, embBuf.byteLength / 2);
     const vectors = new Float32Array(u16.length);
-    for (let i = 0; i < u16.length; i++) {
-      const h = u16[i];
-      const s = (h & 0x8000) >> 15;
-      const e = (h & 0x7c00) >> 10;
-      const f = h & 0x03ff;
-      let v: number;
-      if (e === 0) v = (f / 1024) * Math.pow(2, -14);
-      else if (e === 0x1f) v = f ? NaN : Infinity;
-      else v = (1 + f / 1024) * Math.pow(2, e - 15);
-      vectors[i] = s ? -v : v;
-    }
+    for (let i = 0; i < u16.length; i++) vectors[i] = halfToFloat[u16[i]];
     globalForScan.__scanIndex = { ...indexData, vectors };
     return globalForScan.__scanIndex;
   } catch {
@@ -53,12 +61,7 @@ function getStaticIndex(): ServerIndex | null {
 
 const DB_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
-async function getDbEmbeddings(dim: number): Promise<{ cards: IndexCard[]; vectors: Float32Array }> {
-  const now = Date.now();
-  if (globalForScan.__dbEmbeddings && now - globalForScan.__dbEmbeddings.loadedAt < DB_CACHE_TTL) {
-    return globalForScan.__dbEmbeddings;
-  }
-
+async function loadDbEmbeddings(dim: number, tcg?: string): Promise<DbIndex> {
   const rows = await db
     .select({
       cardId: schema.cardEmbeddings.cardId,
@@ -71,25 +74,18 @@ async function getDbEmbeddings(dim: number): Promise<{ cards: IndexCard[]; vecto
       language: schema.cards.language,
     })
     .from(schema.cardEmbeddings)
-    .innerJoin(schema.cards, eq(schema.cardEmbeddings.cardId, schema.cards.id));
+    .innerJoin(schema.cards, eq(schema.cardEmbeddings.cardId, schema.cards.id))
+    .where(tcg ? eq(schema.cards.tcg, tcg) : undefined);
 
   const cards: IndexCard[] = [];
-  const allVecs: number[] = [];
+  const vectors = new Float32Array(rows.length * dim);
 
   for (const row of rows) {
     const buf = Buffer.from(row.embedding, "base64");
+    if (buf.byteLength !== dim * 2) continue;
     const u16 = new Uint16Array(buf.buffer, buf.byteOffset, buf.byteLength / 2);
-    for (let i = 0; i < u16.length; i++) {
-      const h = u16[i];
-      const s = (h & 0x8000) >> 15;
-      const e = (h & 0x7c00) >> 10;
-      const f = h & 0x03ff;
-      let v: number;
-      if (e === 0) v = (f / 1024) * Math.pow(2, -14);
-      else if (e === 0x1f) v = f ? NaN : Infinity;
-      else v = (1 + f / 1024) * Math.pow(2, e - 15);
-      allVecs.push(s ? -v : v);
-    }
+    const offset = cards.length * dim;
+    for (let i = 0; i < dim; i++) vectors[offset + i] = halfToFloat[u16[i]];
     cards.push({
       id: row.cardId,
       name: row.name,
@@ -101,9 +97,29 @@ async function getDbEmbeddings(dim: number): Promise<{ cards: IndexCard[]; vecto
     } as IndexCard);
   }
 
-  const vectors = new Float32Array(allVecs);
-  globalForScan.__dbEmbeddings = { cards, vectors, loadedAt: now };
-  return { cards, vectors };
+  console.log(`[scan/match] loaded ${cards.length} ${tcg ?? "all"} embeddings`);
+  return { cards, vectors: vectors.subarray(0, cards.length * dim), loadedAt: Date.now() };
+}
+
+async function getDbEmbeddings(dim: number, tcg?: string): Promise<DbIndex> {
+  const key = `${tcg ?? "all"}:${dim}`;
+  const cache = globalForScan.__dbEmbeddingsByKey ??= new Map();
+  const pending = globalForScan.__dbEmbeddingsPendingByKey ??= new Map();
+  const cached = cache.get(key);
+  if (cached && Date.now() - cached.loadedAt < DB_CACHE_TTL) return cached;
+  let loading = pending.get(key);
+  if (!loading) {
+    loading = loadDbEmbeddings(dim, tcg)
+      .then((data) => { cache.set(key, data); return data; })
+      .finally(() => { pending.delete(key); });
+    pending.set(key, loading);
+  }
+  // A cached index stays usable while its replacement loads in the background.
+  if (cached) {
+    void loading.catch((error: unknown) => console.error("[scan/match] index refresh failed:", error));
+    return cached;
+  }
+  return loading;
 }
 
 export async function POST(req: NextRequest) {
@@ -149,10 +165,9 @@ export async function POST(req: NextRequest) {
     // Search DB embeddings
     let dbCards: IndexCard[] = [];
     try {
-      const dbData = await getDbEmbeddings(dim);
+      const dbData = await getDbEmbeddings(dim, tcg);
       dbCards = dbData.cards;
       const dbN = dbData.vectors.length / dim;
-      console.log(`[scan/match] DB embeddings: ${dbN} cards, dim=${dim}`);
 
       for (let i = 0; i < dbN; i++) {
         if (tcg && dbCards[i].tcg !== tcg) continue;

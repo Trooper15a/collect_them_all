@@ -30,7 +30,7 @@ function ScannerSession({ onMatches, onClose, bulkMode, standMode, bulkCount, la
   const tracker = useRef(new LiveScanTracker());
   const viewport = useRef("");
   const [busy, setBusy] = useState(false);
-  const [auto, setAuto] = useState(true);
+  const [auto, setAuto] = useState(!!bulkMode || !!standMode);
   const [live, setLive] = useState<Match[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const streakRef = useRef<{ id: string; count: number }>({ id: "", count: 0 });
