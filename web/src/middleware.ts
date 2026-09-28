@@ -21,7 +21,6 @@ export const config = {
     "/sets/:path*",
     "/settings/:path*",
     "/cards/:path*",
-    "/grade/:path*",
     "/import/:path*",
     "/opens/:path*",
     "/trade/:path*",
