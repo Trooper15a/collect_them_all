@@ -39,6 +39,22 @@ function persistDismissal() {
   } catch { /* storage unavailable */ }
 }
 
+function installInstructions(): string {
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  if (ios) {
+    const safari = /Safari\//.test(navigator.userAgent) &&
+      !/CriOS|FxiOS|EdgiOS/.test(navigator.userAgent);
+    return safari
+      ? "Tap Share, then Add to Home Screen."
+      : "Open this site in Safari, tap Share, then Add to Home Screen.";
+  }
+  if (/Android/.test(navigator.userAgent)) {
+    return "Open your browser menu (⋮), then tap Install app or Add to Home Screen.";
+  }
+  return "Use the install icon in your browser’s address bar, or its menu → Install app.";
+}
+
 /** Count full page loads; returns the running total (1 = first-ever visit). */
 function bumpPageViews(): number {
   try {
@@ -54,20 +70,26 @@ export function PwaRegister() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [visible, setVisible] = useState(false);
   const [showFallback, setShowFallback] = useState(false);
+  const [installing, setInstalling] = useState(false);
   const bannerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!("serviceWorker" in navigator)) return;
-    if (process.env.NODE_ENV !== "production" && !location.protocol.startsWith("https")) return;
-    navigator.serviceWorker.register("/sw.js").catch((e) => console.warn("sw register failed", e));
+    if ("serviceWorker" in navigator &&
+        (process.env.NODE_ENV === "production" || location.protocol === "https:")) {
+      navigator.serviceWorker.register("/sw.js").catch((e) => console.warn("sw register failed", e));
+    }
 
     const handler = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
+      setShowFallback(false);
     };
     window.addEventListener("beforeinstallprompt", handler);
 
-    const onInstalled = () => setVisible(false);
+    const onInstalled = () => {
+      setDeferredPrompt(null);
+      setVisible(false);
+    };
     window.addEventListener("appinstalled", onInstalled);
 
     // Deferred so server and first client render match (banner starts hidden).
@@ -110,19 +132,23 @@ export function PwaRegister() {
 
   const install = useCallback(async () => {
     if (!deferredPrompt) {
-      // Native prompt unavailable — show inline instructions instead of a silent no-op.
       setShowFallback(true);
       return;
     }
-    await deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === "accepted") {
-      setDeferredPrompt(null);
-      setVisible(false);
-    } else {
-      dismiss();
+    if (installing) return;
+    setInstalling(true);
+    setDeferredPrompt(null); // The browser allows each install event to be used only once.
+    try {
+      await deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === "accepted") setVisible(false);
+      else dismiss();
+    } catch {
+      setShowFallback(true);
+    } finally {
+      setInstalling(false);
     }
-  }, [deferredPrompt, dismiss]);
+  }, [deferredPrompt, dismiss, installing]);
 
   if (!visible) return null;
 
@@ -137,17 +163,17 @@ export function PwaRegister() {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold">Install RipnPull</p>
           <p className="text-xs text-muted">Quick access to your collection</p>
-          {showFallback && (
-            <p className="text-xs text-muted mt-1">
-              Use your browser menu &rarr; &quot;Install app&quot; / &quot;Add to Home Screen&quot;
+          {showFallback && !deferredPrompt && (
+            <p className="text-xs text-muted mt-1" role="status">
+              {installInstructions()}
             </p>
           )}
         </div>
         <button onClick={dismiss} className="text-muted hover:text-foreground text-lg px-1" aria-label="Dismiss">
           &times;
         </button>
-        <button onClick={install} className="btn-rainbow shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold">
-          Install
+        <button onClick={install} disabled={installing} className="btn-rainbow shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50">
+          {installing ? "Opening…" : deferredPrompt ? "Install" : "How to install"}
         </button>
       </div>
     </div>

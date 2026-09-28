@@ -25,8 +25,9 @@ export function Delta({ amount, pct, currency = "USD", className = "" }: { amoun
   );
 }
 
-export function CardImage({ id, size = "low", className = "", alt = "", directUrl }: { id: string; size?: "low" | "high"; className?: string; alt?: string; directUrl?: string | null }) {
+export function CardImage({ id, size = "low", className = "", alt = "", directUrl, eager = false, priority = false }: { id: string; size?: "low" | "high"; className?: string; alt?: string; directUrl?: string | null; eager?: boolean; priority?: boolean }) {
   const [failed, setFailed] = useState(false);
+  const [proxyFallback, setProxyFallback] = useState(false);
   if (failed) {
     return (
       <div
@@ -37,7 +38,16 @@ export function CardImage({ id, size = "low", className = "", alt = "", directUr
     );
   }
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={directUrl ?? `/api/images/${encodeURIComponent(id)}?size=${size}`} alt={alt} loading="lazy" onError={() => setFailed(true)} className={`object-cover bg-elev ${className}`} style={{ aspectRatio: "63/88" }} />;
+  return <img
+    src={!proxyFallback && directUrl ? directUrl : `/api/images/${encodeURIComponent(id)}?size=${size}`}
+    alt={alt}
+    loading={eager || priority ? "eager" : "lazy"}
+    fetchPriority={priority ? "high" : undefined}
+    decoding="async"
+    onError={() => directUrl && !proxyFallback ? setProxyFallback(true) : setFailed(true)}
+    className={`object-cover bg-elev ${className}`}
+    style={{ aspectRatio: "63/88" }}
+  />;
 }
 
 export function TcgBadge({ tcg, lang }: { tcg: string; lang?: string | null }) {

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Scanner } from "@/components/Scanner";
 import { Button, CardImage, Empty, Money, Segmented, Skeleton, TcgBadge, inputCls } from "@/components/ui";
 import { haptic } from "@/lib/haptics";
-import { isScanIndexId, type Match } from "@/lib/scanner/matcher";
+import { isScanIndexId, scanThumbnailUrl, type Match } from "@/lib/scanner/matcher";
 import { TCGS, type CardSummary } from "@/lib/types";
 import { useActiveTcgHydrated, type ActiveTcg } from "@/lib/ui-prefs";
 import type { AddSheetCard } from "@/components/AddToPortfolioSheet";
@@ -210,10 +210,10 @@ export function CardDiscovery({ initialTcg, compact = false, allowCamera = true,
           <div className="relative glass w-full max-w-lg rounded-t-3xl p-5 pb-[max(env(safe-area-inset-bottom),20px)]">
             <p className="mb-3 text-xs text-muted">Is it one of these? Tap to add.</p>
             <ul className="divide-y divide-line">
-              {(visibleMatches?.length ? visibleMatches : matches).map((match) => (
+              {(visibleMatches?.length ? visibleMatches : matches).map((match, index) => (
                 <li key={match.card.id}>
                   <button type="button" onClick={() => void selectMatch(match)} disabled={resolvingId !== null} className="flex w-full items-center gap-3 py-2.5 text-left disabled:opacity-50">
-                    <CardImage id={match.card.id} className="w-12 rounded-md" alt="" />
+                    <CardImage id={match.card.id} directUrl={scanThumbnailUrl(match.card)} eager priority={index < 2} className="w-12 rounded-md" alt="" />
                     <span className="min-w-0 flex-1"><span className="block truncate font-medium">{match.card.name}</span><span className="block truncate text-xs text-muted">{match.card.setName ?? match.card.set} #{match.card.num}</span></span>
                     {resolvingId === match.card.id && <span className="h-4 w-4 animate-spin rounded-full border-2 border-accent border-t-transparent" aria-label="Resolving" />}
                   </button>

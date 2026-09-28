@@ -9,7 +9,7 @@ import { Scanner } from "@/components/Scanner";
 import { showToast } from "@/components/Toast";
 import { Button, CardImage, Money, inputCls } from "@/components/ui";
 import { haptic } from "@/lib/haptics";
-import { isScanIndexId, type Match } from "@/lib/scanner/matcher";
+import { isScanIndexId, scanThumbnailUrl, type Match } from "@/lib/scanner/matcher";
 import { TCGS } from "@/lib/types";
 import { useActiveTcgHydrated } from "@/lib/ui-prefs";
 
@@ -205,7 +205,7 @@ export default function ScanPage() {
               {(visibleMatches ?? []).map((m, i) => (
                 <li key={m.card.id}>
                   <button onClick={() => chooseMatch(m)} disabled={resolvingId !== null} className="w-full flex items-center gap-3 py-2.5 text-left disabled:opacity-50">
-                    <CardImage id={m.card.id} className="w-12 rounded-md" alt="" />
+                    <CardImage id={m.card.id} directUrl={scanThumbnailUrl(m.card)} eager priority={i < 2} className="w-12 rounded-md" alt="" />
                     <div className="flex-1 min-w-0">
                       <div className={`font-medium truncate ${i === 0 ? "text-up" : ""}`}>{m.card.name}</div>
                       <div className="text-xs text-muted truncate">

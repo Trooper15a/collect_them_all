@@ -27,6 +27,14 @@ export interface Match {
   score: number;
 }
 
+/** The scan index already includes image URLs; use small CDN images for match thumbnails. */
+export function scanThumbnailUrl(card: IndexCard): string | undefined {
+  if (!card.img) return undefined;
+  if (card.id.startsWith("tcgdex:")) return card.img.replace(/\/high\.webp(?:\?.*)?$/, "/low.webp");
+  if (card.id.startsWith("tp:")) return card.img.replace(/_in_1000x1000\.jpg(?:\?.*)?$/, "_400w.jpg");
+  return card.img;
+}
+
 /** Decode a float16 buffer to float32. */
 export function float16ToFloat32(buf: ArrayBuffer): Float32Array {
   const u16 = new Uint16Array(buf);
