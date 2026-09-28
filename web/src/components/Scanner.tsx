@@ -250,14 +250,12 @@ function ScannerSession({ onMatches, onClose, bulkMode, standMode, bulkCount, la
   }, [auto, engine, scanOnce, bulkMode, standMode, isBatchMode, onMatches, observeScene, clearLive]);
 
   async function capture() {
-    // Keep the current live-mode control: accept a match rather than queueing
-    // another inference request behind the scan loop.
-    if (live.length > 0) {
-      acceptLive();
-      return;
-    }
-    if (auto || manualInFlight.current) return;
+    if (live.length > 0 && acceptLive()) return;
+    if (manualInFlight.current) return;
     manualInFlight.current = true;
+    // A deliberate tap takes priority over the live loop. The engine keeps an
+    // already running inference serial, and no further live scans are started.
+    setAuto(false);
     clearLive();
     setScanError(null);
     setBusy(true);
@@ -292,10 +290,14 @@ function ScannerSession({ onMatches, onClose, bulkMode, standMode, bulkCount, la
 
   // Accepting the live match takes the same path as "Identify card".
   function acceptLive() {
-    if (manualInFlight.current) return;
+    if (manualInFlight.current) return false;
     try {
-      if (observeScene() && tracker.current.matches.length) onMatches(tracker.current.matches);
+      if (observeScene() && tracker.current.matches.length) {
+        onMatches(tracker.current.matches);
+        return true;
+      }
     } catch { clearLive(); }
+    return false;
   }
 
   const top = live[0];
@@ -376,8 +378,8 @@ function ScannerSession({ onMatches, onClose, bulkMode, standMode, bulkCount, la
           <label className="flex items-center gap-2 text-xs text-muted">
             <input type="checkbox" checked={auto} onChange={(e) => { clearLive(); setScanError(null); setAuto(e.target.checked); }} className="accent-accent" /> Live
           </label>
-          <Button className="flex-1" onClick={capture} disabled={busy || !cameraReady || (auto && live.length === 0) || !engine || engine.status !== "ready" || !!camError}>
-            {live.length > 0 ? "Accept match" : busy ? "Identifying…" : auto ? "Scanning…" : "Identify card"}
+          <Button className="flex-1" onClick={capture} disabled={busy || !cameraReady || !engine || engine.status !== "ready" || !!camError}>
+            {busy ? "Identifying…" : live.length > 0 ? "Accept match" : "Identify card"}
           </Button>
           {isBatchMode && (
             <Button variant="ghost" onClick={onClose}>Done</Button>
