@@ -1,247 +1,237 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { Button, Section } from "@/components/ui";
-import { showToast } from "@/components/Toast";
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
+import { Button } from "@/components/ui";
+import {
+  estimatePregrade, inspectPhoto, normalizeCrop, suggestCardCrop,
+  type CropRect, type PhotoCheck, type PixelImage,
+} from "@/lib/grading/analysis";
+import { parsePiPhotoMessage, PI_CAMERA_ORIGIN } from "@/lib/grading/handoff";
 
-interface CenteringResult {
-  leftRight: [number, number];
-  topBottom: [number, number];
-  score: number;
-  psaCentering: string;
-  psaTier: string;
-}
+type Side = "front" | "back";
+type Photo = { file: File; url: string; pixels: PixelImage; crop: CropRect; check: PhotoCheck };
+type Photos = Partial<Record<Side, Photo>>;
 
-function analyzeCentering(canvas: HTMLCanvasElement): CenteringResult {
-  const ctx = canvas.getContext("2d")!;
-  const w = canvas.width;
-  const h = canvas.height;
-  const data = ctx.getImageData(0, 0, w, h).data;
-
-  const brightness = (x: number, y: number) => {
-    const i = (y * w + x) * 4;
-    return (data[i] + data[i + 1] + data[i + 2]) / 3;
-  };
-
-  const edgeThreshold = 30;
-  const numSamples = 15;
-
-  function findEdge(scanFn: (sample: number) => number | null): number {
-    const values: number[] = [];
-    for (let s = 0; s < numSamples; s++) {
-      const v = scanFn(s);
-      if (v != null) values.push(v);
-    }
-    if (values.length === 0) return 0;
-    values.sort((a, b) => a - b);
-    return values[Math.floor(values.length / 2)];
-  }
-
-  const yStart = Math.floor(h * 0.25);
-  const yEnd = Math.floor(h * 0.75);
-  const yStep = Math.max(1, Math.floor((yEnd - yStart) / numSamples));
-
-  const left = findEdge((s) => {
-    const y = yStart + s * yStep;
-    if (y >= h) return null;
-    for (let x = 1; x < w * 0.4; x++) {
-      if (Math.abs(brightness(x, y) - brightness(x - 1, y)) > edgeThreshold) return x;
-    }
-    return null;
-  });
-
-  const right = findEdge((s) => {
-    const y = yStart + s * yStep;
-    if (y >= h) return null;
-    for (let x = w - 2; x > w * 0.6; x--) {
-      if (Math.abs(brightness(x, y) - brightness(x + 1, y)) > edgeThreshold) return w - x;
-    }
-    return null;
-  });
-
-  const xStart = Math.floor(w * 0.25);
-  const xEnd = Math.floor(w * 0.75);
-  const xStep = Math.max(1, Math.floor((xEnd - xStart) / numSamples));
-
-  const top = findEdge((s) => {
-    const x = xStart + s * xStep;
-    if (x >= w) return null;
-    for (let y = 1; y < h * 0.4; y++) {
-      if (Math.abs(brightness(x, y) - brightness(x, y - 1)) > edgeThreshold) return y;
-    }
-    return null;
-  });
-
-  const bottom = findEdge((s) => {
-    const x = xStart + s * xStep;
-    if (x >= w) return null;
-    for (let y = h - 2; y > h * 0.6; y--) {
-      if (Math.abs(brightness(x, y) - brightness(x, y + 1)) > edgeThreshold) return h - y;
-    }
-    return null;
-  });
-
-  ctx.strokeStyle = "rgba(167,139,250,0.7)";
-  ctx.lineWidth = 2;
-  ctx.setLineDash([6, 4]);
-  if (left > 0) { ctx.beginPath(); ctx.moveTo(left, 0); ctx.lineTo(left, h); ctx.stroke(); }
-  if (right > 0) { ctx.beginPath(); ctx.moveTo(w - right, 0); ctx.lineTo(w - right, h); ctx.stroke(); }
-  if (top > 0) { ctx.beginPath(); ctx.moveTo(0, top); ctx.lineTo(w, top); ctx.stroke(); }
-  if (bottom > 0) { ctx.beginPath(); ctx.moveTo(0, h - bottom); ctx.lineTo(w, h - bottom); ctx.stroke(); }
-  ctx.setLineDash([]);
-
-  const lrTotal = left + right || 1;
-  const tbTotal = top + bottom || 1;
-  const lPct = Math.round((left / lrTotal) * 100);
-  const rPct = 100 - lPct;
-  const tPct = Math.round((top / tbTotal) * 100);
-  const bPct = 100 - tPct;
-
-  const lrOff = Math.abs(50 - lPct);
-  const tbOff = Math.abs(50 - tPct);
-  const score = Math.max(0, 10 - (lrOff + tbOff) * 0.3);
-
-  const worstOff = Math.max(lrOff, tbOff);
-  let psaTier: string;
-  if (worstOff <= 5) psaTier = "PSA 10 eligible";
-  else if (worstOff <= 10) psaTier = "PSA 9 range";
-  else if (worstOff <= 15) psaTier = "PSA 8 range";
-  else psaTier = "Below PSA 8";
-
-  return {
-    leftRight: [lPct, rPct],
-    topBottom: [tPct, bPct],
-    score: Math.round(score * 10) / 10,
-    psaCentering: `${lPct}/${rPct} - ${tPct}/${bPct}`,
-    psaTier,
-  };
-}
-
-export default function CenteringCheckerPage() {
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  const [overlayUrl, setOverlayUrl] = useState<string | null>(null);
-  const [centering, setCentering] = useState<CenteringResult | null>(null);
-
-  const fileRef = useRef<HTMLInputElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  function handlePhoto(file: File) {
-    if (photoUrl) URL.revokeObjectURL(photoUrl);
-    const url = URL.createObjectURL(file);
-    setPhotoUrl(url);
-    const img = new Image();
-    img.onload = () => {
-      const canvas = canvasRef.current!;
-      const scale = Math.min(600 / img.width, 840 / img.height, 1);
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        showToast("Couldn't analyze that photo — try another one", "down");
-        return;
-      }
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      const result = analyzeCentering(canvas);
-      setCentering(result);
-      setOverlayUrl(canvas.toDataURL("image/png"));
-    };
-    img.onerror = () => {
-      // broken/corrupt image file — reset instead of hanging in the "uploaded" state
-      showToast("Couldn't read that image — try another photo", "down");
-      URL.revokeObjectURL(url);
-      setPhotoUrl(null);
-      setOverlayUrl(null);
-      setCentering(null);
-    };
-    img.src = url;
-  }
-
-  function reset() {
-    if (photoUrl) URL.revokeObjectURL(photoUrl);
-    setPhotoUrl(null);
-    setOverlayUrl(null);
-    setCentering(null);
-  }
-
-  return (
-    <div className="pb-24">
-      <header className="pt-2 pb-3">
-        <h1 className="text-xl font-bold">Centering Checker</h1>
-        <p className="text-xs text-muted mt-0.5">Snap a photo of your card to check its centering</p>
-      </header>
-
-      <div className="card-surface rounded-2xl p-4">
-        {!photoUrl ? (
-          <div className="text-center">
-            <div className="relative mx-auto mb-4 rounded-xl bg-black/40 border border-line overflow-hidden" style={{ width: "200px", aspectRatio: "63/88" }}>
-              <div className="absolute inset-0 flex items-center justify-center">
-                {/* Corner brackets */}
-                <div className="relative w-[85%] h-[85%]">
-                  <div className="absolute top-0 left-0 w-5 h-5 border-t-[2.5px] border-l-[2.5px] border-white/60 rounded-tl-lg" />
-                  <div className="absolute top-0 right-0 w-5 h-5 border-t-[2.5px] border-r-[2.5px] border-white/60 rounded-tr-lg" />
-                  <div className="absolute bottom-0 left-0 w-5 h-5 border-b-[2.5px] border-l-[2.5px] border-white/60 rounded-bl-lg" />
-                  <div className="absolute bottom-0 right-0 w-5 h-5 border-b-[2.5px] border-r-[2.5px] border-white/60 rounded-br-lg" />
-                  {/* Center crosshair */}
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-px h-4 bg-white/30" />
-                  </div>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="h-px w-4 bg-white/30" />
-                  </div>
-                </div>
-              </div>
-              <div className="absolute bottom-2 inset-x-0 text-center text-[10px] text-white/50 font-medium">
-                Place card here
-              </div>
-            </div>
-            <p className="text-sm text-muted mb-3">Snap a close-up of your card — fill the frame with even borders</p>
-            <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && handlePhoto(e.target.files[0])} />
-            <div className="flex gap-2 justify-center">
-              <Button onClick={() => fileRef.current?.click()}>Take photo</Button>
-              <Button variant="ghost" onClick={() => { if (fileRef.current) { fileRef.current.removeAttribute("capture"); fileRef.current.click(); fileRef.current.setAttribute("capture", "environment"); } }}>Upload</Button>
-            </div>
-          </div>
-        ) : (
-          <div>
-            <div className="relative rounded-xl overflow-hidden bg-black flex justify-center">
-              <img src={overlayUrl ?? photoUrl!} alt="Card photo with centering overlay" className="max-h-72 object-contain" />
-            </div>
-
-            {centering && (
-              <>
-                <div className="mt-3 grid grid-cols-2 gap-2 text-center">
-                  <div className="rounded-xl bg-white/[0.03] border border-line py-2.5 px-1">
-                    <div className="text-[10px] text-muted uppercase tracking-wider">L/R centering</div>
-                    <div className="text-lg font-bold tabular">{centering.leftRight[0]}/{centering.leftRight[1]}</div>
-                  </div>
-                  <div className="rounded-xl bg-white/[0.03] border border-line py-2.5 px-1">
-                    <div className="text-[10px] text-muted uppercase tracking-wider">T/B centering</div>
-                    <div className="text-lg font-bold tabular">{centering.topBottom[0]}/{centering.topBottom[1]}</div>
-                  </div>
-                </div>
-
-                <div className="mt-3 text-center space-y-2">
-                  <div>
-                    <span className="text-sm text-muted">Score: </span>
-                    <span className={`text-xl font-black tabular ${centering.score >= 9 ? "text-up" : centering.score >= 7 ? "text-accent" : "text-down"}`}>
-                      {centering.score}/10
-                    </span>
-                  </div>
-                  <div className={`inline-block text-xs font-semibold uppercase tracking-wider px-3 py-1 rounded-full ${centering.score >= 9 ? "bg-up/15 text-up" : centering.score >= 7 ? "bg-accent/15 text-accent" : "bg-down/15 text-down"}`}>
-                    {centering.psaTier}
-                  </div>
-                </div>
-              </>
-            )}
-
-            <div className="mt-4 flex justify-center">
-              <Button variant="ghost" onClick={reset}>Retake</Button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <canvas ref={canvasRef} className="hidden" />
-    </div>
+function centeringScore(check: PhotoCheck): number | null {
+  if (check.centering.confidence !== "measured") return null;
+  const worst = Math.max(
+    Math.abs(check.centering.leftRight[0] - 50),
+    Math.abs(check.centering.topBottom[0] - 50),
   );
+  return Math.max(1, Math.round((10 - worst * 0.2) * 2) / 2);
+}
+
+async function readPhoto(file: File): Promise<PixelImage> {
+  if (!["image/jpeg", "image/png"].includes(file.type) || file.size > 30_000_000) {
+    throw new Error("Choose a JPEG or PNG under 30 MB.");
+  }
+  const bitmap = await createImageBitmap(file);
+  try {
+    if (bitmap.width < 600 || bitmap.height < 400) {
+      throw new Error("The image is too small for a pre-grade. Use the full-resolution Pi photo.");
+    }
+    const canvas = document.createElement("canvas");
+    const scale = Math.min(1, 800 / bitmap.width);
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) throw new Error("Image analysis is unavailable in this browser.");
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    return ctx.getImageData(0, 0, canvas.width, canvas.height);
+  } finally {
+    bitmap.close();
+  }
+}
+
+function ScoreSlider({ title, detail, value, onChange }: {
+  title: string; detail: string; value: number | null; onChange: (value: number) => void;
+}) {
+  return <label className="block rounded-xl border border-line p-3">
+    <span className="flex justify-between gap-2 text-sm font-semibold">
+      <span>{title}</span><span>{value == null ? "Not assessed" : `${value.toFixed(1)}/10`}</span>
+    </span>
+    <span className="block text-xs text-muted mt-1">{detail}</span>
+    <input type="range" min="1" max="10" step="0.5" value={value ?? 8}
+      onChange={(e) => onChange(Number(e.target.value))}
+      className="mt-3 w-full accent-accent" aria-label={`${title} condition score`} />
+  </label>;
+}
+
+export default function GradePage() {
+  const [photos, setPhotos] = useState<Photos>({});
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState<Side | null>(null);
+  const [cropStart, setCropStart] = useState<{ side: Side; x: number; y: number } | null>(null);
+  const [manualCentering, setManualCentering] = useState<number | null>(null);
+  const [corners, setCorners] = useState<number | null>(null);
+  const [edges, setEdges] = useState<number | null>(null);
+  const [surface, setSurface] = useState<number | null>(null);
+  const popup = useRef<Window | null>(null);
+  const session = useRef("");
+  const frontUrl = photos.front?.url;
+  const backUrl = photos.back?.url;
+  useEffect(() => () => { if (frontUrl) URL.revokeObjectURL(frontUrl); }, [frontUrl]);
+  useEffect(() => () => { if (backUrl) URL.revokeObjectURL(backUrl); }, [backUrl]);
+
+  const acceptPhoto = useCallback(async (side: Side, file: File, fromPi = false) => {
+    setBusy(side);
+    setError("");
+    try {
+      const pixels = await readPhoto(file);
+      const crop = suggestCardCrop(pixels) ?? (fromPi
+        ? { x: 0.28, y: 0.08, width: 0.56, height: 0.66 }
+        : { x: 0.02, y: 0.02, width: 0.96, height: 0.96 });
+      const photo: Photo = {
+        file, url: URL.createObjectURL(file), pixels, crop, check: inspectPhoto(pixels, crop),
+      };
+      setPhotos((previous) => ({ ...previous, [side]: photo }));
+      setCropStart(null);
+      setManualCentering(null);
+      setCorners(null);
+      setEdges(null);
+      setSurface(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not read that photo.");
+    } finally {
+      setBusy(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      const photo = parsePiPhotoMessage(event, popup.current, session.current);
+      if (photo) void acceptPhoto(photo.side, new File([photo.bytes], `${photo.side}.jpg`, { type: "image/jpeg" }), true);
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [acceptPhoto]);
+
+  function openPi() {
+    session.current = crypto.randomUUID();
+    const url = new URL(PI_CAMERA_ORIGIN);
+    url.searchParams.set("gradeOrigin", window.location.origin);
+    url.searchParams.set("session", session.current);
+    popup.current = window.open(url.toString(), "rnp-pi-camera");
+    if (!popup.current) setError("Chrome blocked the camera window. Allow pop-ups, or download and upload the JPEGs below.");
+  }
+
+  function updateCrop(side: Side, crop: CropRect) {
+    const photo = photos[side];
+    if (!photo) return;
+    const normalized = normalizeCrop(crop);
+    setPhotos((previous) => ({
+      ...previous, [side]: { ...photo, crop: normalized, check: inspectPhoto(photo.pixels, normalized) },
+    }));
+    setManualCentering(null);
+  }
+
+  function clickCrop(side: Side, event: MouseEvent<HTMLDivElement>) {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
+    const y = Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height));
+    if (!cropStart || cropStart.side !== side) {
+      setCropStart({ side, x, y });
+      return;
+    }
+    updateCrop(side, { x: Math.min(x, cropStart.x), y: Math.min(y, cropStart.y),
+      width: Math.abs(x - cropStart.x), height: Math.abs(y - cropStart.y) });
+    setCropStart(null);
+  }
+
+  const frontScore = photos.front ? centeringScore(photos.front.check) : null;
+  const backScore = photos.back ? centeringScore(photos.back.check) : null;
+  const suggestedCenter = frontScore != null && backScore != null
+    ? Math.min(frontScore, backScore) : null;
+  const center = manualCentering ?? suggestedCenter;
+  const complete = !!photos.front && !!photos.back &&
+    center != null && corners != null && edges != null && surface != null;
+  const estimate = complete ? estimatePregrade({
+    centering: center, corners: corners!, edges: edges!, surface: surface!,
+  }) : null;
+  const qualityIssues = [...(photos.front?.check.issues ?? []), ...(photos.back?.check.issues ?? [])];
+
+  return <div className="pb-24 max-w-4xl mx-auto space-y-5">
+    <header className="pt-2">
+      <h1 className="text-xl font-bold">Card pre-grade</h1>
+      <p className="text-sm text-muted mt-1">Capture both sides, inspect the crop, then review condition before seeing an estimate.</p>
+    </header>
+
+    <section className="card-surface rounded-2xl p-4 space-y-3">
+      <h2 className="font-semibold">1. Capture the card</h2>
+      <p className="text-sm text-muted">Connect your Pi Zero 2 W through its USB data port. Chrome opens the Pi camera page to take front and back photos.</p>
+      <div className="flex flex-wrap gap-2 items-center">
+        <Button onClick={openPi}>Open Pi camera</Button>
+        <a href={PI_CAMERA_ORIGIN} target="_blank" rel="noreferrer" className="text-sm text-accent underline">Open camera page directly</a>
+      </div>
+      {error && <p className="text-sm text-down" role="alert">{error}</p>}
+    </section>
+
+    <div className="grid gap-4 md:grid-cols-2">
+      {(["front", "back"] as const).map((side) => {
+        const photo = photos[side];
+        return <section key={side} className="card-surface rounded-2xl p-4 space-y-3">
+          <div className="flex justify-between items-center gap-2">
+            <h2 className="font-semibold capitalize">{side} photo</h2>
+            <label className="text-sm text-accent cursor-pointer underline">
+              {photo ? "Replace JPEG" : "Upload JPEG"}
+              <input hidden type="file" accept="image/jpeg,image/png" onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void acceptPhoto(side, file);
+                e.target.value = "";
+              }} />
+            </label>
+          </div>
+          {busy === side && <p className="text-sm text-muted">Reading photo…</p>}
+          {photo ? <>
+            <div className="relative cursor-crosshair" onClick={(event) => clickCrop(side, event)}
+              title="Click the top-left and bottom-right corners of the physical card to correct the crop">
+              {/* eslint-disable-next-line @next/next/no-img-element -- Local blob URLs are not image-optimizer inputs. */}
+              <img src={photo.url} alt={`${side} of card, with crop outline`} className="block w-full h-auto rounded-lg" />
+              <div className="absolute border-2 border-accent pointer-events-none" style={{
+                left: `${photo.crop.x * 100}%`, top: `${photo.crop.y * 100}%`,
+                width: `${photo.crop.width * 100}%`, height: `${photo.crop.height * 100}%`,
+              }} />
+              {cropStart?.side === side && <div className="absolute w-3 h-3 rounded-full bg-accent pointer-events-none"
+                style={{ left: `${cropStart.x * 100}%`, top: `${cropStart.y * 100}%` }} />}
+            </div>
+            <p className="text-xs text-muted">Crop should follow the physical card edge. Click its top-left, then bottom-right corner to correct it.</p>
+            <div className="flex gap-3 text-sm">
+              <a href={photo.url} target="_blank" rel="noreferrer" className="text-accent underline">Inspect full photo</a>
+              <a href={photo.url} download={`${side}.jpg`} className="text-accent underline">Download</a>
+            </div>
+            {photo.check.issues.length
+              ? <ul className="text-xs text-amber-300 list-disc pl-4">{photo.check.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul>
+              : <p className="text-xs text-up">Basic brightness, highlight, and sharpness checks passed.</p>}
+            {photo.check.centering.confidence === "measured"
+              ? <p className="text-sm">Printed border: {photo.check.centering.leftRight.join("/")} left/right · {photo.check.centering.topBottom.join("/")} top/bottom</p>
+              : <p className="text-xs text-muted">{photo.check.centering.reason}</p>}
+          </> : <div className="rounded-xl border border-dashed border-line p-10 text-center text-sm text-muted">Waiting for {side} photo</div>}
+        </section>;
+      })}
+    </div>
+
+    <section className="card-surface rounded-2xl p-4 space-y-3">
+      <h2 className="font-semibold">2. Review condition</h2>
+      <p className="text-xs text-muted">The photo can suggest centering, but this version does not automatically detect microscopic corner, edge, or surface defects. Inspect the full-size photos, preferably with angled light for surface marks.</p>
+      <div className="grid gap-3 md:grid-cols-2">
+        <ScoreSlider title="Centering"
+          detail={suggestedCenter == null
+            ? "Set this when a clear printed border cannot be measured on both sides."
+            : `Photo suggestion: ${suggestedCenter.toFixed(1)}/10. Check the crop and adjust if it measured artwork instead of a border.`}
+          value={center} onChange={setManualCentering} />
+        <ScoreSlider title="Corners" detail="Inspect all four corners on both sides for whitening, bends, and rounding." value={corners} onChange={setCorners} />
+        <ScoreSlider title="Edges" detail="Inspect all edges on both sides for chips, fraying, and dents." value={edges} onChange={setEdges} />
+        <ScoreSlider title="Surface" detail="Look for scratches, creases, print lines, and stains under angled light." value={surface} onChange={setSurface} />
+      </div>
+    </section>
+
+    <section className="card-surface rounded-2xl p-4 space-y-2" aria-live="polite">
+      <h2 className="font-semibold">3. Pre-grade result</h2>
+      {estimate ? <>
+        <p className="text-3xl font-bold">{estimate.score.toFixed(1)} <span className="text-base font-normal text-muted">/ 10 estimated condition</span></p>
+        <p className="text-sm text-muted">Review range: {estimate.low.toFixed(1)}–{estimate.high.toFixed(1)}. This is an informal pre-grade, not a PSA, BGS, or CGC grade.</p>
+        {qualityIssues.length > 0 && <p className="text-sm text-amber-300">Photo quality needs review. Retake the affected side before relying on this estimate.</p>}
+      </> : <p className="text-sm text-muted">Add front and back photos and assess all four categories to see a provisional result.</p>}
+    </section>
+  </div>;
 }

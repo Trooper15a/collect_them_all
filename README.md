@@ -14,7 +14,7 @@ A free, open-source TCG portfolio tracker with an **AI-powered card scanner** th
 - **Portfolio Tracking** — Multiple portfolios, cost basis tracking, gain/loss calculations, daily price history charts
 - **Live Pricing** — Automatic daily price updates from TCGPlayer and CardMarket for every card and sealed product
 - **Bulk Scanning** — Scan an entire stack of cards quickly, add them all to a portfolio at once
-- **AI Grade Estimator** — Analyze card centering with your camera, estimate PSA/CGC/BGS grades, calculate grading ROI and fees
+- **Card pre-grade** — Import front and back photos from the Raspberry Pi USB camera or upload JPEGs, check framing and centering, review condition, and see an informal estimate. Corner, edge, and surface scores require human inspection.
 - **Box Open Tracker** — Track pulls from booster boxes, calculate set ROI in real-time
 - **Multi-Currency** — USD, CAD, EUR, GBP, JPY, AUD with live ECB exchange rates
 - **Import/Export** — CSV import and export for your entire collection
