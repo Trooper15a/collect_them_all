@@ -6,7 +6,8 @@ const startedAt = Date.now();
 
 export async function GET() {
   try {
-    await db.execute(sql`SELECT 1`);
+    // Auth.js selects every users column during Google sign-in. Catch schema drift here.
+    await db.execute(sql`SELECT premium, stripe_customer_id, premium_since FROM users LIMIT 0`);
     return NextResponse.json({
       status: "ok",
       db: true,
