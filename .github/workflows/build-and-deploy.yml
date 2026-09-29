@@ -39,6 +39,7 @@ jobs:
             github_token=${{ secrets.MODEL_TOKEN }}
 
       - name: Trigger Coolify deploy
+        if: ${{ vars.COOLIFY_BASE_URL != '' }}
         env:
           COOLIFY_BASE_URL: ${{ vars.COOLIFY_BASE_URL }}
           COOLIFY_APP_UUID: ${{ secrets.COOLIFY_APP_UUID }}
