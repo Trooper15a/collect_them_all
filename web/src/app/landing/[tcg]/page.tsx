@@ -33,6 +33,13 @@ export async function generateMetadata(props: { params: Promise<{ tcg: string }>
       title: tcg.title,
       description: tcg.description,
       url: `${SITE.url}/landing/${tcg.slug}`,
+      images: [{ url: "/og-image.png", width: 1200, height: 630, alt: tcg.title }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: tcg.title,
+      description: tcg.description,
+      images: ["/og-image.png"],
     },
   };
 }
