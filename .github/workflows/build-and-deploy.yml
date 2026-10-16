@@ -36,7 +36,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           secrets: |
-            github_token=${{ secrets.MODEL_TOKEN }}
+            github_token=${{ secrets.GITHUB_TOKEN }}
 
       - name: Trigger Coolify deploy
         env:
