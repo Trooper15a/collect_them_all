@@ -99,7 +99,7 @@ export function bestPrice(prices: CardPrices | null | undefined, preferVariant?:
   for (const market of order) {
     const m = prices[market];
     if (!m) continue;
-    const keys = preferVariant && m.variants?.[preferVariant] ? [preferVariant, ...Object.keys(m.variants ?? {})] : Object.keys(m.variants ?? {});
+    const keys = preferVariant ? [preferVariant] : Object.keys(m.variants ?? {});
     for (const k of keys) {
       const v = m.variants?.[k];
       const amount = v?.market ?? v?.trend ?? v?.avg7 ?? v?.mid ?? v?.low ?? null;

@@ -21,13 +21,22 @@ export default function OnboardingPage() {
   const [state, setState] = useState<WizardState>({ step: "game", tcg: "pokemon" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [guestScanCount, setGuestScanCount] = useState(0);
   const heading = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
     heading.current?.focus();
   }, [state.step]);
 
-  async function skip() {
+  useEffect(() => {
+    try {
+      const queued = JSON.parse(localStorage.getItem("guestQueue") ?? "[]");
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- restore browser-only guest scans after hydration
+      if (Array.isArray(queued)) setGuestScanCount(queued.length);
+    } catch { /* ignore unavailable or invalid guest storage */ }
+  }, []);
+
+  async function skip(destination = "/") {
     if (busy) return;
     setBusy(true);
     setError(null);
@@ -38,7 +47,7 @@ export default function OnboardingPage() {
         body: JSON.stringify({ state: "dismissed" }),
       });
       if (!response.ok) throw new Error("Could not save your choice. Please try again.");
-      router.replace("/");
+      router.replace(destination);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not save your choice. Please try again.");
     } finally {
@@ -95,6 +104,13 @@ export default function OnboardingPage() {
 
         {state.step === "game" && (
           <section className="anim-widget d1">
+            {guestScanCount > 0 && (
+              <div className="mb-6 rounded-2xl border border-accent/40 bg-accent/10 p-4">
+                <p className="font-semibold">Your {guestScanCount} guest scan{guestScanCount === 1 ? " is" : "s are"} still here</p>
+                <p className="mt-1 text-sm text-muted">Review each card, confirm its variant and condition, then save it to a binder.</p>
+                <Button className="mt-3" onClick={() => void skip("/scan")} disabled={busy}>Review my scans</Button>
+              </div>
+            )}
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-accent">Let’s make this yours</p>
             <h1 ref={heading} tabIndex={-1} className="text-3xl font-bold outline-none">Choose your game</h1>
             <p className="mt-2 text-muted">We’ll tune search and scanning to the cards you collect. Pokémon is selected to get you moving.</p>

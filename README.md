@@ -1,6 +1,6 @@
 # RipnPull
 
-A free, open-source TCG portfolio tracker with an **AI-powered card scanner** that runs entirely on your device. No cloud fees, no subscriptions, no data collection.
+A free, open-source TCG portfolio tracker with an **AI-powered card scanner**. Image processing runs in your browser; matching and collection syncing use the server.
 
 **Supports:** Pokemon, Magic: The Gathering, Yu-Gi-Oh!, One Piece, Lorcana, Digimon, Dragon Ball Super, and more.
 
@@ -10,7 +10,7 @@ A free, open-source TCG portfolio tracker with an **AI-powered card scanner** th
 
 ## Features
 
-- **AI Card Scanner** — Point your phone camera at any card, identified in under 1 second. Runs 100% on-device using machine learning (no internet needed for scanning)
+- **AI Card Scanner** — Point your phone camera at a card. The browser creates an image embedding and sends it to the server for matching; an internet connection is required.
 - **Portfolio Tracking** — Multiple portfolios, cost basis tracking, gain/loss calculations, daily price history charts
 - **Live Pricing** — Automatic daily price updates from TCGPlayer and CardMarket for every card and sealed product
 - **Bulk Scanning** — Scan an entire stack of cards quickly, add them all to a portfolio at once
@@ -276,10 +276,10 @@ The scanner uses a custom-trained **EfficientNet-B0** neural network:
 
 1. **Training**: Learns to produce a unique 512-number "fingerprint" (embedding) for each card image
 2. **On your phone**: The camera frame is processed by the model running in your browser (ONNX Runtime Web)
-3. **Matching**: The fingerprint is compared against all ~170,000 known cards using cosine similarity
-4. **Result**: Best match returned in <1 second, with top 5 alternatives shown
+3. **Matching**: The embedding is sent to the server, where it is compared against the card index using cosine similarity
+4. **Result**: The likely match and alternatives are shown for you to verify
 
-The model is ~18 MB and is cached in your browser after first load. Everything runs on-device — no images are ever sent to any server.
+The model is cached in your browser after first load. The image stays on your device, but the embedding is sent to the server for matching. Scanning requires an internet connection.
 
 **Accuracy**: 99.06% recall@1 (correctly identifies the card on the first try 99% of the time).
 
