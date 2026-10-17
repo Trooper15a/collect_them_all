@@ -5,6 +5,7 @@ import { fmtMoney } from "@/lib/format";
 import { useHidePrices } from "@/lib/ui-prefs";
 import { bestPrice, CONDITION_LABELS, CONDITIONS, CURRENCIES, GRADING_COMPANIES, type CardPrices, variantLabel } from "@/lib/types";
 import { convert, type Rates } from "@/lib/fx";
+import { PriceContext } from "./PriceContext";
 import { Button, CardImage, Field, inputCls } from "./ui";
 
 interface PortfolioLite {
@@ -185,6 +186,9 @@ function Sheet({ card, onClose, onAdded }: { card: AddSheetCard; onClose: () => 
               ))}
             </select>
           </Field>
+          <div className="col-span-2">
+            {unit ? <PriceContext prices={card.prices} market={unit.market} variant={variantLabel(variant)} amount={unit.amount} /> : <p className="text-xs text-muted">No market quote for {variantLabel(variant)}. This card will not have an estimated value until pricing is available.</p>}
+          </div>
           <Field label="Condition">
             <select className={inputCls} value={condition} onChange={(e) => setCondition(e.target.value as (typeof CONDITIONS)[number])} disabled={graded}>
               {CONDITIONS.map((c) => (

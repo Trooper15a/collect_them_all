@@ -35,6 +35,7 @@ export default function ScanPage() {
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [showAllGames, setShowAllGames] = useState(false);
   const [guestQueue, setGuestQueue] = useState<AddSheetCard[]>([]);
+  const [storageReady, setStorageReady] = useState(false);
   const GUEST_QUEUE_LIMIT = 10;
 
   // Load persisted state after mount (SSR-safe defaults above avoid hydration mismatch).
@@ -58,6 +59,7 @@ export default function ScanPage() {
         if (Array.isArray(parsed)) setGuestQueue(parsed);
       }
     } catch { /* corrupt/unavailable storage — keep defaults */ }
+    setStorageReady(true);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
@@ -65,8 +67,20 @@ export default function ScanPage() {
     try { localStorage.setItem("recentScans", JSON.stringify(recentScans)); } catch {}
   }, [recentScans]);
   useEffect(() => {
+    if (!storageReady) return;
     try { localStorage.setItem("guestQueue", JSON.stringify(guestQueue)); } catch {}
-  }, [guestQueue]);
+  }, [guestQueue, storageReady]);
+
+  useEffect(() => {
+    if (!storageReady || !isLoggedIn || guestQueue.length === 0) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- transfer restored browser queue when the session becomes authenticated
+    setBulkQueue((previous) => {
+      const seen = new Set(previous.map((card) => card.id));
+      return [...previous, ...guestQueue.filter((card) => !seen.has(card.id))];
+    });
+    setGuestQueue([]);
+    showToast("Your guest scans are ready to review and save.", "info");
+  }, [guestQueue, isLoggedIn, storageReady]);
 
   const loadPortfolios = useCallback(() => {
     fetch("/api/portfolios")
@@ -84,8 +98,9 @@ export default function ScanPage() {
   }, []);
   useEffect(() => { if (isLoggedIn) loadPortfolios(); }, [isLoggedIn, loadPortfolios]);
   useEffect(() => {
+    if (!storageReady) return;
     try { localStorage.setItem("bulkQueue", JSON.stringify(bulkQueue)); } catch {}
-  }, [bulkQueue]);
+  }, [bulkQueue, storageReady]);
   useEffect(() => {
     try { localStorage.setItem("bulkMode", bulkMode ? "1" : "0"); } catch {}
   }, [bulkMode]);
@@ -184,7 +199,7 @@ export default function ScanPage() {
         <div className="fixed inset-0 z-50 flex items-end justify-center">
           <button className="absolute inset-0 bg-black/70" onClick={() => setMatches(null)} aria-label="Close" />
           <div className="relative glass w-full max-w-lg rounded-t-3xl p-5 pb-[max(env(safe-area-inset-bottom),20px)] anim-widget d1" style={{ animationName: "slide-up-sheet" }}>
-            <div className="text-xs text-muted mb-3">Is it one of these? Tap to add.</div>
+            <div className="text-xs text-muted mb-3">Compare the image, language, set and number. Confirm the finish before saving; match scores are similarity only.</div>
             {activeTcgLabel && gameMatches && (
               <div className="text-[11px] text-muted mb-2 flex items-center justify-between gap-2">
                 <span>
@@ -215,7 +230,7 @@ export default function ScanPage() {
                     {resolvingId === m.card.id ? (
                       <span className="w-4 h-4 rounded-full border-2 border-accent border-t-transparent animate-spin" aria-label="Resolving" />
                     ) : (
-                      <div className="text-xs tabular text-muted">{(m.score * 100).toFixed(0)}%</div>
+                      <div className="text-xs tabular text-muted" title="Image similarity, not a probability of a correct match">{(m.score * 100).toFixed(0)}% similarity</div>
                     )}
                   </button>
                 </li>
@@ -275,14 +290,14 @@ export default function ScanPage() {
                   : "Sign in to save cards to your collection."}
               </div>
             </div>
-            <Link href="/login" className="text-xs font-semibold text-accent px-3 py-1.5 rounded-lg bg-accent/10 whitespace-nowrap">Sign in</Link>
+            <Link href="/login?callbackUrl=%2Fscan" className="text-xs font-semibold text-accent px-3 py-1.5 rounded-lg bg-accent/10 whitespace-nowrap">Sign in to save</Link>
           </div>
         </div>
       )}
       {isLoggedIn && bulkQueue.length > 0 && !scanning && (
         <div className="card-surface rounded-3xl p-4 mt-4">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold">Scanned cards ({bulkQueue.length})</h3>
+            <div><h3 className="text-sm font-semibold">Scanned cards ({bulkQueue.length})</h3><p className="text-xs text-muted">Review each card’s variant and condition before saving, or add all with your bulk defaults.</p></div>
             <div className="flex gap-2">
               {confirmingClear ? (
                 <>

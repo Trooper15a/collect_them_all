@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Scanner } from "@/components/Scanner";
+import { PriceContext } from "@/components/PriceContext";
 import { Button, CardImage, Empty, Money, Segmented, Skeleton, TcgBadge, inputCls } from "@/components/ui";
 import { haptic } from "@/lib/haptics";
 import { isScanIndexId, scanThumbnailUrl, type Match } from "@/lib/scanner/matcher";
-import { TCGS, type CardSummary } from "@/lib/types";
+import { bestPrice, TCGS, variantLabel, type CardSummary } from "@/lib/types";
 import { useActiveTcgHydrated, type ActiveTcg } from "@/lib/ui-prefs";
 import type { AddSheetCard } from "@/components/AddToPortfolioSheet";
 
@@ -186,7 +187,7 @@ export function CardDiscovery({ initialTcg, compact = false, allowCamera = true,
                 <article key={card.id} className="card-surface overflow-hidden rounded-2xl">
                   <button type="button" onClick={() => selectResult(card)} className="block w-full text-left" aria-label={`Add ${card.name}`}>
                     <CardImage id={card.id} className="w-full" alt={card.name} directUrl={card.imageUrl} />
-                    <span className="block p-2.5">
+                    <div className="p-2.5">
                       <span className="block line-clamp-2 text-sm font-medium">{card.name}</span>
                       <span className="block truncate text-[11px] text-muted">{card.setName} {card.cardNumber && `#${card.cardNumber}`}</span>
                       <TcgBadge tcg={card.tcg} lang={card.language} />
@@ -194,7 +195,14 @@ export function CardDiscovery({ initialTcg, compact = false, allowCamera = true,
                         <span>{card.price ? <Money amount={card.display?.amount ?? card.price.amount} currency={card.display?.currency ?? card.price.currency} /> : "—"}</span>
                         <span className="rounded-lg bg-accent/10 px-2 py-1 text-xs font-semibold text-accent">Add</span>
                       </span>
-                    </span>
+                      {(() => {
+                        const quote = bestPrice(card.prices);
+                        return quote ? <>
+                          <span className="block mt-1 text-[11px] text-muted">{variantLabel(quote.variant)} · raw market estimate</span>
+                          <PriceContext prices={card.prices} market={quote.market} variant={variantLabel(quote.variant)} amount={quote.amount} compact />
+                        </> : <span className="block mt-1 text-[11px] text-muted">No market price available</span>;
+                      })()}
+                    </div>
                   </button>
                 </article>
               ))}
@@ -208,13 +216,13 @@ export function CardDiscovery({ initialTcg, compact = false, allowCamera = true,
         <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal aria-label="Choose a card match">
           <button className="absolute inset-0 bg-black/70" onClick={() => setMatches(null)} aria-label="Close" />
           <div className="relative glass w-full max-w-lg rounded-t-3xl p-5 pb-[max(env(safe-area-inset-bottom),20px)]">
-            <p className="mb-3 text-xs text-muted">Is it one of these? Tap to add.</p>
+            <p className="mb-3 text-xs text-muted">Compare the image, language, set and number. Confirm the finish before saving; match order is only a suggestion.</p>
             <ul className="divide-y divide-line">
               {(visibleMatches?.length ? visibleMatches : matches).map((match, index) => (
                 <li key={match.card.id}>
                   <button type="button" onClick={() => void selectMatch(match)} disabled={resolvingId !== null} className="flex w-full items-center gap-3 py-2.5 text-left disabled:opacity-50">
                     <CardImage id={match.card.id} directUrl={scanThumbnailUrl(match.card)} eager priority={index < 2} className="w-12 rounded-md" alt="" />
-                    <span className="min-w-0 flex-1"><span className="block truncate font-medium">{match.card.name}</span><span className="block truncate text-xs text-muted">{match.card.setName ?? match.card.set} #{match.card.num}</span></span>
+                    <span className="min-w-0 flex-1"><span className="block truncate font-medium">{match.card.name}</span><span className="block truncate text-xs text-muted">{match.card.setName ?? match.card.set} #{match.card.num} · {match.card.lang?.toUpperCase() ?? "Language unknown"}</span></span>
                     {resolvingId === match.card.id && <span className="h-4 w-4 animate-spin rounded-full border-2 border-accent border-t-transparent" aria-label="Resolving" />}
                   </button>
                 </li>

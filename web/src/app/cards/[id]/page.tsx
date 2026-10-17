@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AddToPortfolioSheet } from "@/components/AddToPortfolioSheet";
 import { BackLink } from "@/components/BackLink";
 import { PriceChart } from "@/components/PriceChart";
+import { PriceContext } from "@/components/PriceContext";
 import { showToast } from "@/components/Toast";
 import { Button, CardImage, Empty, Money, Section, Segmented, Skeleton, TcgBadge } from "@/components/ui";
 import { RANGES, type Range, fmtMoney, rangeToDays } from "@/lib/format";
@@ -241,7 +242,7 @@ export default function CardPage() {
         <div className="mt-3 text-3xl font-bold tabular">{headline ? <Money amount={toDisplay(headline.amount)} currency={displayCurrency} /> : <span className="text-muted text-lg">No {market} pricing for this {isSealed ? "product" : "card"}</span>}</div>
         {headline && (
           <div className="text-xs text-muted">
-            {variantLabel(headline.variant)} · market
+            {variantLabel(headline.variant)} · raw market estimate
             {displayCurrency !== currency && (
               <>
                 {" "}
@@ -250,6 +251,7 @@ export default function CardPage() {
             )}
           </div>
         )}
+        {headline && <div className="mt-1"><PriceContext prices={card.prices} market={market} variant={variantLabel(headline.variant)} amount={headline.amount} /></div>}
         <div className="mt-2 -mx-2">
           <PriceChart data={series} currency={displayCurrency} height={160} />
         </div>
