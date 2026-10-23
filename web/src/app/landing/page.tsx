@@ -106,6 +106,25 @@ export default function LandingPage() {
             <br />
             <span className="text-rainbow">Know their worth.</span>
           </h1>
+          <figure className="mt-8">
+            <video
+              className="aspect-video w-full rounded-2xl border border-line bg-black shadow-2xl shadow-black/30"
+              width={1920}
+              height={1080}
+              controls
+              playsInline
+              preload="none"
+              poster="/media/ripnpull-demo.jpg"
+              aria-label="RipnPull product demo"
+              aria-describedby="product-demo-caption"
+            >
+              <source src="/media/ripnpull-demo.mp4" type="video/mp4" />
+              <a href="/media/ripnpull-demo.mp4">Watch the RipnPull demo</a>.
+            </video>
+            <figcaption id="product-demo-caption" className="mt-3 text-sm text-muted">
+              Scan a card. Build your binders. Track your collection.
+            </figcaption>
+          </figure>
           <p className="mt-6 text-lg text-muted max-w-lg mx-auto leading-relaxed">
             The TCG portfolio tracker with AI card scanning, daily prices across 14 games, and an installable app. Free during beta, then just $4.99 — once, forever.
           </p>
