@@ -21,6 +21,7 @@ export default function ScanPage() {
   const { tcg } = useActiveTcgHydrated();
   const [scanning, setScanning] = useState(false);
   const [bulkMode, setBulkMode] = useState(false);
+  const [standMode, setStandMode] = useState(false);
   const [bulkQueue, setBulkQueue] = useState<AddSheetCard[]>([]);
   const [confirmingClear, setConfirmingClear] = useState(false);
   const [matches, setMatches] = useState<Match[] | null>(null);
@@ -129,7 +130,7 @@ export default function ScanPage() {
     try {
       const card = await resolveMatch(m);
       setMatches(null);
-      if (!bulkMode) setScanning(false);
+      if (!bulkMode && !standMode) setScanning(false);
       if (card) {
         // eslint-disable-next-line react-hooks/purity -- event handler (tap on a match row), not render; rule false-positives through the .map() callback
         const scan: RecentScan = { id: card.id, name: card.name, setName: card.setName ?? null, ts: Date.now() };
@@ -141,7 +142,7 @@ export default function ScanPage() {
             showToast(`Guest limit reached (${GUEST_QUEUE_LIMIT}). Sign in to save more!`, "info");
           }
           setScanning(true);
-        } else if (bulkMode) {
+        } else if (bulkMode || standMode) {
           setBulkQueue((prev) => [...prev, card]);
           setScanning(true);
         } else {
@@ -182,9 +183,12 @@ export default function ScanPage() {
       <CardDiscovery initialTcg={tcg} allowCamera onSelect={handleDiscoveryCard} />
 
       {isLoggedIn && (
-        <div className="mt-3 flex justify-end">
-          <Button variant="ghost" onClick={() => { setBulkMode(true); setScanning(true); }}>
+        <div className="mt-3 flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => { setBulkMode(true); setStandMode(false); setScanning(true); }}>
             Bulk scan
+          </Button>
+          <Button variant="ghost" onClick={() => { setStandMode(true); setBulkMode(false); setScanning(true); }}>
+            Stand scan
           </Button>
         </div>
       )}
@@ -194,7 +198,7 @@ export default function ScanPage() {
           <button type="button" onClick={() => setResolveError(null)} aria-label="Dismiss error">✕</button>
         </div>
       )}
-      {scanning && !matches && <Scanner onClose={() => { setScanning(false); setBulkMode(false); }} onMatches={(m) => { haptic("heavy"); setShowAllGames(false); setMatches(m); }} bulkMode={bulkMode} bulkCount={bulkQueue.length} lang="all" />}
+      {scanning && (!matches || standMode) && <Scanner onClose={() => { setScanning(false); setBulkMode(false); setStandMode(false); }} onMatches={(m) => { haptic("heavy"); setShowAllGames(false); setMatches(m); }} paused={!!matches} bulkMode={bulkMode} standMode={standMode} bulkCount={bulkQueue.length} lang="all" />}
       {matches && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
           <button className="absolute inset-0 bg-black/70" onClick={() => setMatches(null)} aria-label="Close" />

@@ -14,6 +14,20 @@ import { useHidePrices } from "@/lib/ui-prefs";
 import { convert, type Rates } from "@/lib/fx";
 import { marketplaceLinks } from "@/lib/marketplace";
 import { type MarketPrices, type NormalizedCard, variantLabel } from "@/lib/types";
+import type { EbaySoldItem } from "@/lib/ebay";
+
+interface PopGrade { grade: string; count: number }
+interface PopGrader { name: string; total: number; gems: number; gemRate: number }
+interface PopData {
+  found: boolean;
+  totalPop: number;
+  totalGems: number;
+  gemRate: number;
+  grades: PopGrade[];
+  graders: PopGrader[];
+  gemrateUrl: string;
+  lastUpdated: string | null;
+}
 
 interface HistoryPoint {
   date: string;
@@ -45,6 +59,12 @@ export default function CardPage() {
   const [threshold, setThreshold] = useState("10");
   const [wishlisted, setWishlisted] = useState(false);
   const [wishBusy, setWishBusy] = useState(false);
+  const [ebaySold, setEbaySold] = useState<{ raw: EbaySoldItem[]; graded: { grade: string; items: EbaySoldItem[] }[] } | null>(null);
+  const [ebayLoadedId, setEbayLoadedId] = useState<string | null>(null);
+  const [pop, setPop] = useState<PopData | null>(null);
+  const [popLoadedId, setPopLoadedId] = useState<string | null>(null);
+  const ebayLoading = !!card && ebayLoadedId !== card.id;
+  const popLoading = !!card && popLoadedId !== card.id;
   const lastTap = useRef(0);
 
   const loadAlert = () =>
@@ -136,6 +156,25 @@ export default function CardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  useEffect(() => {
+    if (!card) return;
+    let active = true;
+    const p = new URLSearchParams({ name: card.name, tcg: card.tcg });
+    if (card.setName) p.set("set", card.setName);
+    if (card.cardNumber) p.set("num", card.cardNumber);
+    fetch(`/api/ebay/sold?${p}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (active) setEbaySold(d ? { raw: d.raw, graded: d.graded } : null); })
+      .catch(() => { if (active) setEbaySold(null); })
+      .finally(() => { if (active) setEbayLoadedId(card.id); });
+    fetch(`/api/pop?cardId=${encodeURIComponent(card.id)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (active) setPop(d?.found ? d : null); })
+      .catch(() => { if (active) setPop(null); })
+      .finally(() => { if (active) setPopLoadedId(card.id); });
+    return () => { active = false; };
+  }, [card?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const series = useMemo(() => {
     const days = rangeToDays(range);
     const cutoff = days ? new Date(now - days * 86400000).toISOString().slice(0, 10) : "";
@@ -164,6 +203,10 @@ export default function CardPage() {
   const isSealed = card.rarity === "Sealed" || meta.sealed === true;
   const displayCurrency = fx?.currency ?? currency;
   const toDisplay = (amount: number) => (fx ? convert(amount, currency, fx.currency, fx.rates) : amount);
+  const listingPrice = (item: EbaySoldItem) => <Money
+    amount={fx ? convert(item.price, item.currency, fx.currency, fx.rates) : item.price}
+    currency={fx?.currency ?? item.currency}
+  />;
 
   return (
     <div>
@@ -334,6 +377,75 @@ export default function CardPage() {
         </div>
       </Section>
 
+      {!isSealed && (
+        <Section title="Population">
+          <div className="card-surface rounded-2xl p-4 text-sm">
+            {popLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-16" />
+                <Skeleton className="h-24" />
+              </div>
+            ) : pop ? (
+              <>
+                <div className="grid grid-cols-3 gap-3 text-center mb-4">
+                  <div>
+                    <div className="text-2xl font-bold tabular">{fmtPop(pop.totalPop)}</div>
+                    <div className="text-[10px] text-muted uppercase tracking-wider">Total graded</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold tabular text-up">{fmtPop(pop.totalGems)}</div>
+                    <div className="text-[10px] text-muted uppercase tracking-wider">Gem Mint+</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold tabular">{pop.gemRate}%</div>
+                    <div className="text-[10px] text-muted uppercase tracking-wider">Gem rate</div>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  {pop.grades.filter((g) => g.count > 0).map((g) => {
+                    const pct = pop.totalPop > 0 ? (g.count / pop.totalPop) * 100 : 0;
+                    return (
+                      <div key={g.grade} className="flex items-center gap-2">
+                        <span className="w-8 text-right text-xs font-semibold text-muted">{g.grade}</span>
+                        <div className="flex-1 h-5 rounded-full bg-white/[0.04] overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${g.grade === "10" ? "bg-up" : g.grade === "9" || g.grade === "9.5" ? "bg-accent/70" : "bg-white/20"}`}
+                            style={{ width: `${Math.max(pct, 1)}%` }}
+                          />
+                        </div>
+                        <span className="w-14 text-right text-xs tabular">{fmtPop(g.count)}</span>
+                        <span className="w-12 text-right text-[10px] text-muted tabular">{pct.toFixed(1)}%</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {pop.graders.length > 1 && (
+                  <div className="mt-4 pt-3 border-t border-line">
+                    <div className="text-[10px] text-muted uppercase tracking-wider mb-2">By grading company</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {pop.graders.map((g) => (
+                        <div key={g.name} className="flex items-center justify-between rounded-xl bg-white/[0.03] border border-line px-3 py-2">
+                          <span className="text-xs font-semibold">{g.name}</span>
+                          <div className="text-right">
+                            <div className="text-xs tabular">{fmtPop(g.total)}</div>
+                            <div className="text-[10px] text-muted tabular">{(g.gemRate * 100).toFixed(1)}% gem</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <a href={pop.gemrateUrl} target="_blank" rel="noreferrer" className="block text-[10px] text-muted mt-3 hover:text-accent">
+                  Data from GemRate · updated {pop.lastUpdated ?? "weekly"} · PSA + BGS + SGC + CGC ↗
+                </a>
+              </>
+            ) : (
+              <div className="text-muted text-center py-3">No population data available</div>
+            )}
+          </div>
+        </Section>
+      )}
+
       <Section title="Details">
         <dl className="card-surface rounded-2xl p-4 grid grid-cols-2 gap-y-2 text-sm">
           <Row k="TCG" v={card.tcg} />
@@ -349,6 +461,64 @@ export default function CardPage() {
           {"atk" in meta && meta.atk != null && <Row k="ATK / DEF" v={`${meta.atk} / ${meta.def ?? "—"}`} />}
         </dl>
       </Section>
+
+      {!isSealed && (
+        <Section title="eBay Listings">
+          <div className="card-surface rounded-2xl p-4 text-sm">
+            {ebayLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-14" />
+                <Skeleton className="h-14" />
+              </div>
+            ) : ebaySold && (ebaySold.raw.length > 0 || ebaySold.graded.length > 0) ? (
+              <>
+                {ebaySold.raw.length > 0 && (
+                  <>
+                    <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">Raw Near Mint — {ebaySold.raw.length} Listings</div>
+                    <div className="space-y-1.5">
+                      {ebaySold.raw.map((item, i) => (
+                        <a key={i} href={item.itemUrl} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-xl bg-white/[0.03] border border-line px-3 py-2 hover:bg-white/[0.06]">
+                          <div className="flex-1 min-w-0">
+                            <div className="truncate text-xs">{item.title}</div>
+                            {item.date && <div className="text-[10px] text-muted">{new Date(item.date).toLocaleDateString()}</div>}
+                          </div>
+                          <div className="font-semibold tabular ml-3 text-accent">{listingPrice(item)}</div>
+                        </a>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {ebaySold.graded.length > 0 && (
+                  <>
+                    <div className="text-xs font-semibold text-muted uppercase tracking-wider mt-4 mb-2">Graded — Recent Listings</div>
+                    {ebaySold.graded.map((g) => (
+                      <div key={g.grade} className="mb-2">
+                        <div className="text-xs font-medium text-muted mb-1">{g.grade}</div>
+                        <div className="space-y-1.5">
+                          {g.items.map((item, i) => (
+                            <a key={i} href={item.itemUrl} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-xl bg-white/[0.03] border border-line px-3 py-2 hover:bg-white/[0.06]">
+                              <div className="flex-1 min-w-0">
+                                <div className="truncate text-xs">{item.title}</div>
+                                {item.date && <div className="text-[10px] text-muted">{new Date(item.date).toLocaleDateString()}</div>}
+                              </div>
+                              <div className="font-semibold tabular ml-3 text-accent">{listingPrice(item)}</div>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
+                <div className="text-[10px] text-muted mt-3">Prices from eBay Browse API · updated every 24h</div>
+              </>
+            ) : (
+              <div className="text-muted text-center py-3">
+                {ebayLoading ? "Loading…" : "No eBay listings available"}
+              </div>
+            )}
+          </div>
+        </Section>
+      )}
 
       <Section title="Sold listings">
         <div className="card-surface rounded-2xl p-4 space-y-2 text-sm">
@@ -456,7 +626,8 @@ export default function CardPage() {
 function ebaySoldUrl(card: NormalizedCard, grade?: string) {
   const num = (card.cardNumber ?? "").split("/")[0].replace(/^0+(?=\d)/, "");
   const name = card.name.replace(/\s+-\s+\d+\/\d+$/, "");
-  const terms = [name, num, card.language === "jap" ? "japanese" : "", grade ?? "", card.tcg === "pokemon" ? "pokemon" : ""].filter(Boolean).join(" ");
+  const set = (card.setName ?? "").replace(/^Scarlet & Violet[:—]\s*/, "SV ").replace(/^Sword & Shield[:—]\s*/, "SWSH ");
+  const terms = [name, set, num, card.language === "jap" ? "japanese" : "", grade ?? "", card.tcg === "pokemon" ? "pokemon" : ""].filter(Boolean).join(" ");
   const u = new URL("https://www.ebay.com/sch/i.html");
   u.searchParams.set("_nkw", terms);
   u.searchParams.set("LH_Sold", "1");
@@ -473,6 +644,12 @@ function Row({ k, v }: { k: string; v: string | null | undefined }) {
       <dd className="text-right">{v}</dd>
     </>
   );
+}
+
+function fmtPop(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(n >= 10_000 ? 0 : 1)}K`;
+  return n.toLocaleString();
 }
 
 function firstMarket(m: MarketPrices) {
