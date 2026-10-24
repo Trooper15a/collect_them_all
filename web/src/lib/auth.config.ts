@@ -53,7 +53,8 @@ export default {
         pathname.startsWith("/api/resolve") ||
         pathname.startsWith("/api/cards") ||
         pathname.startsWith("/api/sets") ||
-        pathname.startsWith("/api/decks/limitless")
+        pathname.startsWith("/api/decks/limitless") ||
+        pathname.startsWith("/api/ebay")
       ) {
         return true;
       }

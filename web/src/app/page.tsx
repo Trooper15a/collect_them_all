@@ -195,7 +195,7 @@ export default function HomePage() {
           </ActionBtn>
         </div>
         <div className="grid grid-cols-3 gap-2 mt-2 stagger-children">
-          <ActionBtn href="/grade" label="Centering">
+          <ActionBtn href="/grade" label="Pre-grade">
             <circle cx="12" cy="12" r="9" strokeDasharray="4 2" />
             <line x1="12" y1="3" x2="12" y2="21" />
             <line x1="3" y1="12" x2="21" y2="12" />

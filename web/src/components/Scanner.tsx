@@ -10,7 +10,7 @@ import { useActiveTcg } from "@/lib/ui-prefs";
 import { showToast } from "./Toast";
 import { Button } from "./ui";
 
-type ScannerProps = { onMatches: (m: Match[]) => void; onClose: () => void; bulkMode?: boolean; standMode?: boolean; bulkCount?: number; lang?: string };
+type ScannerProps = { onMatches: (m: Match[]) => void; onClose: () => void; paused?: boolean; bulkMode?: boolean; standMode?: boolean; bulkCount?: number; lang?: string };
 
 export function Scanner(props: ScannerProps) {
   const [attempt, setAttempt] = useState(0);
@@ -18,7 +18,7 @@ export function Scanner(props: ScannerProps) {
   return <ScannerSession key={`${attempt}:${activeTcg}:${props.lang}`} {...props} activeTcg={activeTcg} onRetry={() => setAttempt((n) => n + 1)} />;
 }
 
-function ScannerSession({ onMatches, onClose, bulkMode, standMode, bulkCount, lang, activeTcg, onRetry }: ScannerProps & { activeTcg: string; onRetry: () => void }) {
+function ScannerSession({ onMatches, onClose, paused = false, bulkMode, standMode, bulkCount, lang, activeTcg, onRetry }: ScannerProps & { activeTcg: string; onRetry: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [engine, setEngine] = useState<ScanEngine | null>(null);
@@ -145,7 +145,7 @@ function ScannerSession({ onMatches, onClose, bulkMode, standMode, bulkCount, la
 
   const scanOnce = useCallback(async () => {
     const v = videoRef.current;
-    if (!v || !engine || engine.status !== "ready" || v.videoWidth === 0) return null;
+    if (paused || !v || !engine || engine.status !== "ready" || v.videoWidth === 0) return null;
     if (scanInFlight.current || manualInFlight.current) return null;
     if (!observeScene()) return null;
     const token = tracker.current.capture();
@@ -168,7 +168,17 @@ function ScannerSession({ onMatches, onClose, bulkMode, standMode, bulkCount, la
     } finally {
       scanInFlight.current = false;
     }
-  }, [engine, activeTcg, lang, observeScene, clearLive]);
+  }, [paused, engine, activeTcg, lang, observeScene, clearLive]);
+
+  const publishMatches = useCallback((matches: Match[]) => {
+    const video = videoRef.current;
+    if (standMode && video && video.videoWidth > 0) {
+      if (!fpCanvasRef.current) fpCanvasRef.current = document.createElement("canvas");
+      lastAcceptedFp.current = frameFingerprint(video, videoGuide(video), fpCanvasRef.current);
+      setStandState("waiting");
+    }
+    onMatches(matches);
+  }, [standMode, onMatches]);
 
   // Only publish live results while their captured scene is still current.
   // In bulk mode, auto-accept after consecutive high-confidence frames.
@@ -178,7 +188,7 @@ function ScannerSession({ onMatches, onClose, bulkMode, standMode, bulkCount, la
   const autoAcceptRef = useRef(false);
   const isBatchMode = bulkMode || standMode;
   useEffect(() => {
-    if (!auto || !engine || engine.status !== "ready") return;
+    if (paused || !auto || !engine || engine.status !== "ready") return;
     let stop = false;
     const tick = async () => {
       if (stop) return;
@@ -220,15 +230,9 @@ function ScannerSession({ onMatches, onClose, bulkMode, standMode, bulkCount, la
             if (isBatchMode && streak.count >= AUTO_ACCEPT_STREAK && m[0].score >= AUTO_ACCEPT_SCORE && !autoAcceptRef.current) {
               autoAcceptRef.current = true;
               haptic("heavy");
-              onMatches(m);
+              publishMatches(m);
               streak.id = "";
               streak.count = 0;
-              if (standMode && v && v.videoWidth > 0) {
-                const guide = videoGuide(v);
-                if (!fpCanvasRef.current) fpCanvasRef.current = document.createElement("canvas");
-                lastAcceptedFp.current = frameFingerprint(v, guide, fpCanvasRef.current);
-                setStandState("waiting");
-              }
               setTimeout(() => { autoAcceptRef.current = false; }, standMode ? 300 : 1000);
             }
           }
@@ -247,15 +251,16 @@ function ScannerSession({ onMatches, onClose, bulkMode, standMode, bulkCount, la
     return () => {
       stop = true;
     };
-  }, [auto, engine, scanOnce, bulkMode, standMode, isBatchMode, onMatches, observeScene, clearLive]);
+  }, [paused, auto, engine, scanOnce, bulkMode, standMode, isBatchMode, publishMatches, observeScene, clearLive]);
 
   async function capture() {
+    if (paused) return;
     if (live.length > 0 && acceptLive()) return;
     if (manualInFlight.current) return;
     manualInFlight.current = true;
-    // A deliberate tap takes priority over the live loop. The engine keeps an
-    // already running inference serial, and no further live scans are started.
-    setAuto(false);
+    // manualInFlight gives this tap priority over the live loop. Single scans
+    // stay manual; batch modes resume automatically after confirmation.
+    if (!isBatchMode) setAuto(false);
     clearLive();
     setScanError(null);
     setBusy(true);
@@ -270,7 +275,7 @@ function ScannerSession({ onMatches, onClose, bulkMode, standMode, bulkCount, la
       const m = await engine.match(input, 5, activeTcg === "all" ? undefined : activeTcg, lang === "all" ? undefined : lang);
       if (!mounted.current) return;
       if (m && m.length > 0) {
-        onMatches(m);
+        publishMatches(m);
       } else if (blurry) {
         showToast("Hold the card steady", "info");
       } else {
@@ -290,10 +295,10 @@ function ScannerSession({ onMatches, onClose, bulkMode, standMode, bulkCount, la
 
   // Accepting the live match takes the same path as "Identify card".
   function acceptLive() {
-    if (manualInFlight.current) return false;
+    if (paused || manualInFlight.current) return false;
     try {
       if (observeScene() && tracker.current.matches.length) {
-        onMatches(tracker.current.matches);
+        publishMatches(tracker.current.matches);
         return true;
       }
     } catch { clearLive(); }
@@ -310,7 +315,7 @@ function ScannerSession({ onMatches, onClose, bulkMode, standMode, bulkCount, la
     : auto ? "Ready · scanning live" : "Ready";
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col">
+    <div className="fixed inset-0 z-50 bg-black flex flex-col" inert={paused} aria-hidden={paused || undefined}>
       <div className="relative flex-1 overflow-hidden">
         <video ref={videoRef} playsInline muted className="absolute inset-0 w-full h-full object-cover" />
         <canvas ref={canvasRef} className="hidden" />
