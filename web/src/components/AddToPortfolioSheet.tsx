@@ -29,13 +29,13 @@ export interface AddedPortfolioItem {
   card: AddSheetCard;
 }
 
-export function AddToPortfolioSheet(props: { card: AddSheetCard | null; onClose: () => void; onAdded?: (result: AddedPortfolioItem) => void }) {
+export function AddToPortfolioSheet(props: { card: AddSheetCard | null; onClose: () => void; onAdded?: (result: AddedPortfolioItem) => void; defaultBinderId?: number }) {
   // Keyed on the card id so every open starts with fresh form state.
   if (!props.card) return null;
   return <Sheet key={props.card.id} {...props} card={props.card} />;
 }
 
-function Sheet({ card, onClose, onAdded }: { card: AddSheetCard; onClose: () => void; onAdded?: (result: AddedPortfolioItem) => void }) {
+function Sheet({ card, onClose, onAdded, defaultBinderId }: { card: AddSheetCard; onClose: () => void; onAdded?: (result: AddedPortfolioItem) => void; defaultBinderId?: number }) {
   const hidePrices = useHidePrices();
   const fm = (n: number, c: string) => (hidePrices ? "•••" : fmtMoney(n, c));
   const sealed = !!card.sealed;
@@ -67,7 +67,7 @@ function Sheet({ card, onClose, onAdded }: { card: AddSheetCard; onClose: () => 
         if (cancelled) return;
         const list: PortfolioLite[] = (d.portfolios ?? []).map((p: PortfolioLite) => ({ id: p.id, name: p.name }));
         setPortfolios(list);
-        if (list.length) setPortfolioId(list[0].id);
+        if (list.length) setPortfolioId(list.find((p) => p.id === defaultBinderId)?.id ?? list[0].id);
       })
       .catch(() => undefined);
     fetch("/api/settings")
@@ -85,7 +85,7 @@ function Sheet({ card, onClose, onAdded }: { card: AddSheetCard; onClose: () => 
     return () => {
       cancelled = true;
     };
-  }, [card.id]);
+  }, [card.id, defaultBinderId]);
 
   const unit = bestPrice(card.prices, variant);
 
@@ -100,7 +100,7 @@ function Sheet({ card, onClose, onAdded }: { card: AddSheetCard; onClose: () => 
       if (pid === "new") {
         const r = await fetch("/api/portfolios", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: selectedPortfolioName }) });
         const body = await r.json();
-        if (!r.ok) throw new Error(body.error ?? "Could not create portfolio");
+        if (!r.ok) throw new Error(body.error ?? "Could not create binder");
         pid = body.id as number;
         selectedPortfolioName = body.name ?? selectedPortfolioName;
       }
@@ -146,25 +146,25 @@ function Sheet({ card, onClose, onAdded }: { card: AddSheetCard; onClose: () => 
             <CardImage id={card.id} className="w-20 rounded-lg flex-shrink-0" alt="" />
           )}
           <div className="min-w-0">
-            <div className="text-xs text-muted">Add to portfolio</div>
+            <div className="text-xs text-muted">Add to binder</div>
             <div className="font-semibold text-lg leading-tight">{card.name}</div>
             <div className="text-xs text-muted">{card.setName}</div>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Portfolio">
+          <Field label="Binder">
             <select className={inputCls} value={String(portfolioId)} onChange={(e) => setPortfolioId(e.target.value === "new" ? "new" : Number(e.target.value))}>
               {portfolios.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
                 </option>
               ))}
-              <option value="new">+ New portfolio…</option>
+              <option value="new">+ New binder…</option>
             </select>
           </Field>
           {portfolioId === "new" ? (
-            <Field label="New portfolio name">
+            <Field label="New binder name">
               <input className={inputCls} value={newName} onChange={(e) => setNewName(e.target.value)} />
             </Field>
           ) : (

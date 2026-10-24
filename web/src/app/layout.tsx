@@ -15,7 +15,7 @@ import "./globals.css";
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
-const TITLE_DEFAULT = "RipnPull — Free TCG Portfolio Tracker";
+const TITLE_DEFAULT = "RipnPull — Free TCG Binder Tracker";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE.url),
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   },
   description: SITE.description,
   keywords: [
-    "TCG portfolio tracker",
+    "TCG binder tracker",
     "card collection tracker",
     "trading card prices",
     "TCGPlayer prices",

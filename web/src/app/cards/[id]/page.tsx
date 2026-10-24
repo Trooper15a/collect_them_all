@@ -1,8 +1,9 @@
 "use client";
 
-import { useParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { AddToPortfolioSheet } from "@/components/AddToPortfolioSheet";
+import { PriceAlertControl } from "@/components/PriceAlertControl";
 import { BackLink } from "@/components/BackLink";
 import { PriceChart } from "@/components/PriceChart";
 import { PriceContext } from "@/components/PriceContext";
@@ -13,7 +14,8 @@ import { GRADE_MULT } from "@/lib/grades";
 import { useHidePrices } from "@/lib/ui-prefs";
 import { convert, type Rates } from "@/lib/fx";
 import { marketplaceLinks } from "@/lib/marketplace";
-import { type MarketPrices, type NormalizedCard, variantLabel } from "@/lib/types";
+import { bestPrice, CONDITION_LABELS, type NormalizedCard, variantLabel } from "@/lib/types";
+import { defaultVariant, unitValue, type OwnedCopy } from "@/lib/valuation";
 import type { EbaySoldItem } from "@/lib/ebay";
 
 interface PopGrade { grade: string; count: number }
@@ -36,6 +38,10 @@ interface HistoryPoint {
 }
 
 export default function CardPage() {
+  return <Suspense fallback={<Skeleton className="h-64" />}><CardDetails /></Suspense>;
+}
+
+function CardDetails() {
   const hidePrices = useHidePrices();
   const fm = (n: number | null | undefined, c?: string | null) => (hidePrices ? "•••" : fmtMoney(n, c ?? undefined));
   // Next 16 useParams() returns the RAW percent-encoded segment — card ids contain ":",
@@ -43,9 +49,17 @@ export default function CardPage() {
   // (fetches re-encode with encodeURIComponent where needed.)
   const { id: rawId } = useParams<{ id: string }>();
   const id = decodeURIComponent(rawId);
+  const searchParams = useSearchParams();
+  const itemId = searchParams.get("itemId");
+  const initialVariant = searchParams.get("variant");
+  const contextKey = JSON.stringify([id, itemId, initialVariant]);
+  const requestNumber = useRef(0);
+  const [loadedContext, setLoadedContext] = useState<string | null>(null);
+  const [item, setItem] = useState<OwnedCopy | null>(null);
+  const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
   const [card, setCard] = useState<NormalizedCard | null>(null);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ message: string; context: string } | null>(null);
   const [range, setRange] = useState<Range>("3M");
   const [market, setMarket] = useState<"tcgplayer" | "cardmarket">("tcgplayer");
   const [mode, setMode] = useState<"raw" | "graded">("raw");
@@ -54,9 +68,6 @@ export default function CardPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [now] = useState(() => Date.now());
   const [fx, setFx] = useState<{ rates: Rates; currency: string } | null>(null);
-  const [alert, setAlert] = useState<{ id: number; thresholdPct: number } | null | undefined>(undefined);
-  const [alertOpen, setAlertOpen] = useState(false);
-  const [threshold, setThreshold] = useState("10");
   const [wishlisted, setWishlisted] = useState(false);
   const [wishBusy, setWishBusy] = useState(false);
   const [ebaySold, setEbaySold] = useState<{ raw: EbaySoldItem[]; graded: { grade: string; items: EbaySoldItem[] }[] } | null>(null);
@@ -67,58 +78,32 @@ export default function CardPage() {
   const popLoading = !!card && popLoadedId !== card.id;
   const lastTap = useRef(0);
 
-  const loadAlert = () =>
-    fetch("/api/alerts")
-      .then((r) => r.json())
-      .then((d) => {
-        const mine = (d.alerts ?? []).find((a: { card: { id: string } }) => a.card.id === id);
-        setAlert(mine ? { id: mine.id, thresholdPct: mine.thresholdPct } : null);
-        if (mine) setThreshold(String(mine.thresholdPct));
-      })
-      .catch(() => setAlert(null));
-  async function saveAlert() {
-    const pct = Number(threshold);
-    if (!Number.isFinite(pct) || pct < 1 || pct > 95) return;
+  const load = async (refresh = false, variant: string | null = selectedVariant): Promise<boolean> => {
+    const request = ++requestNumber.current;
+    const key = contextKey;
+    const query = new URLSearchParams();
+    if (itemId !== null) query.set("itemId", itemId);
+    else if (variant) query.set("variant", variant);
+    if (refresh) query.set("refresh", "1");
     try {
-      const r = await fetch("/api/alerts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cardId: id, thresholdPct: pct }) });
-      if (!r.ok) throw new Error("Failed");
-      setAlertOpen(false);
-      showToast("Alert saved ✓", "up");
-      loadAlert();
-    } catch {
-      showToast("Save failed — try again", "down");
+      const r = await fetch(`/api/cards/${encodeURIComponent(id)}${query.size ? `?${query}` : ""}`);
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error ?? "Failed");
+      if (request !== requestNumber.current) return false;
+      setCard(d.card);
+      setItem(d.item ?? null);
+      setSelectedVariant(d.variant ?? d.item?.variantType ?? defaultVariant(d.card.prices));
+      setHistory(d.history ?? []);
+      setError(null);
+      setLoadedContext(key);
+      if (d.fx && d.displayCurrency) setFx({ rates: d.fx, currency: d.displayCurrency });
+      if (!d.card.prices.tcgplayer && d.card.prices.cardmarket) setMarket("cardmarket");
+      return true;
+    } catch (e) {
+      if (request === requestNumber.current && !refresh) setError({ message: (e as Error).message, context: key });
+      return false;
     }
-  }
-  async function removeAlert() {
-    if (!alert) return;
-    try {
-      const r = await fetch(`/api/alerts/${alert.id}`, { method: "DELETE" });
-      if (!r.ok) throw new Error("Failed");
-      setAlertOpen(false);
-      showToast("Alert removed", "info");
-      loadAlert();
-    } catch {
-      showToast("Delete failed — try again", "down");
-    }
-  }
-
-  const load = (refresh = false): Promise<boolean> =>
-    fetch(`/api/cards/${encodeURIComponent(id)}${refresh ? "?refresh=1" : ""}`)
-      .then(async (r) => {
-        if (!r.ok) throw new Error((await r.json()).error ?? "Failed");
-        return r.json();
-      })
-      .then((d) => {
-        setCard(d.card);
-        setHistory(d.history ?? []);
-        if (d.fx && d.displayCurrency) setFx({ rates: d.fx, currency: d.displayCurrency });
-        if (!d.card.prices.tcgplayer && d.card.prices.cardmarket) setMarket("cardmarket");
-        return true;
-      })
-      .catch((e) => {
-        if (!refresh) setError((e as Error).message);
-        return false;
-      });
+  };
 
   const loadWishlist = () =>
     fetch("/api/wishlist")
@@ -150,11 +135,13 @@ export default function CardPage() {
   };
 
   useEffect(() => {
-    load();
-    loadAlert();
+    let active = true;
+    const requests = requestNumber;
+    void Promise.resolve().then(() => { if (active) return load(false, initialVariant); });
     loadWishlist();
+    return () => { active = false; requests.current++; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, itemId, initialVariant]);
 
   useEffect(() => {
     if (!card) return;
@@ -185,8 +172,8 @@ export default function CardPage() {
     });
   }, [history, range, market, now, fx]);
 
-  if (error) return <Empty>{error}</Empty>;
-  if (!card)
+  if (error?.context === contextKey) return <Empty>{error.message}</Empty>;
+  if (!card || loadedContext !== contextKey)
     return (
       <div className="pt-4 space-y-3">
         <Skeleton className="aspect-[63/88] w-2/3 mx-auto" />
@@ -198,7 +185,10 @@ export default function CardPage() {
   const cm = card.prices.cardmarket;
   const active = market === "tcgplayer" ? tp : cm;
   const currency = active?.currency ?? "USD";
-  const headline = active ? firstMarket(active) : null;
+  const variant = selectedVariant ?? defaultVariant(card.prices);
+  const headline = bestPrice({ [market]: active }, variant);
+  const ownedValue = item ? unitValue(card, item.variantType, item.condition, item.isGraded, item.gradingCompany, item.grade) : null;
+  const variants = [...new Set([variant, ...Object.keys(tp?.variants ?? {}), ...Object.keys(cm?.variants ?? {})])];
   const meta = (card.meta ?? {}) as Record<string, unknown>;
   const isSealed = card.rarity === "Sealed" || meta.sealed === true;
   const displayCurrency = fx?.currency ?? currency;
@@ -213,9 +203,7 @@ export default function CardPage() {
       <header className="pt-2 pb-3 flex items-center gap-3">
         <BackLink fallback="/scan" label="Back" />
         <div className="flex-1" />
-        <button onClick={() => setAlertOpen(true)} className={`text-xs mr-3 ${alert ? "text-accent" : "text-muted"}`} aria-label="Price alert">
-          {alert ? `🔔 ±${alert.thresholdPct}%` : "🔕 Alert"}
-        </button>
+        <PriceAlertControl key={id} cardId={id} cardName={card.name} defaultVariant={selectedVariant ?? "normal"} />
         <button
           onClick={async () => {
             if (refreshing) return;
@@ -259,7 +247,34 @@ export default function CardPage() {
         </div>
       </div>
 
+      {item && (
+        <section aria-label="Your copy" className="card-surface rounded-3xl p-4 mt-4 border border-accent/30">
+          <div className="text-sm font-semibold">Your copy · <a className="text-accent" href={`/portfolios/${item.portfolioId}`}>{item.portfolioName}</a></div>
+          <div className="text-sm text-muted mt-1">
+            {variantLabel(item.variantType)} · {CONDITION_LABELS[item.condition as keyof typeof CONDITION_LABELS] ?? item.condition}
+            {item.isGraded && ` · ${item.gradingCompany ?? "Graded"} ${item.grade ?? ""}`}
+          </div>
+          <div className="mt-2 text-3xl font-bold tabular">
+            {ownedValue ? <Money amount={fx ? convert(ownedValue.amount, ownedValue.currency, fx.currency, fx.rates) : ownedValue.amount} currency={fx?.currency ?? ownedValue.currency} /> : <span className="text-lg text-muted">No quote for this finish</span>}
+          </div>
+          <div className="text-xs text-muted">Per-copy {item.isGraded ? "graded" : "condition-adjusted"} estimate</div>
+          <div className="mt-2 text-sm">{item.quantity} {item.quantity === 1 ? "copy" : "copies"} · Total estimate {ownedValue ? <Money amount={(fx ? convert(ownedValue.amount, ownedValue.currency, fx.currency, fx.rates) : ownedValue.amount) * item.quantity} currency={fx?.currency ?? ownedValue.currency} /> : "unavailable"}</div>
+          <div className="text-xs text-muted mt-2">Based on the exact finish&apos;s raw market quote; condition and grading values are estimates.</div>
+        </section>
+      )}
+
       <div className="card-surface rounded-3xl p-4 mt-4">
+        <div className="text-sm font-semibold mb-2">{item ? "Raw market reference" : "Market value"} · {variantLabel(variant)}</div>
+        {!item && <label className="flex items-center gap-2 text-xs text-muted mb-3">Finish
+          <select aria-label="Finish" value={variant} className="rounded-lg bg-elev border border-line px-2 py-1" onChange={(e) => {
+            const next = e.target.value;
+            setSelectedVariant(next);
+            setHistory([]);
+            load(false, next);
+          }}>
+            {variants.map((v) => <option key={v} value={v}>{variantLabel(v)}</option>)}
+          </select>
+        </label>}
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <Segmented
             value={market}
@@ -295,6 +310,7 @@ export default function CardPage() {
           </div>
         )}
         {headline && <div className="mt-1"><PriceContext prices={card.prices} market={market} variant={variantLabel(headline.variant)} amount={headline.amount} /></div>}
+        <div className="text-xs text-muted mt-2">Raw market history · {variantLabel(variant)}</div>
         <div className="mt-2 -mx-2">
           <PriceChart data={series} currency={displayCurrency} height={160} />
         </div>
@@ -304,6 +320,7 @@ export default function CardPage() {
 
         {mode === "raw" && active && (
           <table className="w-full text-sm mt-4">
+            <caption className="text-xs text-muted text-left mb-2">Market reference quotes by finish · excludes condition and grading adjustments</caption>
             <thead className="text-[10px] uppercase tracking-wider text-muted">
               <tr>
                 <th className="text-left font-medium py-1">Variant</th>
@@ -570,44 +587,11 @@ export default function CardPage() {
             {wishlisted ? "♥" : "♡"}
           </button>
           <Button variant="rainbow" className="pointer-events-auto shadow-[0_10px_30px_rgba(167,139,250,0.3)]" onClick={() => setAdding(true)}>
-            + Add to portfolio
+            + Add to binder
           </Button>
         </div>
       </div>
 
-      {alertOpen && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center">
-          <button className="absolute inset-0 bg-black/60" onClick={() => setAlertOpen(false)} aria-label="Close" />
-          <div className="relative glass w-full max-w-lg rounded-t-3xl p-5 pb-[max(env(safe-area-inset-bottom),20px)]">
-            <div className="font-semibold text-lg">Price alert</div>
-            <div className="text-xs text-muted mb-3">Show a badge on the dashboard when this card moves more than this much from its price today.</div>
-            <label className="block text-xs text-muted mb-1">Threshold (%)</label>
-            <input type="number" min={1} max={95} step={1} inputMode="numeric" value={threshold} onChange={(e) => setThreshold(e.target.value)} autoFocus className="w-full rounded-xl bg-elev border border-line px-3 py-2.5 text-sm outline-none focus:border-accent/60" />
-            {(() => {
-              const pct = Number(threshold);
-              const valid = Number.isFinite(pct) && pct >= 1 && pct <= 95;
-              return (
-                <>
-                  {!valid && <div className="text-xs text-down mt-1">Enter a value between 1 and 95.</div>}
-                  <div className="mt-4 flex gap-2">
-                    {alert && (
-                      <Button variant="danger" onClick={removeAlert}>
-                        Remove
-                      </Button>
-                    )}
-                    <Button variant="ghost" className="flex-1" onClick={() => setAlertOpen(false)}>
-                      Cancel
-                    </Button>
-                    <Button className="flex-1" onClick={saveAlert} disabled={!valid}>
-                      Save alert
-                    </Button>
-                  </div>
-                </>
-              );
-            })()}
-          </div>
-        </div>
-      )}
       {zoom && (
         <button className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4" onClick={() => setZoom(false)}>
           {isSealed ? (
@@ -650,12 +634,4 @@ function fmtPop(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(n >= 10_000 ? 0 : 1)}K`;
   return n.toLocaleString();
-}
-
-function firstMarket(m: MarketPrices) {
-  for (const [variant, v] of Object.entries(m.variants ?? {})) {
-    const amount = v.market ?? v.trend ?? v.avg7 ?? v.mid ?? v.low;
-    if (amount != null) return { amount, variant };
-  }
-  return null;
 }

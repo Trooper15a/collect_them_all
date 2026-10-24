@@ -151,7 +151,7 @@ export default function ImportPage() {
             </div>
 
             <label className="block text-sm mb-4">
-              <span className="text-muted">Portfolio name</span>
+              <span className="text-muted">Binder name</span>
               <input
                 value={portfolio}
                 onChange={(e) => setPortfolio(e.target.value)}

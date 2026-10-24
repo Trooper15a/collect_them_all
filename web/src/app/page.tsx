@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { PriceAlertControl } from "@/components/PriceAlertControl";
 import { PriceChart } from "@/components/PriceChart";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { FirstBinderMilestone } from "@/components/FirstBinderMilestone";
 import { CardImage, Delta, Empty, Money, Segmented, Skeleton } from "@/components/ui";
 import { RANGES, type Range } from "@/lib/format";
+import { variantLabel } from "@/lib/types";
 import { useHidePrices } from "@/lib/ui-prefs";
 
 interface SlimItem {
@@ -30,7 +32,10 @@ interface AlertRow {
   id: number;
   card: { id: string; name: string; setName: string | null; cardNumber: string | null; tcg: string; language: string };
   thresholdPct: number;
+  variantType: string;
+  direction: "drop" | "rise" | "either";
   basePrice: number | null;
+  baseCurrency: string | null;
   currentPrice: number | null;
   currency: string | null;
   changePct: number | null;
@@ -67,6 +72,7 @@ export default function HomePage() {
   const [range, setRange] = useState<Range>("1M");
   const [data, setData] = useState<Dashboard | null>(null);
   const [alerts, setAlerts] = useState<AlertRow[]>([]);
+  const [showAllAlerts, setShowAllAlerts] = useState(false);
   const hidePrices = useHidePrices();
   const loadAlerts = () =>
     fetch("/api/alerts")
@@ -210,6 +216,7 @@ export default function HomePage() {
         </div>
       </div>
 
+      {alerts.length > 3 && <button className="mt-3 text-xs text-accent" onClick={() => setShowAllAlerts((value) => !value)}>{showAllAlerts ? "Show fewer alerts" : `Show all alerts (${alerts.length})`}</button>}
       {/* ── Widget: Triggered Alerts ── */}
       {triggeredAlerts.length > 0 && (
         <div className="card-surface rounded-3xl p-4 mt-3 anim-widget d5">
@@ -218,28 +225,20 @@ export default function HomePage() {
             <span className="text-xs text-muted font-medium">{triggeredAlerts.length} Price Alert{triggeredAlerts.length > 1 ? "s" : ""} Triggered</span>
           </div>
           <ul className="space-y-2 stagger-children">
-            {triggeredAlerts.slice(0, 3).map((a) => (
+            {triggeredAlerts.slice(0, showAllAlerts ? undefined : 3).map((a) => (
               <li key={a.id} className="flex items-center gap-3 rounded-2xl bg-down/[0.06] p-3 tap-scale">
-                <Link href={`/cards/${encodeURIComponent(a.card.id)}`} className="flex items-center gap-3 flex-1 min-w-0">
+                <Link href={`/cards/${encodeURIComponent(a.card.id)}?variant=${encodeURIComponent(a.variantType)}`} className="flex items-center gap-3 flex-1 min-w-0">
                   <CardImage id={a.card.id} className="w-10 rounded-md" alt="" />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium truncate text-sm">{a.card.name}</div>
-                    <div className="text-xs text-muted truncate">{a.card.setName}</div>
+                    <div className="text-xs text-muted truncate">{a.card.setName} · {variantLabel(a.variantType)}</div>
                   </div>
                 </Link>
                 <div className="text-right">
                   <div className="font-semibold text-sm"><Money amount={a.currentPrice} currency={a.currency ?? "USD"} /></div>
                   <div className="text-xs"><Delta pct={a.changePct} /></div>
                 </div>
-                <button
-                  onClick={async () => {
-                    await fetch(`/api/alerts/${a.id}`, { method: "POST" });
-                    loadAlerts();
-                  }}
-                  className="text-[10px] text-accent ml-1"
-                >
-                  Dismiss
-                </button>
+                <PriceAlertControl cardId={a.card.id} cardName={a.card.name} initialAlert={a} onChanged={loadAlerts} />
               </li>
             ))}
           </ul>
@@ -385,19 +384,20 @@ export default function HomePage() {
         <div className="card-surface rounded-3xl p-4 mt-3 anim-widget d8">
           <div className="text-xs text-muted font-medium mb-3">Watching ({alerts.filter((a) => !a.triggered).length})</div>
           <ul className="space-y-1 stagger-children">
-            {alerts.filter((a) => !a.triggered).slice(0, 4).map((a) => (
-              <li key={a.id}>
-                <Link href={`/cards/${encodeURIComponent(a.card.id)}`} className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.03] tap-scale">
+            {alerts.filter((a) => !a.triggered).slice(0, showAllAlerts ? undefined : 4).map((a) => (
+              <li key={a.id} className="flex items-center gap-2">
+                <Link href={`/cards/${encodeURIComponent(a.card.id)}?variant=${encodeURIComponent(a.variantType)}`} className="flex flex-1 min-w-0 items-center gap-3 p-2 rounded-xl hover:bg-white/[0.03] tap-scale">
                   <CardImage id={a.card.id} className="w-8 rounded" alt="" />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate">{a.card.name}</div>
-                    <div className="text-[11px] text-muted">±{a.thresholdPct}% alert</div>
+                    <div className="text-[11px] text-muted">{variantLabel(a.variantType)} · {a.direction === "drop" ? "↓" : a.direction === "rise" ? "↑" : "±"}{a.thresholdPct}% alert</div>
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-semibold tabular"><Money amount={a.currentPrice} currency={a.currency ?? "USD"} /></div>
                     <div className="text-xs"><Delta pct={a.changePct} /></div>
                   </div>
                 </Link>
+                <PriceAlertControl cardId={a.card.id} cardName={a.card.name} initialAlert={a} onChanged={loadAlerts} />
               </li>
             ))}
           </ul>

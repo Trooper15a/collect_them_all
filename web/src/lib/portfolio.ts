@@ -3,8 +3,9 @@ import { db, schema } from "@/db";
 import { getCard, recordPriceSnapshot, refreshCardPrices, rowToCard } from "./cards";
 import { convert, getRates, type Rates } from "./currency";
 import { daysAgo, today, type Range, rangeToDays } from "./format";
-import { GRADE_MULT } from "./grades";
-import { bestPrice, type CardPrices, type NormalizedCard } from "./types";
+import { unitValue } from "./valuation";
+export { unitValue } from "./valuation";
+import { type CardPrices, type NormalizedCard } from "./types";
 
 export interface ValuedItem {
   id: number;
@@ -29,18 +30,6 @@ export interface ValuedItem {
   gainPct: number | null;
   change24h: number | null;
   change24hPct: number | null;
-}
-
-const CONDITION_MULT: Record<string, number> = { NM: 1, LP: 0.85, MP: 0.7, HP: 0.5, DMG: 0.35 };
-
-// GRADE_MULT lives in ./grades (shared with the card page's graded estimates).
-
-export function unitValue(card: NormalizedCard, variant: string, condition: string, isGraded: boolean, gradingCompany: string | null, grade: string | null) {
-  const bp = bestPrice(card.prices, variant);
-  if (!bp) return null;
-  let mult = isGraded ? (GRADE_MULT[`${gradingCompany} ${grade}`] ?? 1) : (CONDITION_MULT[condition] ?? 1);
-  if (!Number.isFinite(mult)) mult = 1;
-  return { amount: bp.amount * mult, currency: bp.currency, variant: bp.variant, raw: bp.amount };
 }
 
 type PreviousPrice = { tcgplayerMarket: number | null; cardmarketAvg: number | null };
@@ -182,7 +171,10 @@ export async function refreshOwnedPrices(opts: { userId?: string; maxCards?: num
   const itemRows = opts.userId
     ? await baseQuery.innerJoin(schema.portfolios, eq(schema.portfolioItems.portfolioId, schema.portfolios.id)).where(eq(schema.portfolios.userId, opts.userId))
     : await baseQuery;
-  const ids = [...new Set(itemRows.map((r) => r.cardId))];
+  // Missing singles watched for a price move need the same refresh as owned cards.
+  const watchedQuery = db.select({ cardId: schema.alerts.cardId }).from(schema.alerts);
+  const watchedRows = opts.userId ? await watchedQuery.where(eq(schema.alerts.userId, opts.userId)) : await watchedQuery;
+  const ids = [...new Set([...itemRows, ...watchedRows].map((r) => r.cardId))];
   const cards = ids.length ? await db.select().from(schema.cards).where(inArray(schema.cards.id, ids)) : [];
   const stale = opts.onlyStale === false ? cards : cards.filter((c) => !c.priceUpdatedAt || Date.now() - Date.parse(c.priceUpdatedAt) > 20 * 3600 * 1000);
   let refreshed = 0;

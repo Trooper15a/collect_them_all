@@ -13,7 +13,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const portfolioId = Number((await ctx.params).id);
   if (!Number.isInteger(portfolioId)) return NextResponse.json({ error: "Bad id" }, { status: 400 });
   const portfolios = await db.select().from(schema.portfolios).where(and(eq(schema.portfolios.id, portfolioId), eq(schema.portfolios.userId, userId))).limit(1);
-  if (!portfolios[0]) return NextResponse.json({ error: "Portfolio not found" }, { status: 404 });
+  if (!portfolios[0]) return NextResponse.json({ error: "Binder not found" }, { status: 404 });
   const parsed = ItemBody.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
   const d = parsed.data;

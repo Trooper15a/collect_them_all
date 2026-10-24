@@ -18,7 +18,7 @@ export function startCron() {
     } catch (err) {
       console.error("[cron] tcgcsv import failed", err);
     }
-    console.log("[cron] refreshing owned card prices...");
+    console.log("[cron] refreshing owned and watched card prices...");
     try {
       const r = await refreshOwnedPrices();
       console.log(`[cron] done: refreshed ${r.refreshed}, failed ${r.failed}, skipped ${r.skipped} of ${r.total}`);

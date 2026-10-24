@@ -1,16 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { PriceAlertControl } from "@/components/PriceAlertControl";
+import { MissingSetAlerts } from "@/components/MissingSetAlerts";
+import { useParams, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AddToPortfolioSheet, type AddSheetCard } from "@/components/AddToPortfolioSheet";
 import { BackLink } from "@/components/BackLink";
 import { SetLogo } from "@/components/SetLogo";
-import { CardImage, Empty, Money, Segmented, Skeleton } from "@/components/ui";
+import { CardImage, Empty, Money, Segmented, Skeleton, inputCls } from "@/components/ui";
 import { showToast } from "@/components/Toast";
 import { langLabel } from "@/lib/format";
 import { tcgplayerSearchUrl } from "@/lib/marketplace";
-import type { CardPrices } from "@/lib/types";
+import { type CardPrices, variantLabel } from "@/lib/types";
 
 interface SetCard {
   id: string;
@@ -21,6 +23,8 @@ interface SetCard {
   price: number | null;
   tcgplayerUrl: string | null;
   owned: number;
+  prices: CardPrices;
+  priceVariant: string | null;
 }
 interface SealedProduct {
   id: string;
@@ -36,17 +40,28 @@ interface Data {
   currency: string;
   cards: SetCard[];
   sealed?: SealedProduct[];
-  completion: { owned: number; total: number; pct: number; missingCost: number; totalValue: number };
+  completion: { owned: number; total: number; pct: number; missingCost: number; totalValue: number; catalogComplete: boolean; catalogTotal: number | null; unpricedMissing: number };
 }
 
 type Sort = "number" | "name" | "price-desc" | "price-asc";
 
 export default function SetPage() {
+  return <Suspense fallback={<Skeleton className="mt-4 h-64" />}><SetDetails /></Suspense>;
+}
+
+function SetDetails() {
   // Next 16 useParams() returns the RAW percent-encoded segment — decode before use.
   const { id: rawId } = useParams<{ id: string }>();
   const id = decodeURIComponent(rawId);
+  const params = useSearchParams();
+  const binderId = params.get("binderId");
+  const mySets = params.get("view") === "my-sets";
+  const context = `${id}/${binderId ?? "all"}`;
+  const [loadedContext, setLoadedContext] = useState("");
+  const requestNumber = useRef(0);
+  const [query, setQuery] = useState("");
   const [data, setData] = useState<Data | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ context: string; message: string } | null>(null);
   const [filter, setFilter] = useState<"all" | "owned" | "missing">("all");
   const [sort, setSort] = useState<Sort>("number");
   const [adding, setAdding] = useState<AddSheetCard | null>(null);
@@ -86,32 +101,36 @@ export default function SetPage() {
     }
   };
 
-  const load = () =>
-    fetch(`/api/sets/${encodeURIComponent(id)}`)
+  const load = useCallback(() => {
+    const request = ++requestNumber.current;
+    return fetch(`/api/sets/${encodeURIComponent(id)}${binderId !== null ? `?binderId=${encodeURIComponent(binderId)}` : ""}`)
       .then(async (r) => {
         if (!r.ok) throw new Error((await r.json()).error ?? "Failed");
         return r.json();
       })
-      .then(setData)
-      .catch((e) => setError(e.message));
+      .then((result) => { if (request === requestNumber.current) { setData(result); setLoadedContext(context); setError(null); } })
+      .catch((e) => { if (request === requestNumber.current) setError({ context, message: e.message }); });
+  }, [id, binderId, context]);
   useEffect(() => {
-    load();
+    void Promise.resolve().then(load);
     loadWishlist();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+    const requests = requestNumber;
+    return () => { requests.current++; };
+  }, [load, loadWishlist]);
 
   const cards = useMemo(() => {
     if (!data) return [];
-    const filtered = data.cards.filter((x) => (filter === "all" ? true : filter === "owned" ? x.owned > 0 : x.owned === 0));
+    const q = query.trim().toLowerCase();
+    const filtered = data.cards.filter((x) => (filter === "all" ? true : filter === "owned" ? x.owned > 0 : x.owned === 0) && (!q || `${x.name} ${x.cardNumber ?? ""}`.toLowerCase().includes(q)));
     const sorted = [...filtered];
     if (sort === "name") sorted.sort((a, b) => a.name.localeCompare(b.name));
     else if (sort === "price-desc") sorted.sort((a, b) => (b.price ?? 0) - (a.price ?? 0));
     else if (sort === "price-asc") sorted.sort((a, b) => (a.price ?? 0) - (b.price ?? 0));
     return sorted;
-  }, [data, filter, sort]);
+  }, [data, filter, sort, query]);
 
-  if (error) return <Empty>{error}</Empty>;
-  if (!data)
+  if (error?.context === context) return <Empty>{error.message}<button className="block mx-auto text-accent mt-3" onClick={load}>Retry</button></Empty>;
+  if (!data || loadedContext !== context)
     return (
       <div className="pt-4 space-y-3">
         <Skeleton className="h-28" />
@@ -124,7 +143,7 @@ export default function SetPage() {
   return (
     <div>
       <header className="pt-2 pb-3 flex items-center gap-3">
-        <BackLink fallback="/sets" label="Sets" />
+        <BackLink fallback={mySets ? `/portfolios?view=sets${binderId ? `&binderId=${binderId}` : ""}` : "/sets"} label={mySets ? "My sets" : "All sets"} />
       </header>
       <div className="card-surface rounded-3xl p-4 flex items-center gap-4">
         <SetLogo id={set.id} code={set.code} tcg={set.tcg} className="w-20 h-14" />
@@ -138,23 +157,24 @@ export default function SetPage() {
 
       <div className="card-surface rounded-3xl p-4 mt-3">
         <div className="flex items-baseline justify-between">
-          <div className="text-xs text-muted">Completion</div>
+          <div className="text-xs text-muted">{c.catalogComplete ? "Completion" : "Imported checklist"}{binderId ? " · this binder" : " · all binders"}</div>
           <div className="text-sm font-semibold tabular">
             {c.owned} / {c.total} · {c.pct.toFixed(0)}%
           </div>
         </div>
+        {!c.catalogComplete && <p className="mt-2 text-xs text-muted">Showing {c.total} imported singles{c.catalogTotal != null ? `; catalogue lists ${c.catalogTotal} products` : ""}. Missing cards below cover this imported checklist.</p>}
         <div className="mt-2 h-2 rounded-full bg-white/[0.06] overflow-hidden">
           <div className="h-full bg-up" style={{ width: `${c.pct}%` }} />
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2 text-center">
           <div className="rounded-2xl bg-white/[0.03] border border-line py-2">
-            <div className="text-[10px] text-muted uppercase tracking-wider">Cost to complete</div>
+            <div className="text-[10px] text-muted uppercase tracking-wider">Missing singles estimate</div>
             <div className="text-sm font-semibold">
               <Money amount={c.missingCost} currency={currency} />
             </div>
           </div>
           <div className="rounded-2xl bg-white/[0.03] border border-line py-2">
-            <div className="text-[10px] text-muted uppercase tracking-wider">Full set value</div>
+            <div className="text-[10px] text-muted uppercase tracking-wider">Checklist market estimate</div>
             <div className="text-sm font-semibold">
               <Money amount={c.totalValue} currency={currency} />
             </div>
@@ -162,6 +182,9 @@ export default function SetPage() {
         </div>
       </div>
 
+      <p className="mt-2 text-[11px] text-muted">Market estimates use the finish shown on each card, before condition or grading. {c.unpricedMissing > 0 && `${c.unpricedMissing} missing singles have no quote and are excluded.`}</p>
+      <MissingSetAlerts key={context} cards={data.cards.filter((card) => card.owned === 0)} />
+      <input aria-label="Search cards in this set" className={`${inputCls} mt-4`} placeholder="Search card name or number…" value={query} onChange={(e) => setQuery(e.target.value)} />
       <div className="mt-4 flex flex-wrap justify-between items-center gap-2">
         <Segmented
           value={filter}
@@ -189,10 +212,11 @@ export default function SetPage() {
         </div>
       </div>
 
+      {cards.length === 0 && <div className="mt-3"><Empty>No cards match this view and search.</Empty></div>}
       <div className="mt-3 grid grid-cols-3 sm:grid-cols-4 gap-2">
         {cards.map((card) => (
           <div key={card.id} className={`card-surface rounded-xl overflow-hidden relative ${card.owned ? "" : "opacity-70"}`}>
-            <Link href={`/cards/${encodeURIComponent(card.id)}`}>
+            <Link href={`/cards/${encodeURIComponent(card.id)}${card.priceVariant ? `?variant=${encodeURIComponent(card.priceVariant)}` : ""}`}>
               <CardImage id={card.id} className="w-full" alt={card.name} />
             </Link>
             {card.owned > 0 && <div className="absolute top-1 right-1 rounded-full bg-up text-black text-[10px] font-bold px-1.5">×{card.owned}</div>}
@@ -202,7 +226,9 @@ export default function SetPage() {
                 <span>#{card.cardNumber}</span>
                 <span className="tabular">{card.price != null ? <Money amount={card.price} currency={currency} /> : "—"}</span>
               </div>
-              <button onClick={() => setAdding({ id: card.id, name: card.name, setName: set.name })} className="mt-1 w-full min-h-8 text-[11px] font-semibold text-accent bg-accent/10 rounded-md py-1">
+              {card.priceVariant && <div className="text-[10px] text-muted">{variantLabel(card.priceVariant)} market</div>}
+              <PriceAlertControl cardId={card.id} cardName={card.name} defaultVariant={card.priceVariant ?? "normal"} />
+              <button onClick={() => setAdding({ id: card.id, name: card.name, setName: set.name, prices: card.prices })} className="mt-1 w-full min-h-8 text-[11px] font-semibold text-accent bg-accent/10 rounded-md py-1">
                 {card.owned > 0 ? "+ More" : "+ Add"}
               </button>
               {card.owned === 0 && (
@@ -258,6 +284,7 @@ export default function SetPage() {
       )}
       <AddToPortfolioSheet
         card={adding}
+        defaultBinderId={binderId ? Number(binderId) : undefined}
         onClose={() => setAdding(null)}
         onAdded={() => {
           setAdding(null);

@@ -7,6 +7,14 @@ export const db = drizzle(client, { schema });
 
 export { schema };
 
+// Alert queries await this promise; the additive migration must finish before
+// Drizzle selects the new column. Keep its failure visible to those callers.
+const alertMigrationGlobal = globalThis as typeof globalThis & { __alertsSchemaReady?: Promise<unknown> };
+export const alertsSchemaReady = alertMigrationGlobal.__alertsSchemaReady ??= client.unsafe(
+  `ALTER TABLE alerts ADD COLUMN IF NOT EXISTS direction TEXT NOT NULL DEFAULT 'either'`,
+);
+void alertsSchemaReady.catch((error) => console.error("[db] alerts.direction migration failed", error));
+
 const migrated = (globalThis as Record<string, unknown>).__dbMigrated;
 if (!migrated) {
   (globalThis as Record<string, unknown>).__dbMigrated = true;
