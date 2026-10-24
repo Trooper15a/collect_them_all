@@ -16,7 +16,7 @@ export default function PrivacyPage() {
         <h1 className="text-3xl font-bold tracking-tight">Privacy Policy</h1>
         <p className="mt-2 text-sm text-muted">Effective date: {EFFECTIVE_DATE}</p>
         <p className="mt-4 text-muted leading-relaxed">
-          {SITE.name} ({SITE.url}) is an open-source TCG portfolio tracker
+          {SITE.name} ({SITE.url}) is an open-source TCG binder tracker
           operated from Canada. This policy explains, in plain language, what
           information we collect, why we collect it, and the choices you have.
         </p>
@@ -34,7 +34,7 @@ export default function PrivacyPage() {
             </li>
             <li>
               <span className="text-fg font-medium">Collection data.</span> The
-              cards, binders, portfolios, quantities, purchase prices, grades,
+              cards, binders, quantities, purchase prices, grades,
               and wishlist entries you add to the app. This is the core data the
               service exists to store for you.
             </li>
@@ -54,7 +54,7 @@ export default function PrivacyPage() {
           <h2 className="text-xl font-semibold mb-2">Why we collect it</h2>
           <p className="text-muted">
             We use your Google profile to sign you in, and your collection data
-            to show you your portfolio, values, and price history. That&apos;s
+            to show you your binder, values, and price history. That&apos;s
             it — we don&apos;t use your data for advertising, profiling, or
             anything unrelated to running the app.
           </p>

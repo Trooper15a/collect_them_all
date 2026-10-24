@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { SetBrowser } from "@/components/SetBrowser";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { showToast } from "@/components/Toast";
 import { Button, Delta, Empty, Field, Money, Skeleton, inputCls } from "@/components/ui";
@@ -27,6 +29,15 @@ interface PortfolioRow {
 }
 
 export default function PortfoliosPage() {
+  return <Suspense fallback={<Skeleton className="mt-4 h-32" />}><Binders /></Suspense>;
+}
+
+function Binders() {
+  const params = useSearchParams();
+  const router = useRouter();
+  const mySets = params.get("view") === "sets";
+  const rawBinder = params.get("binderId");
+  const binderId = rawBinder && /^[1-9]\d*$/.test(rawBinder) ? Number(rawBinder) : undefined;
   const [data, setData] = useState<{ portfolios: PortfolioRow[]; all: Summary; currency: string } | null>(null);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
@@ -108,10 +119,18 @@ export default function PortfoliosPage() {
     <div>
       <header className="pt-2 pb-3 flex items-center justify-between anim-widget d1">
         <h1 className="text-xl font-bold uppercase tracking-wider">My Binders</h1>
-        <Button variant="rainbow" className="px-3 py-1.5 text-xs" onClick={() => setCreating((v) => !v)}>
+        {!mySets && <Button variant="rainbow" className="px-3 py-1.5 text-xs" onClick={() => setCreating((v) => !v)}>
           + New
-        </Button>
+        </Button>}
       </header>
+      <nav aria-label="Binder views" className="flex gap-2 mb-4">
+        <Link href="/portfolios" aria-current={!mySets ? "page" : undefined} className={`rounded-xl px-4 py-2 text-sm ${!mySets ? "bg-accent/15 text-accent" : "text-muted"}`}>Binders</Link>
+        <Link href="/portfolios?view=sets" aria-current={mySets ? "page" : undefined} className={`rounded-xl px-4 py-2 text-sm ${mySets ? "bg-accent/15 text-accent" : "text-muted"}`}>My sets</Link>
+      </nav>
+      {mySets ? <section>
+        <Field label="Cards from"><select className={`${inputCls} mb-4`} value={binderId ?? "all"} onChange={(e) => router.replace(`/portfolios?view=sets${e.target.value === "all" ? "" : `&binderId=${e.target.value}`}`)}><option value="all">All binders</option>{data.portfolios.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
+        <SetBrowser ownedOnly binderId={binderId} />
+      </section> : <>
 
       {creating && (
         <div className="card-surface rounded-2xl p-4 mb-4 grid grid-cols-2 gap-3">
@@ -139,13 +158,13 @@ export default function PortfoliosPage() {
           </Field>
           {error && <div className="col-span-2 text-sm text-down">{error}</div>}
           <Button variant="rainbow" className="col-span-2" onClick={create} disabled={busy || !name.trim()}>
-            {busy ? "Creating…" : "Create portfolio"}
+            {busy ? "Creating…" : "Create binder"}
           </Button>
         </div>
       )}
 
       <div className="card-surface rounded-3xl p-4 anim-widget d2">
-        <div className="text-xs text-muted">All portfolios</div>
+        <div className="text-xs text-muted">All binders</div>
         <div className="text-3xl font-bold tabular mt-1">
           <Money amount={data.all.value} currency={c} />
         </div>
@@ -162,7 +181,7 @@ export default function PortfoliosPage() {
 
       {data.portfolios.length === 0 && (
         <div className="mt-4">
-          <Empty>No portfolios yet. Create one, or add a card from Scan and one will be created for you.</Empty>
+          <Empty>No binders yet. Create one, or add a card from Scan and one will be created for you.</Empty>
         </div>
       )}
 
@@ -199,6 +218,7 @@ export default function PortfoliosPage() {
           </section>
         );
       })}
+    </>}
     </div>
     </PullToRefresh>
   );

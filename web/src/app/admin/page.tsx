@@ -80,8 +80,8 @@ export default function AdminPage() {
       <section className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <StatCard label="Users" value={overview.totalUsers} />
         <StatCard label="Active Sessions" value={overview.activeSessions} />
-        <StatCard label="Portfolios" value={overview.totalPortfolios} />
-        <StatCard label="Cards in Portfolios" value={overview.totalPortfolioItems} />
+        <StatCard label="Binders" value={overview.totalPortfolios} />
+        <StatCard label="Cards in Binders" value={overview.totalPortfolioItems} />
         <StatCard label="Wishlist Items" value={overview.totalWishlistItems} />
         <StatCard label="Box Opens" value={overview.totalBoxOpens} />
         <StatCard label="Price Alerts" value={overview.totalAlerts} />
@@ -136,12 +136,12 @@ export default function AdminPage() {
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold mb-3">Top Portfolios</h2>
+        <h2 className="text-lg font-semibold mb-3">Top Binders</h2>
         <div className="rounded-xl border border-line overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-elev text-muted text-left">
-                <th className="px-4 py-2 font-medium">Portfolio</th>
+                <th className="px-4 py-2 font-medium">Binder</th>
                 <th className="px-4 py-2 font-medium">Owner</th>
                 <th className="px-4 py-2 font-medium text-right">Cards</th>
               </tr>

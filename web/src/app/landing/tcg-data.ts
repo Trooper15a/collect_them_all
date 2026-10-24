@@ -26,7 +26,7 @@ export const TCG_SEO: TcgSeo[] = [
       "Daily prices from TCGPlayer for every card, including reverse holos, full arts, and alt arts",
       "Track set completion with progress bars — see exactly what you're missing and the cost to complete",
       "Wishlist cards you want and get alerts when prices drop to your target",
-      "Organize cards into portfolio binders with grading support (PSA, BGS, CGC)",
+      "Organize cards into binders with grading support (PSA, BGS, CGC)",
       "Track purchase price vs. current market value to see your gains over time",
     ],
     keywords: [
@@ -34,7 +34,7 @@ export const TCG_SEO: TcgSeo[] = [
       "pokemon card collection tracker",
       "pokemon card price tracker",
       "pokemon card scanner",
-      "pokemon TCG portfolio",
+      "pokemon TCG binder",
       "pokemon card value tracker",
       "free pokemon card tracker",
     ],
@@ -43,7 +43,7 @@ export const TCG_SEO: TcgSeo[] = [
     slug: "mtg",
     name: "Magic: The Gathering",
     shortName: "MTG",
-    title: "Free MTG Collection Tracker — Magic Card Prices, Scanner & Portfolio",
+    title: "Free MTG Collection Tracker — Magic Card Prices, Scanner & Binder",
     description:
       "Track your Magic: The Gathering collection — free during beta, then $4.99 one-time. AI card scanner, daily prices from TCGPlayer and CardMarket, set completion tracking, and wishlist price drop alerts.",
     h1: "Magic: The Gathering Collection Tracker",
@@ -54,7 +54,7 @@ export const TCG_SEO: TcgSeo[] = [
       "Daily prices from TCGPlayer for every card including extended art, borderless, and showcase",
       "Track set completion across every Magic set, from Alpha to the latest release",
       "Wishlist expensive staples and get notified when prices drop to your buy target",
-      "Portfolio binders with grading support — track PSA/BGS graded cards separately",
+      "Binders with grading support — track PSA/BGS graded cards separately",
       "Compare purchase price vs. current market value across your entire collection",
     ],
     keywords: [
@@ -62,7 +62,7 @@ export const TCG_SEO: TcgSeo[] = [
       "magic the gathering card tracker",
       "mtg price tracker",
       "mtg card scanner",
-      "mtg portfolio tracker",
+      "mtg binder tracker",
       "magic card collection app",
       "free mtg tracker",
     ],
@@ -82,7 +82,7 @@ export const TCG_SEO: TcgSeo[] = [
       "Daily prices from TCGPlayer for every card including starlight rares, collector's rares, and ghost rares",
       "Track set completion for core sets, side sets, and Structure Decks",
       "Wishlist chase cards and get alerts when prices drop to your target",
-      "Portfolio binders with grading support — track PSA/BGS/CGC slabs",
+      "Binders with grading support — track PSA/BGS/CGC slabs",
       "See total collection value and price trends over time",
     ],
     keywords: [
@@ -90,7 +90,7 @@ export const TCG_SEO: TcgSeo[] = [
       "yugioh collection tracker",
       "yugioh price tracker",
       "yugioh card scanner",
-      "yugioh portfolio tracker",
+      "yugioh binder tracker",
       "free yugioh card tracker",
     ],
   },
@@ -109,7 +109,7 @@ export const TCG_SEO: TcgSeo[] = [
       "Daily prices from TCGPlayer for every card including alt art leaders and manga rares",
       "Track set completion with progress bars across all booster sets",
       "Wishlist cards and get notified when prices drop",
-      "Portfolio binders with grading support",
+      "Binders with grading support",
       "Track your collection value over time with price history charts",
     ],
     keywords: [
@@ -135,7 +135,7 @@ export const TCG_SEO: TcgSeo[] = [
       "Daily prices from TCGPlayer for every card including enchanted and promo versions",
       "Track set completion across all Lorcana sets with progress bars",
       "Wishlist enchanted cards and get notified when prices drop",
-      "Portfolio binders with grading support",
+      "Binders with grading support",
       "See your total collection value and track gains over time",
     ],
     keywords: [
@@ -161,7 +161,7 @@ export const TCG_SEO: TcgSeo[] = [
       "Daily prices from TCGPlayer for every card including alt arts and secret rares",
       "Track set completion with progress bars",
       "Wishlist chase cards and get price drop alerts",
-      "Portfolio binders with grading support",
+      "Binders with grading support",
       "Track collection value and price trends",
     ],
     keywords: [
@@ -186,7 +186,7 @@ export const TCG_SEO: TcgSeo[] = [
       "Daily prices from TCGPlayer for every card including cold foils and extended arts",
       "Track set completion across all Flesh and Blood sets",
       "Wishlist high-value cards and get price drop alerts",
-      "Portfolio binders with grading support",
+      "Binders with grading support",
       "Track collection value over time",
     ],
     keywords: [
@@ -211,7 +211,7 @@ export const TCG_SEO: TcgSeo[] = [
       "Daily prices from TCGPlayer for DBS and Fusion World cards",
       "Track set completion with progress bars",
       "Wishlist cards and get price drop alerts",
-      "Portfolio binders with grading support",
+      "Binders with grading support",
       "Track collection value over time",
     ],
     keywords: [
@@ -236,7 +236,7 @@ export const TCG_SEO: TcgSeo[] = [
       "Daily prices from TCGPlayer for every card including hyperspace and showcase variants",
       "Track set completion with progress bars",
       "Wishlist cards and get price drop alerts",
-      "Portfolio binders with grading support",
+      "Binders with grading support",
       "Track collection value and price trends",
     ],
     keywords: [
@@ -261,7 +261,7 @@ export const TCG_SEO: TcgSeo[] = [
       "Scan Vanguard cards with your camera — AI identification for Vanguard is in beta and gets better as the model is trained on more cards",
       "Track set completion with progress bars across all booster sets",
       "Wishlist chase cards and get alerts when prices drop to your target",
-      "Portfolio binders with grading support",
+      "Binders with grading support",
       "Track collection value and price trends over time",
     ],
     keywords: [
@@ -287,7 +287,7 @@ export const TCG_SEO: TcgSeo[] = [
       "Scan Weiß Schwarz cards with your camera — AI identification for Weiß Schwarz is in beta and improving",
       "Track set completion with progress bars across booster and trial decks",
       "Wishlist signed cards and get alerts when prices drop to your target",
-      "Portfolio binders with grading support",
+      "Binders with grading support",
       "Track collection value and price trends over time",
     ],
     keywords: [
@@ -313,7 +313,7 @@ export const TCG_SEO: TcgSeo[] = [
       "Scan Final Fantasy cards with your camera — AI identification for Final Fantasy is in beta and improving",
       "Track set completion with progress bars across all Opus sets",
       "Wishlist chase cards and get alerts when prices drop to your target",
-      "Portfolio binders with grading support",
+      "Binders with grading support",
       "Track collection value and price trends over time",
     ],
     keywords: [
@@ -339,7 +339,7 @@ export const TCG_SEO: TcgSeo[] = [
       "Scan Union Arena cards with your camera — AI identification for Union Arena is in beta and improving",
       "Track set completion with progress bars across all booster sets",
       "Wishlist chase cards and get alerts when prices drop to your target",
-      "Portfolio binders with grading support",
+      "Binders with grading support",
       "Track collection value and price trends over time",
     ],
     keywords: [
@@ -365,7 +365,7 @@ export const TCG_SEO: TcgSeo[] = [
       "Scan Fusion World cards with your camera — AI identification for Fusion World is in beta and improving",
       "Track set completion with progress bars across all Fusion World sets",
       "Wishlist chase cards and get alerts when prices drop to your target",
-      "Portfolio binders with grading support",
+      "Binders with grading support",
       "Track collection value and price trends over time",
     ],
     keywords: [

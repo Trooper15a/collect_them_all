@@ -187,6 +187,7 @@ export const alerts = pgTable("alerts", {
   userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
   cardId: text("card_id").notNull().references(() => cards.id, { onDelete: "cascade" }),
   thresholdPct: doublePrecision("threshold_pct").notNull().default(10),
+  direction: text("direction").$type<"drop" | "rise" | "either">().notNull().default("either"),
   basePrice: doublePrecision("base_price"),
   baseCurrency: text("base_currency"),
   variantType: text("variant_type").notNull().default("normal"),

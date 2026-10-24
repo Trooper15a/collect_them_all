@@ -46,7 +46,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "Can I track graded cards?",
-    a: "Yes. When adding a card, you can mark it as graded and enter the grading company (PSA, BGS, CGC), grade number, and cert number. Graded cards are tracked separately from raw cards in your portfolio.",
+    a: "Yes. When adding a card, you can mark it as graded and enter the grading company (PSA, BGS, CGC), grade number, and cert number. Graded cards are tracked separately from raw cards in your binder.",
   },
   {
     q: "How does the wishlist work?",
@@ -54,7 +54,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "Can I track purchase price and gains?",
-    a: "Yes. When you add a card to a portfolio, you can enter what you paid for it. RipnPull calculates your gains or losses based on the current market price, both per card and across your entire collection.",
+    a: "Yes. When you add a card to a binder, you can enter what you paid for it. RipnPull calculates your gains or losses based on the current market price, both per card and across your entire collection.",
   },
   {
     q: "What is set completion tracking?",
@@ -78,7 +78,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "How is this different from TCGPlayer?",
-    a: "TCGPlayer is a marketplace for buying and selling cards. RipnPull is a portfolio tracker — it helps you organize your collection, track what you own, monitor prices, and see your gains over time. We use TCGPlayer's pricing data but serve a different purpose.",
+    a: "TCGPlayer is a marketplace for buying and selling cards. RipnPull is a binder tracker — it helps you organize your collection, track what you own, monitor prices, and see your gains over time. We use TCGPlayer's pricing data but serve a different purpose.",
   },
   {
     q: "Will beta users have to pay $4.99 later?",

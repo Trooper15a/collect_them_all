@@ -211,6 +211,7 @@ export default function PortfolioPage() {
           Delete
         </button>
       </header>
+      <nav aria-label="Binder views" className="flex gap-2 mb-3"><span className="rounded-xl px-4 py-2 text-sm bg-accent/15 text-accent">Cards</span><Link className="rounded-xl px-4 py-2 text-sm text-muted" href={`/portfolios?view=sets&binderId=${id}`}>My sets</Link></nav>
 
       {confirmingDelete && (
         <div className="card-surface rounded-2xl p-4 mb-3 border border-down/30">
@@ -322,7 +323,7 @@ export default function PortfolioPage() {
             return (
             <SwipeToDelete key={i.id} onDelete={() => deleteItem(i)}>
             <div className="card-surface rounded-2xl overflow-hidden flex flex-col tap-scale hover-lift relative">
-              <Link href={`/cards/${encodeURIComponent(i.card.id)}`}>
+              <Link href={`/cards/${encodeURIComponent(i.card.id)}?itemId=${i.id}`} aria-label={`View ${i.card.name} · ${variantLabel(i.variantType)} · ${i.condition}`}>
                 {sealed ? (
                   // sealed product shots aren't card-shaped — keep natural aspect
                   // eslint-disable-next-line @next/next/no-img-element
@@ -338,9 +339,11 @@ export default function PortfolioPage() {
                   {i.card.setName} {i.card.cardNumber ? `#${i.card.cardNumber}` : sealed ? "· Sealed" : ""}
                 </div>
                 <TcgBadge tcg={i.card.tcg} lang={i.card.language} />
+                <div className="text-[11px] text-muted">{variantLabel(i.variantType)} · {i.isGraded ? `${i.gradingCompany ?? "Graded"} ${i.grade ?? ""}` : i.condition}</div>
                 <div className="mt-auto pt-1 flex items-center justify-between">
                   <span className="font-semibold text-sm">
-                    <Money amount={i.value} currency={c} />
+                    {i.unitPrice ? <Money amount={i.value} currency={c} /> : "No quote"}
+                    {i.unitPrice && <span className="block text-[10px] text-muted font-normal">{i.quantity > 1 ? `${i.quantity} copies · total estimate` : "Per-copy estimate"}</span>}
                   </span>
                   <span className="text-[11px]">
                     <Delta pct={i.change24hPct} />
@@ -511,7 +514,7 @@ function EditItemSheet({ item, onClose, onSaved, onRemove }: { item: Item; onClo
         </div>
         {allPortfolios.length > 0 && (
           <div className="mt-4 pt-3 border-t border-line">
-            <div className="text-xs text-muted mb-2">Transfer to another portfolio</div>
+            <div className="text-xs text-muted mb-2">Transfer to another binder</div>
             <div className="flex gap-2">
               <select className={`${inputCls} flex-1`} value={transferTo ?? ""} onChange={(e) => setTransferTo(Number(e.target.value))}>
                 {allPortfolios.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}

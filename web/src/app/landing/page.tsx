@@ -4,16 +4,16 @@ import { SITE } from "@/lib/site";
 import { TCG_SEO } from "./tcg-data";
 
 export const metadata: Metadata = {
-  title: "Free TCG Portfolio Tracker — AI Scanner, Prices & Collection Tracking | RipnPull",
+  title: "Free TCG Binder Tracker — AI Scanner, Prices & Collection Tracking | RipnPull",
   description:
     "Track your Pokémon, Magic, Yu-Gi-Oh! and 11 more TCG collections — free during beta, then $4.99 one-time. AI card scanner, daily TCGPlayer prices, wishlist alerts, grading support, and an installable app. Open source.",
   alternates: { canonical: `${SITE.url}/landing` },
   openGraph: {
-    title: "RipnPull — Free TCG Portfolio Tracker with AI Card Scanner",
+    title: "RipnPull — Free TCG Binder Tracker with AI Card Scanner",
     description:
-      "The free, open-source TCG portfolio tracker. AI card scanning, daily prices across 14 games, wishlist price alerts, and an installable app.",
+      "The free, open-source TCG binder tracker. AI card scanning, daily prices across 14 games, wishlist price alerts, and an installable app.",
     url: `${SITE.url}/landing`,
-    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "RipnPull — Free TCG Portfolio Tracker with AI Card Scanner" }],
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "RipnPull — Free TCG Binder Tracker with AI Card Scanner" }],
   },
 };
 
@@ -34,7 +34,7 @@ const FEATURES = [
     emoji: "🃏",
   },
   {
-    title: "Portfolio Binders",
+    title: "Binders",
     desc: "Organize cards into binders with grading support. Track purchase price, quantity, and see gains over time.",
     emoji: "📁",
   },
@@ -70,7 +70,7 @@ const jsonLd = {
   description: SITE.description,
   url: SITE.url,
   screenshot: `${SITE.url}/og-image.png`,
-  featureList: "AI Card Scanner, Daily TCGPlayer Prices, 14 TCGs, Portfolio Tracking, Wishlist Price Alerts, Installable App, Open Source",
+  featureList: "AI Card Scanner, Daily TCGPlayer Prices, 14 TCGs, Binder Tracking, Wishlist Price Alerts, Installable App, Open Source",
 };
 
 export default function LandingPage() {
@@ -126,7 +126,7 @@ export default function LandingPage() {
             </figcaption>
           </figure>
           <p className="mt-6 text-lg text-muted max-w-lg mx-auto leading-relaxed">
-            The TCG portfolio tracker with AI card scanning, daily prices across 14 games, and an installable app. Free during beta, then just $4.99 — once, forever.
+            The TCG binder tracker with AI card scanning, daily prices across 14 games, and an installable app. Free during beta, then just $4.99 — once, forever.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
             <Link

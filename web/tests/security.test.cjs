@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- Exercise server handlers through isolated CommonJS fixtures. */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -21,7 +22,7 @@ function harness(userId = 'alice') {
   const schema = new Proxy({}, { get(_, table) {
     return new Proxy({ table }, { get(obj, key) { return key === 'table' ? obj.table : key === 'column' ? undefined : { table, column: key }; } });
   } });
-  const val = (v, row) => v?.column ? row[v.table]?.[v.column] : v;
+  const val = (v, row) => v?.column ? row[v.table]?.[v.column] : Array.isArray(v?.strings) && v.strings.join('').startsWith('lower(') ? val(v.args[0], row)?.toLowerCase() : v;
   const orm = {
     eq: (a, b) => row => val(a, row) === val(b, row),
     and: (...p) => row => p.filter(f => typeof f === 'function').every(f => f(row)),
@@ -79,7 +80,7 @@ function harness(userId = 'alice') {
     'next/server': { NextResponse: Response }, '@/lib/auth': auth,
     '@/lib/portfolio': { snapshotPortfolios: async () => {} },
     '@/lib/currency': { getRates: async () => ({}), convert: x => x },
-    '@/lib/cards': { rowToCard: r => ({ ...r, prices: {} }), getCard: async id => data.cards.find(c => c.id === id) },
+    '@/lib/cards': { rowToCard: r => ({ ...r, prices: { tcgplayer: { currency: 'USD', variants: { normal: { market: 10 } } } } }), getCard: async id => data.cards.find(c => c.id === id) },
     '@/lib/types': { bestPrice: () => null, TCG_IDS: ['pokemon', 'mtg', 'yugioh'] },
   };
   function load(relative, overrides = {}) {
@@ -88,7 +89,7 @@ function harness(userId = 'alice') {
       filename = path.resolve(__dirname, '..', filename);
       if (!path.extname(filename)) filename += '.ts';
       if (cache[filename]) return cache[filename].exports;
-      const module = { exports: {} }; cache[filename] = module;
+      const compiled = { exports: {} }; cache[filename] = compiled;
       const code = ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText;
       const localRequire = id => {
         let key = id;
@@ -98,8 +99,8 @@ function harness(userId = 'alice') {
         if (key.startsWith('@/')) return read('src/' + key.slice(2));
         return require(id);
       };
-      vm.runInNewContext('(function(require,module,exports){' + code + '\n})', { Response, Request, URL, console, process: { env: {} }, Buffer, Date, setTimeout, clearTimeout, fetch: () => { throw new Error('Network prohibited in security tests'); } }, { filename })(localRequire, module, module.exports);
-      return module.exports;
+      vm.runInNewContext('(function(require,module,exports){' + code + '\n})', { Response, Request, URL, console, process: { env: {} }, Buffer, Date, setTimeout, clearTimeout, fetch: () => { throw new Error('Network prohibited in security tests'); } }, { filename })(localRequire, compiled, compiled.exports);
+      return compiled.exports;
     }
     return read(relative);
   }
@@ -235,7 +236,7 @@ test('public card read returns history without starting an archive job', async (
   const h = harness(null);
   let jobs = 0;
   const route = h.load('src/app/api/cards/[id]/route.ts', {
-    '@/lib/cards': { getCard: async () => ({ id: 'tp:1' }), getPriceHistory: async () => [] },
+    '@/lib/cards': { getCard: async () => ({ id: 'tp:1', prices: {} }), getPriceHistory: async () => [] },
     '@/lib/tcgcsv': { backfillCardHistory: async () => { jobs++; return 0; } },
   });
   const res = await route.GET(h.request('/api/cards/tp:1'), ctx('tp:1'));
@@ -391,4 +392,14 @@ test('anonymous set catalog never queries private holdings; signed-in queries en
     if (!user) assert.equal(h.queries.some(q => q.table === 'portfolioItems'), false);
     assert.equal(res.headers.get('cache-control'), 'private, no-store');
   }
+});
+test("refresh includes this user's watched missing singles and excludes foreign watches", async () => {
+  const h = harness();
+  h.data.cards.push({ id: 'tp:missing', pricesJson: '{}' }, { id: 'tp:foreign', pricesJson: '{}' });
+  h.data.alerts.push({ id: 3, userId: 'alice', cardId: 'tp:missing' }, { id: 4, userId: 'bob', cardId: 'tp:foreign' });
+  const refreshed = [];
+  const portfolio = h.load('src/lib/portfolio.ts', { '@/lib/cards': { rowToCard: r => ({ ...r, prices: {} }), getCard: async () => null, refreshCardPrices: async id => refreshed.push(id) } });
+  const result = await portfolio.refreshOwnedPrices({ userId: 'alice' });
+  assert.deepEqual(refreshed.sort(), ['tp:1', 'tp:missing']);
+  assert.equal(result.total, 2);
 });
