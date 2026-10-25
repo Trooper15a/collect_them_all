@@ -36,9 +36,10 @@ export async function GET(req: NextRequest) {
   const range = (RANGES as readonly string[]).includes(rangeParam) ? (rangeParam as Range) : "1M";
   try {
     const fx = await getRates();
-    const items = await valuedItems(null, currency, fx, userId);
+    const [items, series] = await Promise.all([
+      valuedItems(null, currency, fx, userId), valueSeries(null, range, currency, fx, userId),
+    ]);
     const summary = summarize(items);
-    const series = await valueSeries(null, range, currency, fx, userId);
     const mostValuable = [...items].sort((a, b) => b.value - a.value).slice(0, 10).map(slim);
     const movers = items.filter((i) => i.change24hPct != null);
     const trending = [...movers].sort((a, b) => Math.abs(b.change24hPct ?? 0) - Math.abs(a.change24hPct ?? 0)).slice(0, 10).map(slim);

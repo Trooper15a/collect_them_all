@@ -33,8 +33,10 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   const range = (RANGES as readonly string[]).includes(rangeParam) ? (rangeParam as Range) : "1M";
   try {
     const fx = await getRates();
-    const items = await valuedItems(id, currency, fx, userId);
-    return NextResponse.json({ portfolio, items, summary: summarize(items), series: await valueSeries(id, range, currency, fx, userId), currency });
+    const [items, series] = await Promise.all([
+      valuedItems(id, currency, fx, userId), valueSeries(id, range, currency, fx, userId),
+    ]);
+    return NextResponse.json({ portfolio, items, summary: summarize(items), series, currency });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Failed" }, { status: 500 });
   }

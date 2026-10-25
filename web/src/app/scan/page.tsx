@@ -10,6 +10,7 @@ import { showToast } from "@/components/Toast";
 import { Button, CardImage, Money, inputCls } from "@/components/ui";
 import { haptic } from "@/lib/haptics";
 import { isScanIndexId, scanThumbnailUrl, type Match } from "@/lib/scanner/matcher";
+import { useScanPreparation } from "@/lib/scanner/use-scan-preparation";
 import { TCGS } from "@/lib/types";
 import { useActiveTcgHydrated } from "@/lib/ui-prefs";
 
@@ -18,7 +19,8 @@ interface RecentScan { id: string; name: string; setName: string | null; ts: num
 export default function ScanPage() {
   const { data: session } = useSession();
   const isLoggedIn = !!session?.user;
-  const { tcg } = useActiveTcgHydrated();
+  const { tcg, hydrated } = useActiveTcgHydrated();
+  const prepareScanner = useScanPreparation(tcg, hydrated);
   const [scanning, setScanning] = useState(false);
   const [bulkMode, setBulkMode] = useState(false);
   const [standMode, setStandMode] = useState(false);
@@ -175,7 +177,7 @@ export default function ScanPage() {
     setGuestQueue((previous) => [...previous, card]);
   }
   return (
-    <div>
+    <div onPointerDownCapture={prepareScanner} onFocusCapture={prepareScanner} onTouchStartCapture={prepareScanner}>
       <header className="pt-2 pb-3 anim-widget d1">
         <h1 className="text-xl font-bold uppercase tracking-wider">Find a Card</h1>
       </header>

@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { TCG_IDS } from "@/lib/types";
 import { and, eq, gt, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { listSets } from "@/lib/cards";
-import { cached } from "@/lib/cache";
+import { cachedPublicCatalog } from "@/lib/cache";
 import { auth } from "@/lib/auth";
 import { binderScope, ownedPortfolioIds } from "@/lib/ownership";
 import { setKey } from "@/lib/set-identity";
@@ -29,29 +29,26 @@ export async function GET(req: NextRequest) {
   const parsed = Query.safeParse(Object.fromEntries(req.nextUrl.searchParams));
   if (!parsed.success) return NextResponse.json({ error: "Invalid query" }, { status: 400 });
   try {
-    const sets = await listSets(parsed.data.tcg, parsed.data.lang);
-    // TCGCSV set totals count every product (incl. sealed); card completion should only
-    // count actual cards, so override with a card-only total once cards are imported.
-    // Cached briefly — this scans/groups the entire cards table on every mount.
-    const cardTotalRows = await cached("sets:card-totals:v2", 60, () =>
-      db
+    const { tcg, lang } = parsed.data;
+    const catalogScope = and(tcg === "all" ? undefined : eq(schema.cards.tcg, tcg), lang === "all" ? undefined : eq(schema.cards.language, lang));
+    // Only public checklist counts are shared. Binder ownership is always read fresh.
+    const cacheKey = tcg === "all" && lang === "all" ? "sets:card-totals:v2" : `sets:card-totals:v3:${tcg}:${lang}`;
+    const [sets, cardTotalRows, ownedRows] = await Promise.all([
+      listSets(tcg, lang),
+      cachedPublicCatalog(cacheKey, 300, async () => db
         .select({ tcg: schema.cards.tcg, code: LOWER_CODE, language: schema.cards.language, n: sql<number>`count(distinct ${NORMALIZED_NUMBER})` })
-        .from(schema.cards)
+        .from(schema.cards).where(catalogScope)
         .groupBy(schema.cards.tcg, LOWER_CODE, schema.cards.language),
-    );
+        { staleWhileRevalidateSeconds: 3600, schedule: after }),
+      userId ? db
+        .select({ tcg: schema.cards.tcg, code: LOWER_CODE, language: schema.cards.language, n: sql<number>`count(distinct ${NORMALIZED_NUMBER})` })
+        .from(schema.portfolioItems)
+        .innerJoin(schema.cards, eq(schema.portfolioItems.cardId, schema.cards.id))
+        .where(and(catalogScope, gt(schema.portfolioItems.quantity, 0), scope.id ? eq(schema.portfolioItems.portfolioId, scope.id) : inArray(schema.portfolioItems.portfolioId, ownedPortfolioIds(userId))))
+        .groupBy(schema.cards.tcg, LOWER_CODE, schema.cards.language) : [],
+    ]);
     const cardTotals: Record<string, number> = {};
-    for (const r of cardTotalRows) {
-      if (!r.code) continue;
-      // A group that only holds sealed products (every card_number null) yields 0 —
-      // overriding the inflated TCGCSV product count is exactly what we want.
-      cardTotals[`${r.tcg}:${r.code}:${r.language}`] = Number(r.n);
-    }
-    const ownedRows = userId ? await db
-      .select({ tcg: schema.cards.tcg, code: LOWER_CODE, language: schema.cards.language, n: sql<number>`count(distinct ${NORMALIZED_NUMBER})` })
-      .from(schema.portfolioItems)
-      .innerJoin(schema.cards, eq(schema.portfolioItems.cardId, schema.cards.id))
-      .where(and(gt(schema.portfolioItems.quantity, 0), scope.id ? eq(schema.portfolioItems.portfolioId, scope.id) : inArray(schema.portfolioItems.portfolioId, ownedPortfolioIds(userId))))
-      .groupBy(schema.cards.tcg, LOWER_CODE, schema.cards.language) : [];
+    for (const row of cardTotalRows) if (row.code) cardTotals[`${row.tcg}:${row.code}:${row.language}`] = Number(row.n);
     const owned: Record<string, number> = {};
     for (const r of ownedRows) if (r.code) owned[`${r.tcg}:${r.code}:${r.language}`] = Number(r.n);
     const enriched = sets

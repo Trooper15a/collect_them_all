@@ -6,16 +6,26 @@ const vm = require("node:vm");
 const ts = require("typescript");
 const path = require("node:path");
 
-function engineHarness({ failFirst = false, matchStatus = 200, offline = false, matchDelay = 0 } = {}) {
+function engineHarness({ failFirst = false, matchStatus = 200, offline = false, matchDelay = 0, run, missingModel = false } = {}) {
   const requests = [];
-  let heads = 0;
+  let sessions = 0;
+  let releases = 0;
+  const inputs = [];
   const ort = {
     env: { wasm: {} },
-    Tensor: class {},
-    InferenceSession: { create: async () => ({
+    Tensor: class { constructor(_type, data) { this.data = data; } },
+    InferenceSession: { create: async () => {
+      sessions++;
+      if (missingModel || (failFirst && sessions <= 2)) throw new Error("Offline");
+      return {
       inputNames: ["input"], outputNames: ["output"],
-      run: async () => ({ output: { data: new Float32Array([1, 0]) } }),
-    }) },
+      run: async ({ input }) => {
+        inputs.push(input.data);
+        if (run) await run(input.data);
+        return { output: { data: new Float32Array([1, 0]) } };
+      },
+      release: async () => { releases++; },
+    }; } },
   };
   const exports = {};
   const source = fs.readFileSync(path.join(__dirname, "../src/lib/scanner/engine.ts"), "utf8");
@@ -48,21 +58,19 @@ function engineHarness({ failFirst = false, matchStatus = 200, offline = false, 
         return { ok: matchStatus === 200, status: matchStatus, json: async () => ({ matches: [] }) };
       }
       if (options?.method === "HEAD") {
-        heads++;
-        if (failFirst && heads === 1) throw new Error("Offline");
-        return { ok: true, headers: { get: () => "application/octet-stream" } };
+        return { ok: !missingModel, headers: { get: () => missingModel ? "text/html" : "application/octet-stream" } };
       }
       throw new Error(`Unexpected download: ${url}`);
     },
   });
-  return { getScanEngine: exports.getScanEngine, requests };
+  return { getScanEngine: exports.getScanEngine, requests, inputs, sessions: () => sessions, releases: () => releases };
 }
 
 test("engine becomes ready without downloading the server's card index", async () => {
   const harness = engineHarness();
   const engine = await harness.getScanEngine();
   assert.equal(engine.status, "ready");
-  assert.deepEqual(harness.requests, ["/model/card_embedder.onnx"]);
+  assert.deepEqual(harness.requests, []);
 });
 
 test("a cold matching server gets enough time to answer without duplicate retries", async () => {
@@ -77,7 +85,7 @@ test("ready engine is reused across scanner openings", async () => {
   const harness = engineHarness();
   const first = await harness.getScanEngine();
   assert.equal(await harness.getScanEngine(), first);
-  assert.equal(harness.requests.length, 1);
+  assert.equal(harness.sessions(), 1);
 });
 
 test("matching failures explain server unavailability and connection failures", async () => {
@@ -90,5 +98,54 @@ test("matching failures explain server unavailability and connection failures", 
 test("a failed model initialization can be retried", async () => {
   const harness = engineHarness({ failFirst: true });
   assert.notEqual((await harness.getScanEngine()).status, "ready");
+  assert.equal((await harness.getScanEngine()).status, "ready");
+});
+
+test("a missing model still explains scanner unavailability", async () => {
+  const h = engineHarness({ missingModel: true });
+  const engine = await h.getScanEngine();
+  assert.equal(engine.status, "missing");
+  assert.match(engine.error, /model is unavailable/);
+  assert.deepEqual(h.requests, ["/model/card_embedder.onnx"]);
+});
+
+test("loading completes one blank inference before a shared engine becomes ready", async () => {
+  let release;
+  const inference = new Promise(resolve => { release = resolve; });
+  const harness = engineHarness({ run: () => inference });
+  const first = harness.getScanEngine();
+  const opened = harness.getScanEngine();
+  let ready = false;
+  first.then(() => { ready = true; });
+  await new Promise(setImmediate);
+  assert.equal(harness.sessions(), 1);
+  assert.equal(harness.inputs.length, 1);
+  assert.equal(harness.inputs[0].length, 3 * 224 * 224);
+  assert.ok(harness.inputs[0].every(value => value === 0));
+  assert.equal(ready, false);
+  assert.equal(harness.requests.length, 0, "blank inference must not publish a matching request");
+  release();
+  assert.equal(await opened, await first);
+});
+
+test("public embeddings and matching cannot overlap ONNX inference", async () => {
+  let active = 0, maximum = 0;
+  const harness = engineHarness({ run: async () => {
+    active++;
+    maximum = Math.max(maximum, active);
+    await new Promise(setImmediate);
+    active--;
+  } });
+  const engine = await harness.getScanEngine();
+  await Promise.all([engine.embed(new Float32Array([1])), engine.match(new Float32Array([2]))]);
+  assert.equal(maximum, 1);
+  assert.equal(harness.inputs.length, 3);
+});
+
+test("failed blank initialization can retry without returning a broken engine", async () => {
+  let first = true;
+  const harness = engineHarness({ run: async () => { if (first) { first = false; throw new Error("Kernel failed"); } } });
+  assert.notEqual((await harness.getScanEngine()).status, "ready");
+  assert.equal(harness.releases(), 1, "failed kernel initialization must release its session before retrying");
   assert.equal((await harness.getScanEngine()).status, "ready");
 });

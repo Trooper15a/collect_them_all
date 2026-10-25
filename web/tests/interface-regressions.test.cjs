@@ -8,6 +8,7 @@ const ts = require("typescript");
 
 function clientHarness(entry, { hidden = false, query = new URLSearchParams(), fetch = async () => ({ ok: true, json: async () => ({}) }) } = {}) {
   const slots = [], effects = [], cleanups = [];
+  const preparations = [];
   let cursor = 0;
   const hooks = {
     useState: (initial) => {
@@ -30,7 +31,7 @@ function clientHarness(entry, { hidden = false, query = new URLSearchParams(), f
   const modules = {
     react: hooks, "react/jsx-runtime": { jsx, jsxs: jsx, Fragment: "fragment" },
     "next/link": { __esModule: true, default: "a" },
-    "next/navigation": { useParams: () => ({ id: "tp:test" }), useSearchParams: () => query, useRouter: () => ({ push: () => {} }) },
+    "next/navigation": { usePathname: () => "/", useParams: () => ({ id: "tp:test" }), useSearchParams: () => query, useRouter: () => ({ push: () => {} }) },
     "next-auth/react": { useSession: () => ({ data: { user: { id: "fixture" } }, status: "authenticated" }) },
     "@/components/Scanner": { Scanner: "Scanner" },
     "@/components/AddToPortfolioSheet": { AddToPortfolioSheet: "AddToPortfolioSheet" },
@@ -40,8 +41,13 @@ function clientHarness(entry, { hidden = false, query = new URLSearchParams(), f
     "@/components/PriceChart": { PriceChart: "PriceChart" },
     "@/components/Toast": { showToast: () => {} },
     "@/lib/haptics": { haptic: () => {} },
-    "@/lib/ui-prefs": { useHidePrices: () => hidden, useActiveTcgHydrated: () => ({ tcg: "all", hydrated: true }) },
+    "@/lib/ui-prefs": { getActiveTcg: () => "pokemon", useHidePrices: () => hidden, useActiveTcgHydrated: () => ({ tcg: "all", hydrated: true }) },
     "@/lib/scanner/matcher": { isScanIndexId: () => false, scanThumbnailUrl: () => null },
+    "@/lib/scanner/preparation": { prepareScanEngine: async tcg => preparations.push(tcg) },
+    "@/lib/scanner/use-scan-preparation": { useScanPreparation: (tcg, hydrated) => {
+      preparations.push({ tcg, hydrated });
+      return () => preparations.push(tcg);
+    } },
   };
   function load(file) {
     const exports = {};
@@ -57,8 +63,10 @@ function clientHarness(entry, { hidden = false, query = new URLSearchParams(), f
     });
     return exports;
   }
-  const { default: Page } = load(path.join(__dirname, "../src", entry));
+  const component = load(path.join(__dirname, "../src", entry));
+  const Page = component.default ?? component.TabBar;
   return {
+    preparations,
     render: () => { cursor = 0; const tree = Page(); return tree.type === "Suspense" ? tree.props.children.type(tree.props.children.props) : tree; },
     flush: async () => { for (const effect of effects.splice(0)) effect(); await new Promise(setImmediate); },
   };
@@ -90,6 +98,31 @@ test("Stand mode retains and pauses the scanner while confirming a match", async
   assert.equal(retained.props.paused, true);
   await nodes(confirmation, (n) => n.type === "button" && n.props.disabled === false && text(n).includes("Raichu"))[0].props.onClick();
   assert.equal(nodes(h.render(), (n) => n.type === "Scanner")[0].props.paused, false);
+});
+
+test("Scan page schedules hydrated preparation and warms on camera intent before mounting a scanner", () => {
+  const h = clientHarness("app/scan/page.tsx");
+  const tree = h.render();
+  assert.deepEqual(h.preparations, [{ tcg: "all", hydrated: true }]);
+  for (const event of ["onPointerDownCapture", "onFocusCapture", "onTouchStartCapture"]) {
+    assert.equal(typeof tree.props[event], "function");
+    tree.props[event]();
+  }
+  assert.equal(nodes(tree, n => n.type === "Scanner").length, 0);
+  assert.deepEqual(h.preparations.slice(1), ["all", "all", "all"]);
+});
+
+test("only Scan tab pointer, focus and touch intent warms the persisted game", async () => {
+  const h = clientHarness("components/TabBar.tsx");
+  const tree = h.render();
+  const links = nodes(tree, n => n.type === "a");
+  const scan = links.find(n => n.props.href === "/scan");
+  for (const event of ["onPointerEnter", "onFocus", "onTouchStart"]) {
+    assert.equal(typeof scan.props[event], "function");
+    scan.props[event]();
+  }
+  for (const link of links.filter(n => n !== scan)) assert.equal(link.props.onPointerEnter, undefined);
+  assert.deepEqual(h.preparations, ["pokemon", "pokemon", "pokemon"]);
 });
 
 for (const hidden of [false, true]) {
