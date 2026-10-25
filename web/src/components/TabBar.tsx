@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { prepareScanEngine } from "@/lib/scanner/preparation";
+import { getActiveTcg } from "@/lib/ui-prefs";
 
 const tabs = [
   { href: "/", label: "Home", icon: HomeIcon },
@@ -14,6 +16,7 @@ const tabs = [
 ];
 
 const PUBLIC_PATHS = ["/landing", "/login", "/privacy", "/terms", "/faq", "/auth/error", "/onboarding"];
+const prepareScanner = () => { void prepareScanEngine(getActiveTcg()); };
 
 export function TabBar() {
   const pathname = usePathname();
@@ -51,6 +54,9 @@ export function TabBar() {
             <Link
               key={t.href}
               href={t.href}
+              onPointerEnter={t.href === "/scan" ? prepareScanner : undefined}
+              onFocus={t.href === "/scan" ? prepareScanner : undefined}
+              onTouchStart={t.href === "/scan" ? prepareScanner : undefined}
               aria-current={active ? "page" : undefined}
               className={`relative flex flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors ${active ? "" : "text-muted hover:text-fg"}`}
             >

@@ -32,10 +32,6 @@ export function getScanEngine(): Promise<ScanEngine> {
 
 async function load(): Promise<ScanEngine> {
   try {
-    const head = await fetch(MODEL_URL, { method: "HEAD", signal: AbortSignal.timeout(15000) });
-    if (!head.ok || !(head.headers.get("content-type") ?? "").match(/octet|onnx|protobuf/)) {
-      return missing("The scanner model is unavailable. Please try again later.");
-    }
     const ort = await import("onnxruntime-web");
     ort.env.wasm.wasmPaths = "/ort/";
     ort.env.wasm.numThreads = Math.min(4, navigator.hardwareConcurrency || 2);
@@ -45,14 +41,38 @@ async function load(): Promise<ScanEngine> {
       session = await ort.InferenceSession.create(MODEL_URL, { executionProviders: ["webgpu", "wasm"], graphOptimizationLevel: "all" });
       backend = "webgpu";
     } catch {
-      session = await ort.InferenceSession.create(MODEL_URL, { executionProviders: ["wasm"], graphOptimizationLevel: "all" });
+      try {
+        session = await ort.InferenceSession.create(MODEL_URL, { executionProviders: ["wasm"], graphOptimizationLevel: "all" });
+      } catch (error) {
+        // Diagnose missing/HTML model responses only after loading fails. A
+        // successful session needs no separate availability round trip.
+        const head = await fetch(MODEL_URL, { method: "HEAD", signal: AbortSignal.timeout(15000) });
+        if (!head.ok || !(head.headers.get("content-type") ?? "").match(/octet|onnx|protobuf/)) {
+          return missing("The scanner model is unavailable. Please try again later.");
+        }
+        throw error;
+      }
     }
     const inputName = session.inputNames[0];
-    const embed = async (input: Float32Array) => {
-      const tensor = new ort.Tensor("float32", input, [1, 3, IMAGE_SIZE, IMAGE_SIZE]);
-      const out = await session.run({ [inputName]: tensor });
-      return out[session.outputNames[0]].data as Float32Array;
+    let inferenceTail: Promise<unknown> = Promise.resolve();
+    const embed = (input: Float32Array): Promise<Float32Array> => {
+      const result = inferenceTail.then(async () => {
+        const tensor = new ort.Tensor("float32", input, [1, 3, IMAGE_SIZE, IMAGE_SIZE]);
+        const out = await session.run({ [inputName]: tensor });
+        return out[session.outputNames[0]].data as Float32Array;
+      });
+      // Retain the actual inference lock even if a caller's scan task times out.
+      inferenceTail = result.catch(() => {});
+      return result;
     };
+    // Initialize kernels before publishing the ready engine. This never matches
+    // a frame or reaches the confirmation flow, and camera openings share it.
+    try {
+      await embed(new Float32Array(3 * IMAGE_SIZE * IMAGE_SIZE));
+    } catch (error) {
+      await session.release().catch(() => {});
+      throw error;
+    }
     const match = createScanTask(async (input: Float32Array, k = 5, tcg?: string, lang?: string): Promise<Match[]> => {
       const embedding = await embed(input);
       const body = JSON.stringify({ embedding: Array.from(embedding), k, tcg, lang });

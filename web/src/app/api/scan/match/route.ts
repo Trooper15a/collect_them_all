@@ -5,6 +5,7 @@ import type { IndexCard } from "@/lib/scanner/matcher";
 import { db, schema } from "@/db";
 import { eq } from "drizzle-orm";
 import { insertTopMatch, selectPreferredMatches } from "@/lib/scanner/top-matches";
+import { TCG_IDS } from "@/lib/types";
 
 const MODEL_DIR = path.join(process.cwd(), "public", "model");
 const INDEX_PATH = path.join(MODEL_DIR, "index.json");
@@ -36,22 +37,40 @@ for (let h = 0; h < halfToFloat.length; h++) {
 
 const globalForScan = globalThis as unknown as {
   __scanIndex?: ServerIndex;
+  __scanIndexPending?: Promise<ServerIndex | null>;
   __dbEmbeddingsByKey?: Map<string, DbIndex>;
   __dbEmbeddingsPendingByKey?: Map<string, Promise<DbIndex>>;
 };
 
-function getStaticIndex(): ServerIndex | null {
+async function getStaticIndex(): Promise<ServerIndex | null> {
   if (globalForScan.__scanIndex) return globalForScan.__scanIndex;
+  if (globalForScan.__scanIndexPending) return globalForScan.__scanIndexPending;
+  const loading = loadStaticIndex().finally(() => { globalForScan.__scanIndexPending = undefined; });
+  globalForScan.__scanIndexPending = loading;
+  return loading;
+}
+
+async function loadStaticIndex(): Promise<ServerIndex | null> {
   try {
-    const indexData = JSON.parse(fs.readFileSync(INDEX_PATH, "utf8")) as {
+    const [metadata, embBuf] = await Promise.all([
+      fs.promises.readFile(INDEX_PATH, "utf8"),
+      fs.promises.readFile(EMB_PATH),
+    ]);
+    const indexData = JSON.parse(metadata) as {
       dim: number;
       count: number;
       cards: IndexCard[];
     };
-    const embBuf = fs.readFileSync(EMB_PATH);
     const u16 = new Uint16Array(embBuf.buffer, embBuf.byteOffset, embBuf.byteLength / 2);
     const vectors = new Float32Array(u16.length);
-    for (let i = 0; i < u16.length; i++) vectors[i] = halfToFloat[u16[i]];
+    // Large static indexes contain hundreds of millions of values. Yield
+    // between chunks so warming does not monopolize the server event loop.
+    const chunkSize = 1024 * 1024;
+    for (let start = 0; start < u16.length; start += chunkSize) {
+      const end = Math.min(start + chunkSize, u16.length);
+      for (let i = start; i < end; i++) vectors[i] = halfToFloat[u16[i]];
+      if (end < u16.length) await new Promise<void>(resolve => setImmediate(resolve));
+    }
     globalForScan.__scanIndex = { ...indexData, vectors };
     return globalForScan.__scanIndex;
   } catch {
@@ -60,6 +79,26 @@ function getStaticIndex(): ServerIndex | null {
 }
 
 const DB_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+const MODEL_DIM = 512; // The deployed card embedder and DB embeddings use 512 dimensions.
+const VALID_TCGS = new Set<string>(TCG_IDS);
+
+/** Load the same public indexes used by POST, without identifying a frame. */
+export async function GET(req: NextRequest) {
+  const game = new URL(req.url).searchParams.get("tcg");
+  if (game !== null && game !== "all" && !VALID_TCGS.has(game)) {
+    return NextResponse.json({ error: "Invalid game" }, { status: 400 });
+  }
+  const tcg = game === null || game === "all" ? undefined : game;
+  const staticIndex = await getStaticIndex();
+  let ready = !!staticIndex?.cards.some(card => !tcg || card.tcg === tcg);
+  try {
+    const index = await getDbEmbeddings(staticIndex?.dim ?? MODEL_DIM, tcg);
+    ready ||= index.cards.length > 0;
+  } catch (error) {
+    console.error("[scan/match] index preparation failed:", error);
+  }
+  return NextResponse.json({ ready }, { status: ready ? 200 : 503, headers: { "Cache-Control": "no-store" } });
+}
 
 async function loadDbEmbeddings(dim: number, tcg?: string): Promise<DbIndex> {
   const rows = await db
@@ -133,6 +172,9 @@ export async function POST(req: NextRequest) {
     if (!Array.isArray(embedding) || embedding.length === 0) {
       return NextResponse.json({ error: "Missing embedding" }, { status: 400 });
     }
+    if (tcg !== undefined && !VALID_TCGS.has(tcg)) {
+      return NextResponse.json({ error: "Invalid game" }, { status: 400 });
+    }
 
     const query = new Float32Array(embedding);
     const dim = query.length;
@@ -146,7 +188,7 @@ export async function POST(req: NextRequest) {
     };
 
     // Search static index
-    const staticIdx = getStaticIndex();
+    const staticIdx = await getStaticIndex();
     if (staticIdx) {
       const { vectors, cards } = staticIdx;
       if (staticIdx.dim !== dim) {

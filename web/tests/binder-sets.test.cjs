@@ -14,6 +14,7 @@ function harness(userId = "alice") {
     portfolios: [{ id: 1, userId: "alice", name: "My binder" }, { id: 2, userId: "bob", name: "Foreign binder" }, { id: 3, userId: "alice", name: "Other binder" }],
     portfolioItems: [{ id: 11, portfolioId: 1, cardId: "tp:1", quantity: 2 }, { id: 12, portfolioId: 1, cardId: "dex:1", quantity: 1 }, { id: 22, portfolioId: 2, cardId: "tp:2", quantity: 8 }, { id: 33, portfolioId: 3, cardId: "tp:2", quantity: 1 }],
   };
+  const scans = [], cacheKeys = [];
   const schema = new Proxy({}, { get: (_, table) => new Proxy({ table }, { get: (target, key) => key === "table" ? target.table : { table, column: key } }) });
   const val = (value, row) => {
     if (value?.column) return row[value.table]?.[value.column];
@@ -59,6 +60,7 @@ function harness(userId = "alice") {
       for (const [table, on] of this.joins) rows = rows.flatMap((row) => data[table].map((r) => ({ ...row, [table]: r })).filter(on));
       rows = rows.filter((row) => this.predicates.every((condition) => typeof condition === "function" ? condition(row) : val(condition, row)));
       if (this.max != null) rows = rows.slice(0, this.max);
+      if (this.groups && this.table === "cards") scans.push(rows.length);
       const groups = this.groups ? [...Map.groupBy(rows, (row) => JSON.stringify(this.groups.map((column) => val(column, row)))).values()] : rows.map((row) => [row]);
       return groups.map((group) => !selection ? group[0][this.table] : Object.fromEntries(Object.entries(selection).map(([key, value]) => {
         if (Array.isArray(value?.strings) && value.strings.join("").startsWith("count(distinct")) return [key, new Set(group.map((row) => val(value.args[0], row)).filter((v) => v != null)).size];
@@ -71,7 +73,7 @@ function harness(userId = "alice") {
     "@/db": { db, schema }, "drizzle-orm": orm, "next/server": { NextResponse: Response },
     "@/lib/auth": { auth: async () => userId ? { user: { id: userId } } : null },
     "@/lib/cards": { listSets: async () => data.sets, rowToCard: (row) => ({ ...row, prices: JSON.parse(row.pricesJson ?? "{}") }) },
-    "@/lib/cache": { cached: (_key, _ttl, fn) => fn() },
+    "@/lib/cache": { cached: (key, _ttl, fn) => { cacheKeys.push(key); return fn(); }, cachedPublicCatalog: (key, _ttl, fn) => { cacheKeys.push(key); return fn(); } },
     "@/lib/user-settings": { getUserSetting: async () => "USD" },
     "@/lib/currency": { getRates: async () => ({}), convert: (amount) => amount },
   };
@@ -86,7 +88,7 @@ function harness(userId = "alice") {
     return compiled.exports;
   }
   const request = (query = "") => ({ nextUrl: new URL("https://example.test/api/sets" + query) });
-  return { data, load, request };
+  return { data, load, request, scans, cacheKeys };
 }
 const ctx = { params: Promise.resolve({ id: "pokemon:123:eng" }) };
 
@@ -139,4 +141,14 @@ test("all-provider checklist totals match detail and zero quantities are not own
   for (const item of h.data.portfolioItems) item.quantity = 0;
   const empty = await (await h.load("src/app/api/sets/route.ts").GET(h.request())).json();
   assert.equal(empty.sets[0].owned, 0);
+});
+test("filtered catalogue totals do not scan other games or reuse their cache key", async () => {
+  const h = harness();
+  h.data.cards.push(...Array.from({ length: 100 }, (_, i) => ({ ...h.data.cards[0], id: 'mtg:' + i, tcg: 'mtg', cardNumber: String(i) })));
+  const { GET } = h.load('src/app/api/sets/route.ts');
+  await GET(h.request('?tcg=pokemon&lang=eng'));
+  assert.equal(h.scans[0], 3);
+  await GET(h.request('?tcg=mtg&lang=jap'));
+  assert.equal(h.scans[1], 0);
+  assert.notEqual(h.cacheKeys[0], h.cacheKeys[1]);
 });
