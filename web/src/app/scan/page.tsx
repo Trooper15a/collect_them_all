@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AddToPortfolioSheet, type AddSheetCard } from "@/components/AddToPortfolioSheet";
 import { CardDiscovery, type DiscoveryCard } from "@/components/CardDiscovery";
 import { Scanner } from "@/components/Scanner";
+import { ScanLanguageBadge } from "@/components/ScanLanguageBadge";
 import { showToast } from "@/components/Toast";
 import { Button, CardImage, Money, inputCls } from "@/components/ui";
 import { haptic } from "@/lib/haptics";
@@ -230,8 +231,9 @@ export default function ScanPage() {
                     <div className="flex-1 min-w-0">
                       <div className={`font-medium truncate ${i === 0 ? "text-up" : ""}`}>{m.card.name}</div>
                       <div className="text-xs text-muted truncate">
-                        {m.card.setName ?? m.card.set} #{m.card.num} · {m.card.lang?.toUpperCase()}
+                        {m.card.setName ?? m.card.set} #{m.card.num}
                       </div>
+                      <ScanLanguageBadge language={m.card.lang} />
                     </div>
                     {resolvingId === m.card.id ? (
                       <span className="w-4 h-4 rounded-full border-2 border-accent border-t-transparent animate-spin" aria-label="Resolving" />

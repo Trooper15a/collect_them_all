@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Scanner } from "@/components/Scanner";
+import { ScanLanguageBadge } from "@/components/ScanLanguageBadge";
 import { PriceContext } from "@/components/PriceContext";
 import { Button, CardImage, Empty, Money, Segmented, Skeleton, TcgBadge, inputCls } from "@/components/ui";
 import { haptic } from "@/lib/haptics";
@@ -222,7 +223,11 @@ export function CardDiscovery({ initialTcg, compact = false, allowCamera = true,
                 <li key={match.card.id}>
                   <button type="button" onClick={() => void selectMatch(match)} disabled={resolvingId !== null} className="flex w-full items-center gap-3 py-2.5 text-left disabled:opacity-50">
                     <CardImage id={match.card.id} directUrl={scanThumbnailUrl(match.card)} eager priority={index < 2} className="w-12 rounded-md" alt="" />
-                    <span className="min-w-0 flex-1"><span className="block truncate font-medium">{match.card.name}</span><span className="block truncate text-xs text-muted">{match.card.setName ?? match.card.set} #{match.card.num} · {match.card.lang?.toUpperCase() ?? "Language unknown"}</span></span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">{match.card.name}</span>
+                      <span className="block truncate text-xs text-muted">{match.card.setName ?? match.card.set} #{match.card.num}</span>
+                      <ScanLanguageBadge language={match.card.lang} />
+                    </span>
                     {resolvingId === match.card.id && <span className="h-4 w-4 animate-spin rounded-full border-2 border-accent border-t-transparent" aria-label="Resolving" />}
                   </button>
                 </li>
