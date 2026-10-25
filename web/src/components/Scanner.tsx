@@ -9,6 +9,7 @@ import { haptic } from "@/lib/haptics";
 import { useActiveTcg } from "@/lib/ui-prefs";
 import { showToast } from "./Toast";
 import { Button } from "./ui";
+import { ScanLanguageBadge } from "./ScanLanguageBadge";
 
 type ScannerProps = { onMatches: (m: Match[]) => void; onClose: () => void; paused?: boolean; bulkMode?: boolean; standMode?: boolean; bulkCount?: number; lang?: string };
 
@@ -355,8 +356,9 @@ function ScannerSession({ onMatches, onClose, paused = false, bulkMode, standMod
             <div className="text-[10px] uppercase tracking-wider text-muted">Live match · {(top.score * 100).toFixed(0)}% · tap to accept</div>
             <div className={`font-semibold ${confident ? "text-up" : ""}`}>{top.card.name}</div>
             <div className="text-xs text-muted">
-              {top.card.setName ?? top.card.set} #{top.card.num} · {top.card.lang?.toUpperCase()}
+              {top.card.setName ?? top.card.set} #{top.card.num}
             </div>
+            <ScanLanguageBadge language={top.card.lang} />
           </div>
         )}
       </div>
