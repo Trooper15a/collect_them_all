@@ -36,6 +36,8 @@ export default {
         return true;
       }
       // Public pages accessible without login.
+      // The calculator uses public catalog data and device-local guest drafts.
+      if (pathname === "/card-show") return true;
       if (pathname === "/scan" || pathname.startsWith("/scan/")) {
         return true;
       }
@@ -43,6 +45,7 @@ export default {
         return true;
       }
       // Public API endpoints (preserve existing public-API behavior).
+      if (pathname === "/api/card-show/lookup") return true;
       if (
         pathname.startsWith("/api/auth") ||
         pathname.startsWith("/api/prices") ||

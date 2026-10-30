@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useSession } from "next-auth/react";
 import { usePathname, useRouter } from "next/navigation";
 
-const BYPASS = ["/landing", "/login", "/privacy", "/terms", "/faq", "/auth/error", "/onboarding"];
+const BYPASS = ["/landing", "/login", "/privacy", "/terms", "/faq", "/auth/error", "/onboarding", "/card-show"];
 
 function bypassesGate(pathname: string) {
   return BYPASS.some((path) => pathname === path || pathname.startsWith(path + "/"));

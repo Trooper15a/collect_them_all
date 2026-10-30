@@ -137,6 +137,8 @@ test("add sheet reports the created item and binder destination", () => {
 test("card discovery keeps relevance order and supports price sorting", () => {
   const { sortDiscoveryResults } = load("src/components/CardDiscovery.tsx", {
     "@/components/Scanner": { Scanner: () => null },
+    "@/components/ScanLanguageBadge": { ScanLanguageBadge: () => null },
+    "@/components/PriceContext": { PriceContext: () => null },
     "@/components/ui": { Button: () => null, CardImage: () => null, Empty: () => null, Money: () => null, Segmented: () => null, Skeleton: () => null, TcgBadge: () => null, inputCls: "" },
     "@/lib/haptics": { haptic: () => undefined },
     "@/lib/scanner/matcher": { isScanIndexId: () => false },
