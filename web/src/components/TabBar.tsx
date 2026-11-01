@@ -10,9 +10,10 @@ const tabs = [
   { href: "/", label: "Home", icon: HomeIcon },
   { href: "/scan", label: "Scan", icon: ScanIcon, badge: true },
   { href: "/card-show", label: "Card Show", icon: CardShowIcon },
+  { href: "/investing", label: "Investing", icon: InvestingIcon },
   { href: "/shop", label: "Shop", icon: ShopIcon },
   { href: "/portfolios", label: "Binders", icon: FolderIcon },
-  { href: "/sets", label: "Sets", icon: GridIcon },
+  { href: "/sets", label: "Lookup", icon: GridIcon },
   { href: "/settings", label: "Settings", icon: GearIcon },
 ];
 
@@ -47,9 +48,9 @@ export function TabBar() {
 
   return (
     <nav aria-label="Primary" className="fixed bottom-0 inset-x-0 z-40 px-3 pb-[max(env(safe-area-inset-bottom),10px)] pointer-events-none">
-      <div className="glass pointer-events-auto mx-auto max-w-lg rounded-2xl grid grid-cols-7 h-16 shadow-[0_8px_40px_rgba(0,0,0,0.45)]">
+      <div className="glass pointer-events-auto mx-auto max-w-2xl rounded-2xl flex overflow-x-auto h-16 shadow-[0_8px_40px_rgba(0,0,0,0.45)]">
         {tabs.map((t) => {
-          const active = t.href === "/" ? pathname === "/" : pathname.startsWith(t.href);
+          const active = t.href === "/" ? pathname === "/" : pathname.startsWith(t.href) || (t.href === "/sets" && pathname.startsWith('/cards'));
           const badge = t.badge ? scanBadge : 0;
           return (
             <Link
@@ -59,7 +60,8 @@ export function TabBar() {
               onFocus={t.href === "/scan" ? prepareScanner : undefined}
               onTouchStart={t.href === "/scan" ? prepareScanner : undefined}
               aria-current={active ? "page" : undefined}
-              className={`relative min-w-0 flex flex-col items-center justify-center gap-1 text-[9px] min-[375px]:text-[10px] sm:text-[11px] font-medium transition-colors ${active ? "" : "text-muted hover:text-fg"}`}
+              aria-label={t.href === "/investing" ? "Card Investing" : undefined}
+              className={`relative min-w-11 flex-1 flex flex-col items-center justify-center gap-1 text-[8px] min-[375px]:text-[9px] sm:text-[11px] font-medium transition-colors ${active ? "" : "text-muted hover:text-fg"}`}
             >
               <div className="relative">
                 <t.icon className={`w-6 h-6 ${active ? "icon-rainbow" : ""}`} />
@@ -76,6 +78,10 @@ export function TabBar() {
       </div>
     </nav>
   );
+}
+
+function InvestingIcon({ className }: { className?: string }) {
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18M6 15l5-5 4 3 6-8M16 5h5v5" /></svg>;
 }
 
 function CardShowIcon({ className }: { className?: string }) {

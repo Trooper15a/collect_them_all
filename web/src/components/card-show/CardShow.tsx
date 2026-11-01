@@ -1,12 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { CURRENCIES, type Currency } from '@/lib/types';
+import Link from 'next/link';
+import { useEffect, useRef, useState } from 'react';
+import { CURRENCIES, type CardSummary, type Currency } from '@/lib/types';
 import type { Rates } from '@/lib/fx';
 import { evaluateCash, evaluateTrade, totalCards } from '@/lib/card-show';
 import { Field, inputCls, Money } from '@/components/ui';
 import { AmountField, CardBasket } from './CardBasket';
-import { changeCurrency, createDraft, readDraft, type Basket, type Draft, type Side } from './draft';
+import { catalogCard, changeCurrency, createDraft, readDraft, startOfferCheck, type Basket, type Draft, type Side } from './draft';
+import { MarketCheck } from './MarketCheck';
+import { OfferCardImage } from './OfferCardImage';
 
 const modes = [{ id: 'buy', label: 'Buying' }, { id: 'sell', label: 'Selling' }, { id: 'trade', label: 'Trading' }] as const;
 
@@ -16,6 +19,7 @@ export function CardShow({ storageKey, initialCurrency, fx, guest = false }: { s
   const [notice, setNotice] = useState('');
   const [saved, setSaved] = useState(false);
   const [undo, setUndo] = useState<Draft | null>(null);
+  const importStarted = useRef(false);
 
   useEffect(() => {
     // Restore only after mount so SSR and the first client render agree.
@@ -42,9 +46,43 @@ export function CardShow({ storageKey, initialCurrency, fx, guest = false }: { s
     }
   }, [draft, ready, storageKey]);
 
+  useEffect(() => {
+    if (!ready || importStarted.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('card');
+    if (!id) return;
+    const source = params.get('market'), variant = params.get('variant');
+    importStarted.current = true;
+    let cancelled = false;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
+    void (async () => {
+      try {
+        const response = await fetch(`/api/card-show/lookup?id=${encodeURIComponent(id)}`, { signal: controller.signal });
+        const data = await response.json();
+        if (!response.ok || !data.card) throw new Error(data.error ?? 'Could not add this market card. Try searching below.');
+        const entry = catalogCard(data.card as CardSummary);
+        const index = entry.options.findIndex((option) => option.source === source && option.variant === variant);
+        if (index < 0) throw new Error('This exact variant is no longer priced. Search below and confirm a matching reference.');
+        const selected = entry.options[index];
+        Object.assign(entry, { optionIndex: index, value: selected.value, currency: selected.currency, custom: false });
+        if (cancelled) return;
+        setDraft((current) => startOfferCheck(current, entry));
+        setNotice(`Market card selected. Checking ${entry.name} only. Enter the seller asking price below.`);
+        const url = new URL(window.location.href);
+        for (const key of ['card', 'market', 'variant']) url.searchParams.delete(key);
+        window.history.replaceState(null, '', url.toString());
+      } catch (cause) {
+        if (!cancelled) setNotice(cause instanceof Error ? cause.message : 'Could not add this market card. Search below.');
+      } finally { clearTimeout(timeout); }
+    })();
+    return () => { cancelled = true; clearTimeout(timeout); controller.abort(); };
+  }, [ready]);
+
   const update = (side: Side, basket: Basket) => setDraft((current) => ({ ...current, [side]: basket }));
   const { currency, mode } = draft;
   const basket = mode === 'sell' ? draft.sell : draft.buy;
+  const focusedCard = mode === 'buy' && draft.offerBackup && basket.cards.length === 1 ? basket.cards[0] : null;
   const market = totalCards(basket.cards, currency, fx);
   const cash = mode === 'trade' ? null : evaluateCash(market, basket.cash, draft.target, mode);
   const trade = evaluateTrade(
@@ -62,8 +100,20 @@ export function CardShow({ storageKey, initialCurrency, fx, guest = false }: { s
         setUndo(draft); setDraft({ ...createDraft(currency), mode, target: draft.target }); setNotice('New deal started.');
       }}>New deal</button><p role="status" className="text-[10px] text-muted mt-2">{saved ? 'Saved on this device' : 'Draft is not saved'}</p></div>
     </header>
+    <Link href="/investing" className="inline-block text-xs text-accent underline">See Pokémon market movers and what to avoid ↗</Link>
     {guest && <p className="rounded-xl border border-line p-3 text-xs text-muted">Guest calculator · your deal is saved on this device.</p>}
     {notice && <p role="status" className="rounded-xl border border-line p-3 text-xs text-muted">{notice} {undo && <button type="button" className="text-accent underline ml-2" onClick={() => { setDraft(undo); setUndo(null); setNotice('Previous deal restored.'); }}>Undo reset</button>}</p>}
+    {draft.offerBackup && mode === 'buy' && <section aria-label="Offer check" className="rounded-xl border border-accent/30 bg-accent/5 p-4 flex items-start gap-4">
+      {focusedCard?.id && <OfferCardImage key={focusedCard.id} id={focusedCard.id} name={focusedCard.name} />}
+      <div className="min-w-0 space-y-2">
+        <h2 className="text-sm font-semibold">{focusedCard ? `Offer: ${focusedCard.name}` : 'Offer check'}</h2>
+        {focusedCard && <p className="text-[11px] text-muted leading-relaxed">{focusedCard.detail}</p>}
+        <p className="text-xs text-muted">Your previous deal is saved separately. Checking another offer will not add it to this card’s price.</p>
+        <button type="button" className="text-xs font-semibold text-accent underline" onClick={() => {
+          if (draft.offerBackup) { setDraft(draft.offerBackup); setNotice('Previous deal restored.'); }
+        }}>Restore previous deal</button>
+      </div>
+    </section>}
 
     <div className="flex items-center gap-3">
       <div role="group" aria-label="Deal type" className="grid grid-cols-3 flex-1 rounded-xl bg-elev border border-line p-1">
@@ -84,6 +134,7 @@ export function CardShow({ storageKey, initialCurrency, fx, guest = false }: { s
         </div>
         <div className="flex items-center gap-2"><span className="text-xs text-muted mr-auto">Quick targets</span>{[70, 80, 90].map((pct) => <button type="button" key={pct} aria-pressed={draft.target === String(pct)} onClick={() => setDraft((current) => ({ ...current, target: String(pct) }))} className={`rounded-lg border px-3 py-2 text-xs font-semibold ${draft.target === String(pct) ? 'border-accent text-accent bg-accent/10' : 'border-line text-muted'}`}>{pct}%</button>)}</div>
       </div>
+      {focusedCard && <MarketCheck key={`${focusedCard.key}:${focusedCard.optionIndex}:${focusedCard.custom}`} card={focusedCard} asking={basket.cash} target={draft.target} currency={currency} fx={fx} />}
       <div aria-live="polite" aria-atomic="true">
         {cash ? <section className={`rounded-2xl border p-5 space-y-3 ${cash.tone === 'good' ? 'border-up/30 bg-up/10' : cash.tone === 'bad' ? 'border-down/30 bg-down/10' : 'border-amber-400/30 bg-amber-400/5'}`}>
           <div className="flex items-start justify-between gap-3">
@@ -96,7 +147,7 @@ export function CardShow({ storageKey, initialCurrency, fx, guest = false }: { s
       {market !== null && <section aria-label="Cash value benchmarks" className="grid grid-cols-3 gap-2">
         {[70, 80, 90].map((percent) => <div key={percent} className="card-surface rounded-xl px-2 py-3 text-center"><p className="text-xs text-muted mb-1">{percent}% cash</p><p className="font-semibold text-sm"><Money amount={market * percent / 100} currency={currency} /></p></div>)}
       </section>}
-      <CardBasket key={mode} title={mode === 'buy' ? 'Cards you’re buying' : 'Cards you’re selling'} basket={basket} onChange={(next) => update(mode, next)} currency={currency} fx={fx} />
+      <CardBasket key={mode} title={mode === 'buy' ? 'Cards you’re buying' : 'Cards you’re selling'} basket={basket} onChange={(next) => update(mode, next)} currency={currency} fx={fx} buyTarget={mode === 'buy' && !focusedCard ? draft.target : undefined} />
       <p className="text-xs text-muted leading-relaxed">70–90% is your cash negotiation range. Lower helps when buying; higher helps when selling. Your target starts at 80% and can be changed.</p>
     </> : <>
       <p className="text-xs text-muted leading-relaxed">Start at 100% market value on both sides. If a vendor uses different percentages, adjust each side below. Cash always counts at full value.</p>

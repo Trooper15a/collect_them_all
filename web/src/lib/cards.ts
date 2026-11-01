@@ -63,6 +63,7 @@ export function toSummary(c: NormalizedCard): CardSummary {
     cardNumber: c.cardNumber,
     rarity: c.rarity,
     language: c.language,
+    imageUrl: c.imageUrl,
     price: bp ? { amount: bp.amount, currency: bp.currency, variant: bp.variant } : null,
     prices: c.prices,
   };
@@ -327,6 +328,7 @@ export async function getPriceHistory(cardId: string, variant?: string) {
     .orderBy(schema.priceHistory.date);
   return rows.map((r) => ({
     date: r.date,
+    variantType: r.variantType,
     tcgplayerMarket: r.tcgplayerMarket ?? null,
     cardmarketAvg: r.cardmarketAvg ?? null,
   }));
