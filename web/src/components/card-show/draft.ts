@@ -6,6 +6,7 @@ import type { Rates } from '@/lib/fx';
 const text = z.string().max(40);
 const priceOption = z.object({
   label: z.string().max(180), value: text, currency: z.enum(CURRENCIES), updatedAt: z.string().max(80).nullable(),
+  source: z.enum(['tcgplayer', 'cardmarket']).optional(), variant: z.string().max(100).optional(), metric: z.string().max(40).optional(),
 });
 const cardSchema = z.object({
   key: z.string().max(100), id: z.string().max(100).nullable(), name: z.string().max(240), detail: z.string().max(400),
@@ -13,10 +14,12 @@ const cardSchema = z.object({
   options: z.array(priceOption).max(100), optionIndex: z.number().int().min(0).max(100), custom: z.boolean(), notes: z.string().max(240),
 });
 const basketSchema = z.object({ cards: z.array(cardSchema).max(100), cash: text, rate: text });
-const draftSchema = z.object({
+const snapshotSchema = z.object({
   version: z.literal(1), mode: z.enum(['buy', 'sell', 'trade']), currency: z.enum(CURRENCIES), target: text,
   buy: basketSchema, sell: basketSchema, giving: basketSchema, getting: basketSchema,
 });
+// Keep one complete previous draft, without recursive/nested backups.
+const draftSchema = snapshotSchema.extend({ offerBackup: snapshotSchema.optional() });
 export type ShowCard = z.infer<typeof cardSchema>;
 export type Basket = z.infer<typeof basketSchema>;
 export type Draft = z.infer<typeof draftSchema>;
@@ -25,6 +28,16 @@ export type Side = 'buy' | 'sell' | 'giving' | 'getting';
 export function createDraft(currency: Currency): Draft {
   const basket = (): Basket => ({ cards: [], cash: '', rate: '100' });
   return { version: 1, mode: 'buy', currency, target: '80', buy: basket(), sell: basket(), giving: basket(), getting: basket() };
+}
+
+/** An Investing offer is one card, not another item in the previous bundle. */
+export function startOfferCheck(draft: Draft, card: ShowCard): Draft {
+  const { offerBackup, ...previous } = draft;
+  return {
+    ...draft, mode: 'buy',
+    buy: { cards: [{ ...card, quantity: 1 }], cash: '', rate: '100' },
+    offerBackup: offerBackup ?? previous,
+  };
 }
 
 export function readDraft(raw: string | null): Draft | null {
@@ -47,6 +60,7 @@ export function catalogCard(card: CardSummary): ShowCard {
       options.push({
         label: `${source === 'tcgplayer' ? 'TCGPlayer' : 'Cardmarket'} · ${variantLabel(variant)} · ${metric[0]}`,
         value: metric[1].toFixed(2), currency: market.currency, updatedAt: market.updatedAt ?? null,
+        source, variant, metric: metric[0],
       });
     }
   }

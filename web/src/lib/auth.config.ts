@@ -35,9 +35,9 @@ export default {
       if (pathname === "/shop" || pathname.startsWith("/shop/")) {
         return true;
       }
-      // Public pages accessible without login.
-      // The calculator uses public catalog data and device-local guest drafts.
-      if (pathname === "/card-show") return true;
+      // Public catalog and offer tools. Guest drafts stay on the device;
+      // account settings and set ownership are read only for signed-in users.
+      if (pathname === "/card-show" || pathname === "/investing" || pathname === "/cards" || pathname === "/sets") return true;
       if (pathname === "/scan" || pathname.startsWith("/scan/")) {
         return true;
       }
@@ -46,6 +46,7 @@ export default {
       }
       // Public API endpoints (preserve existing public-API behavior).
       if (pathname === "/api/card-show/lookup") return true;
+      if (pathname === "/api/investing" || pathname === "/api/investing/card") return true;
       if (
         pathname.startsWith("/api/auth") ||
         pathname.startsWith("/api/prices") ||

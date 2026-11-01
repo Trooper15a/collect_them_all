@@ -20,7 +20,7 @@ function load(relative) {
   });
   return exports;
 }
-const { createDraft, readDraft, changeCurrency, catalogCard } = load('components/card-show/draft.ts');
+const { createDraft, readDraft, changeCurrency, catalogCard, startOfferCheck } = load('components/card-show/draft.ts');
 const fx = { base: 'USD', date: 'fixture', rates: { USD: 1, CAD: 1.4, EUR: 0.9 } };
 
 test('drafts restore all modes and reject corrupt or unsafe saved values', () => {
@@ -64,4 +64,56 @@ test('unpriced cards remain incomplete until a user provides a positive value', 
   const card = catalogCard({ id: 'tp:none', name: 'Unpriced', language: 'eng', prices: {} });
   assert.equal(card.value, '');
   assert.equal(card.custom, true);
+});
+
+function pricedCard(id, amount) {
+  return catalogCard({ id, name: id, language: 'eng', prices: { tcgplayer: { currency: 'USD', variants: { normal: { market: amount } } } } });
+}
+test('checking an offer focuses one card instead of mixing it into a saved buying bundle', () => {
+  assert.equal(typeof startOfferCheck, 'function');
+  const original = createDraft('CAD');
+  original.buy.cards = [pricedCard('tp:old1', 100), pricedCard('tp:old2', 50)];
+  original.buy.cash = '140'; original.target = '75'; original.mode = 'trade';
+  original.giving.cash = '20';
+  const selected = startOfferCheck(original, pricedCard('tp:new', 25));
+  assert.equal(selected.mode, 'buy');
+  assert.equal(selected.buy.cards.length, 1);
+  assert.equal(selected.buy.cards[0].id, 'tp:new');
+  assert.equal(selected.buy.cash, '');
+  assert.equal(selected.offerBackup.buy.cash, '140');
+  assert.equal(selected.offerBackup.buy.cards.length, 2);
+  assert.equal(selected.offerBackup.mode, 'trade');
+  assert.equal(selected.offerBackup.currency, 'CAD');
+  assert.equal(selected.giving.cash, '20');
+  assert.equal(original.buy.cards.length, 2, 'the original bundle is not mutated');
+});
+test('successive offer checks retain the original draft and clear the old asking price', () => {
+  assert.equal(typeof startOfferCheck, 'function');
+  const original = createDraft('USD');
+  original.buy.cards = [pricedCard('tp:original', 100)]; original.buy.cash = '75';
+  const first = startOfferCheck(original, pricedCard('tp:first', 25));
+  first.buy.cash = '20'; first.buy.cards[0].quantity = 3;
+  const second = startOfferCheck(first, pricedCard('tp:second', 50));
+  assert.equal(second.buy.cards.length, 1);
+  assert.equal(second.buy.cards[0].id, 'tp:second');
+  assert.equal(second.buy.cards[0].quantity, 1);
+  assert.equal(second.buy.cash, '');
+  assert.equal(second.offerBackup.buy.cards[0].id, 'tp:original');
+  assert.equal(second.offerBackup.buy.cash, '75');
+  assert.equal(second.offerBackup.offerBackup, undefined, 'backups never nest');
+});
+test('the previous deal survives reload and remains in its own currency after offer conversion', () => {
+  assert.equal(typeof startOfferCheck, 'function');
+  const original = createDraft('USD');
+  original.buy.cards = [pricedCard('tp:original', 100)]; original.buy.cash = '75'; original.target = '70';
+  const focused = startOfferCheck(original, pricedCard('tp:new', 50));
+  focused.buy.cash = '35';
+  const converted = changeCurrency(focused, 'CAD', fx);
+  const restored = readDraft(JSON.stringify(converted));
+  assert.equal(restored.currency, 'CAD');
+  assert.equal(restored.buy.cash, '49.00');
+  assert.equal(restored.offerBackup.currency, 'USD');
+  assert.equal(restored.offerBackup.buy.cash, '75');
+  assert.equal(restored.offerBackup.target, '70');
+  assert.equal(readDraft(JSON.stringify({ ...focused, offerBackup: { broken: true } })), null);
 });

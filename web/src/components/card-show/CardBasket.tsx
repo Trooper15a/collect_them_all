@@ -7,6 +7,7 @@ import type { Rates } from '@/lib/fx';
 import { CardSearch } from './CardSearch';
 import { catalogCard, type Basket, type ShowCard } from './draft';
 import { PhotoCardPicker } from './PhotoCardPicker';
+import { MarketCheck } from './MarketCheck';
 
 export function AmountField({ label, value, onChange, placeholder = '0.00', optional = false, max = 1_000_000_000, min = 0 }: {
   label: string; value: string; onChange: (value: string) => void; placeholder?: string; optional?: boolean; max?: number; min?: number;
@@ -21,8 +22,9 @@ export function AmountField({ label, value, onChange, placeholder = '0.00', opti
   </Field>;
 }
 
-export function CardBasket({ title, basket, onChange, currency, fx, trade = false }: {
+export function CardBasket({ title, basket, onChange, currency, fx, trade = false, buyTarget }: {
   title: string; basket: Basket; onChange: (basket: Basket) => void; currency: Currency; fx: Rates; trade?: boolean;
+  buyTarget?: string;
 }) {
   const update = (key: string, patch: Partial<ShowCard>) => onChange({ ...basket, cards: basket.cards.map((card) => card.key === key ? { ...card, ...patch } : card) });
   const add = (card?: CardSummary) => {
@@ -89,6 +91,7 @@ export function CardBasket({ title, basket, onChange, currency, fx, trade = fals
             </div>
             <span className="text-sm font-semibold">{converted === null ? <span className="text-down text-xs">Market value needed</span> : <Money amount={converted} currency={currency} />}</span>
           </div>
+          {buyTarget !== undefined && <MarketCheck key={`${card.key}:${card.optionIndex}:${card.custom}`} card={card} asking={basket.cards.length === 1 ? basket.cash : null} target={buyTarget} currency={currency} fx={fx} />}
         </article>;
       })}
     </div>

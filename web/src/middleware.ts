@@ -25,6 +25,7 @@ export const config = {
     "/opens/:path*",
     "/trade/:path*",
     "/card-show/:path*",
+    "/investing/:path*",
     "/wishlist/:path*",
     "/onboarding/:path*",
     "/api/:path*",
