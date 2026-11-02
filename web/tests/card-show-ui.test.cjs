@@ -82,7 +82,10 @@ test('Card Show works on a phone: cash targets, mixed-currency trades, search, s
     await page.goto(`http://127.0.0.1:${server.address().port}/card-show`);
     await page.getByRole('heading', { name: 'Card Show', exact: true }).waitFor();
     assert.equal(await page.getByRole('button', { name: 'Take a picture', exact: true }).count(), 1);
-    assert.equal(await page.getByRole('link', { name: 'Card Show' }).getAttribute('aria-current'), 'page');
+    assert.equal(await page.getByRole('button', { name: 'More', exact: true }).getAttribute('aria-current'), 'page');
+    await page.getByRole('button', { name: 'More', exact: true }).click();
+    assert.equal(await page.getByRole('dialog', { name: 'More tools' }).getByRole('link', { name: 'Card Show', exact: true }).getAttribute('aria-current'), 'page');
+    await page.getByRole('button', { name: 'Close more tools', exact: true }).click();
     await page.getByRole('button', { name: '+ Add manual / graded card', exact: true }).click();
     await page.getByRole('textbox', { name: 'Card name / grade' }).fill('Charizard PSA 10');
     await page.getByRole('textbox', { name: 'Unit market value (USD)' }).fill('100');
@@ -179,7 +182,8 @@ test('Card Show works on a phone: cash targets, mixed-currency trades, search, s
     for (const width of [320, 390, 768]) {
       await page.setViewportSize({ width, height: 844 });
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `No horizontal overflow at ${width}px`);
-      assert.equal(await page.getByRole('navigation', { name: 'Primary' }).getByRole('link').count(), 7);
+      assert.equal(await page.getByRole('navigation', { name: 'Primary' }).getByRole('link').count(), 4);
+      assert.equal(await page.getByRole('button', { name: 'More', exact: true }).isVisible(), true);
       for (const link of await page.getByRole('navigation', { name: 'Primary' }).getByRole('link').all()) {
         assert.equal(await link.isVisible(), true);
         const bounds = await link.boundingBox();

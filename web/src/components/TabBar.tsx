@@ -2,18 +2,24 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { prepareScanEngine } from "@/lib/scanner/preparation";
 import { getActiveTcg } from "@/lib/ui-prefs";
 
 const tabs = [
   { href: "/", label: "Home", icon: HomeIcon },
+  { href: "/portfolios", label: "Binders", icon: FolderIcon },
   { href: "/scan", label: "Scan", icon: ScanIcon, badge: true },
+  { href: "/sets", label: "Lookup", icon: GridIcon },
+];
+
+const moreTools = [
   { href: "/card-show", label: "Card Show", icon: CardShowIcon },
   { href: "/investing", label: "Investing", icon: InvestingIcon },
   { href: "/shop", label: "Shop", icon: ShopIcon },
-  { href: "/portfolios", label: "Binders", icon: FolderIcon },
-  { href: "/sets", label: "Lookup", icon: GridIcon },
+  { href: "/grade", label: "Pre-grade", icon: GradeIcon },
+  { href: "/wishlist", label: "Wishlist", icon: HeartIcon },
+  { href: "/opens", label: "Box opens", icon: BoxIcon },
   { href: "/settings", label: "Settings", icon: GearIcon },
 ];
 
@@ -23,7 +29,23 @@ const prepareScanner = () => { void prepareScanEngine(getActiveTcg()); };
 export function TabBar() {
   const pathname = usePathname();
   const [scanBadge, setScanBadge] = useState(0);
+  const [moreForPath, setMoreForPath] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const hidden = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
+  const moreOpen = !hidden && moreForPath === pathname;
+  const moreActive = moreTools.some((t) => pathname === t.href || pathname.startsWith(t.href + "/")) || pathname === "/premium" || pathname === "/pricing";
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!moreOpen || !dialog) return;
+    dialog.showModal();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      dialog.close();
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [moreOpen]);
 
   useEffect(() => {
     // Signal to globals.css (.safe-bottom / .pwa-banner) that no tab bar is rendered.
@@ -35,7 +57,8 @@ export function TabBar() {
     const update = () => {
       try {
         const q = localStorage.getItem("bulkQueue");
-        setScanBadge(q ? JSON.parse(q).length : 0);
+        const queue: unknown = q ? JSON.parse(q) : [];
+        setScanBadge(Array.isArray(queue) ? queue.length : 0);
       } catch { setScanBadge(0); }
     };
     update();
@@ -47,8 +70,9 @@ export function TabBar() {
   if (hidden) return null;
 
   return (
-    <nav aria-label="Primary" className="fixed bottom-0 inset-x-0 z-40 px-3 pb-[max(env(safe-area-inset-bottom),10px)] pointer-events-none">
-      <div className="glass pointer-events-auto mx-auto max-w-2xl rounded-2xl flex overflow-x-auto h-16 shadow-[0_8px_40px_rgba(0,0,0,0.45)]">
+    <>
+    <nav aria-label="Primary" className="app-tabbar">
+      <div className="app-tabbar-inner">
         {tabs.map((t) => {
           const active = t.href === "/" ? pathname === "/" : pathname.startsWith(t.href) || (t.href === "/sets" && pathname.startsWith('/cards'));
           const badge = t.badge ? scanBadge : 0;
@@ -60,24 +84,56 @@ export function TabBar() {
               onFocus={t.href === "/scan" ? prepareScanner : undefined}
               onTouchStart={t.href === "/scan" ? prepareScanner : undefined}
               aria-current={active ? "page" : undefined}
-              aria-label={t.href === "/investing" ? "Card Investing" : undefined}
-              className={`relative min-w-11 flex-1 flex flex-col items-center justify-center gap-1 text-[8px] min-[375px]:text-[9px] sm:text-[11px] font-medium transition-colors ${active ? "" : "text-muted hover:text-fg"}`}
+              className={`app-tab ${active ? "is-active" : ""}`}
             >
               <div className="relative">
-                <t.icon className={`w-6 h-6 ${active ? "icon-rainbow" : ""}`} />
+                <t.icon className="w-5 h-5" />
                 {badge > 0 && (
-                  <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-down text-white text-[9px] font-bold px-1 anim-pop">
+                  <span className="scan-queue-badge" aria-label={`${badge} cards in scan queue`}>
                     {badge}
                   </span>
                 )}
               </div>
-              <span className={active ? "text-rainbow" : ""}>{t.label}</span>
+              <span>{t.label}</span>
             </Link>
           );
         })}
+        <button type="button" className={`app-tab ${moreActive ? "is-active" : ""}`} aria-current={moreActive ? "page" : undefined} aria-haspopup="dialog" aria-expanded={moreOpen} onClick={() => setMoreForPath(pathname)}>
+          <MoreIcon className="w-5 h-5" />
+          <span>More</span>
+        </button>
       </div>
     </nav>
+    <dialog ref={dialogRef} className="more-dialog" aria-label="More tools" onClose={() => setMoreForPath(null)} onClick={(e) => { if (e.target === e.currentTarget) setMoreForPath(null); }}>
+      <div className="flex items-center justify-between gap-4 mb-5">
+        <h2 className="text-lg font-medium">More tools</h2>
+        <button type="button" className="sheet-close" aria-label="Close more tools" onClick={() => setMoreForPath(null)}><CloseIcon className="w-5 h-5" /></button>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {moreTools.map((t) => {
+          const active = pathname === t.href || pathname.startsWith(t.href + "/");
+          return <Link key={t.href} href={t.href} aria-label={t.href === "/investing" ? "Card Investing" : undefined} aria-current={active ? "page" : undefined} className="more-tool" onClick={() => setMoreForPath(null)}><t.icon className="w-5 h-5 shrink-0" /><span>{t.label}</span></Link>;
+        })}
+      </div>
+    </dialog>
+    </>
   );
+}
+
+function MoreIcon({ className }: { className?: string }) {
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></svg>;
+}
+function CloseIcon({ className }: { className?: string }) {
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden><path d="m6 6 12 12M18 6 6 18" /></svg>;
+}
+function GradeIcon({ className }: { className?: string }) {
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden><path d="M4 8V4h4m8 0h4v4m0 8v4h-4M8 20H4v-4" /><circle cx="12" cy="12" r="4" /></svg>;
+}
+function HeartIcon({ className }: { className?: string }) {
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0l-1 1.1-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21.2l8.8-8.8a5.5 5.5 0 0 0 0-7.8Z" /></svg>;
+}
+function BoxIcon({ className }: { className?: string }) {
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 5v10l9 5 9-5V8M12 13v10" /></svg>;
 }
 
 function InvestingIcon({ className }: { className?: string }) {

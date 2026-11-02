@@ -88,7 +88,10 @@ test('mobile market discovery, exact-card offer checks and card/set lookup work 
     const fillLabel = async (label, value) => { const handle = await page.evaluateHandle((text) => [...document.querySelectorAll('label')].find((node) => node.querySelector('span')?.textContent === text)?.querySelector('input'), label); const input = handle.asElement(); assert.ok(input, label); await input.click(); await page.keyboard.down('Control'); await page.keyboard.press('A'); await page.keyboard.up('Control'); await page.keyboard.type(value); await handle.dispose(); };
     await page.goto(base + '/investing');
     await waitText('Pikachu');
-    assert.equal(await page.$eval('nav[aria-label="Primary"] a[aria-label="Card Investing"]', (node) => node.getAttribute('aria-current')), 'page');
+    assert.equal(await page.$eval('nav[aria-label="Primary"] button[aria-haspopup="dialog"]', (node) => node.getAttribute('aria-current')), 'page');
+    await page.click('nav[aria-label="Primary"] button[aria-haspopup="dialog"]');
+    assert.equal(await page.$eval('dialog[open] a[aria-label="Card Investing"]', (node) => node.getAttribute('aria-current')), 'page');
+    await page.keyboard.press('Escape');
     await clickText('What to avoid2 references');
     await waitText('Sharp price decline');
     await clickText('Worth researching1 references');

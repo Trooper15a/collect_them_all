@@ -1,0 +1,50 @@
+/* Rainbow original: keep the foil-inspired actions, give collection data calm space. */
+.app-header { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 4px 24px; }
+.app-wordmark { display:inline-flex; align-items:center; gap:8px; font-size:21px; line-height:1; font-weight:600; letter-spacing:-.6px; color:var(--fg); }
+.brand-card-mark { display:block; width:15px; height:22px; border-radius:4px; background:var(--rainbow); transform:rotate(-8deg); }
+.game-picker-trigger { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:36px; max-width:48%; padding:8px 10px; border:1px solid var(--line); border-radius:10px; background:var(--bg-elev); color:var(--muted); font-size:12px; line-height:18px; }
+.app-tabbar { position:fixed; bottom:0; inset-inline:0; z-index:40; background:var(--bg-elev); border-top:1px solid var(--line); padding:0 12px max(env(safe-area-inset-bottom),12px); }
+.app-tabbar-inner { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:4px; max-width:736px; min-height:64px; padding:8px 0; margin-inline:auto; }
+.app-tab { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; position:relative; min-width:0; min-height:48px; border:0; border-radius:10px; padding:4px 0; background:transparent; color:var(--muted); font-size:11px; line-height:16px; font-weight:400; transition:color 160ms ease,background-color 160ms ease; }
+.app-tab svg { stroke-width:1.5; }
+.app-tab.is-active { color:var(--fg); }
+.app-tab.is-active svg { color:var(--accent); }
+.app-tab:hover { color:var(--fg); background:var(--raised); }
+.scan-queue-badge { display:flex; align-items:center; justify-content:center; position:absolute; top:-8px; right:-10px; min-width:18px; height:18px; border-radius:9px; padding-inline:4px; background:var(--down); color:#1d1014; font-size:11px; line-height:16px; font-variant-numeric:tabular-nums; }
+.more-dialog { position:fixed; inset:auto 0 0; margin:0 auto; width:min(100%,512px); max-width:100%; max-height:calc(100dvh - 24px); overflow-y:auto; overscroll-behavior:contain; padding:24px 20px max(env(safe-area-inset-bottom),24px); border:1px solid var(--line); border-bottom:0; border-radius:24px 24px 0 0; background:var(--bg-elev); color:var(--fg); }
+.more-dialog::backdrop { background:rgb(0 0 0 / .6); }
+.more-dialog[open] { animation:sheet-in 180ms cubic-bezier(.22,1,.36,1); }
+.sheet-close { display:grid; place-items:center; min-width:44px; min-height:44px; border:0; border-radius:10px; background:var(--raised); color:var(--fg); }
+.more-tool { display:flex; align-items:center; gap:10px; min-height:60px; padding:12px; border:1px solid var(--line); border-radius:12px; background:var(--bg); font-size:13px; line-height:20px; transition:background-color 160ms ease; }
+.more-tool svg { stroke-width:1.5; color:var(--muted); }
+.more-tool:hover,.more-tool[aria-current='page'] { background:var(--raised); }
+.more-tool[aria-current='page'] svg { color:var(--accent); }
+.dashboard { padding-bottom:8px; }
+.dashboard-value { padding:20px 20px 12px; border:1px solid var(--line); border-radius:22px; background:var(--bg-elev); }
+.dashboard-amount { font-size:clamp(28px,8.5vw,36px); line-height:1.2; font-weight:500; letter-spacing:-1px; margin-top:8px; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.dashboard-change { font-size:12px; line-height:20px; margin-top:6px; font-variant-numeric:tabular-nums; }
+.dashboard-ranges { display:flex; justify-content:space-between; gap:2px; margin-top:8px; }
+.dashboard-ranges button { min-width:0; min-height:36px; flex:1; border:0; border-radius:7px; padding:8px 4px; background:transparent; color:var(--muted); font-size:11px; line-height:16px; transition:color 160ms ease,background-color 160ms ease; }
+.dashboard-ranges button[aria-pressed='true'] { background:var(--raised); color:var(--fg); }
+.dashboard-ranges button:hover { color:var(--fg); }
+.dashboard-stat { padding:12px 16px; min-width:0; min-height:94px; border:1px solid var(--line); border-radius:16px; background:var(--bg-elev); }
+.dashboard-stat-label { color:var(--muted); font-size:12px; line-height:18px; }
+.dashboard-stat-value { font-size:22px; font-weight:500; line-height:1.25; margin:4px 0; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.dashboard-stat-meta { color:var(--muted); font-size:11px; line-height:16px; }
+.dashboard-context { display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px 12px; padding:12px 4px 0; color:var(--muted); font-size:11px; line-height:16px; }
+.dashboard-section { margin-top:24px; }
+.dashboard-heading { font-size:15px; line-height:22px; font-weight:500; margin-bottom:12px; }
+.dashboard-quick-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px 8px; }
+.dashboard-action { display:flex; flex-direction:column; align-items:center; gap:6px; min-height:68px; min-width:0; font-size:12px; line-height:16px; text-align:center; }
+.dashboard-action-icon { display:grid; place-items:center; width:48px; height:48px; border-radius:15px; background:var(--rainbow); color:#222035; transition:filter 160ms ease,transform 120ms ease; }
+.dashboard-action-icon svg { width:20px; height:20px; stroke-width:1.5; }
+.dashboard-action:hover .dashboard-action-icon { filter:brightness(1.04); }
+.dashboard-action:active .dashboard-action-icon { transform:scale(.98); }
+.dashboard-collection { padding:16px; border:1px solid var(--line); border-radius:16px; background:var(--bg-elev); }
+.dashboard-row { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--line); }
+.dashboard-row:hover { background:var(--bg-elev); }
+.dashboard .dashboard-row img { width:36px; border-radius:3px; }
+.dashboard .dashboard-row:last-child { border-bottom:0; }
+@keyframes sheet-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+@media(max-width:360px) { .app-header { gap:8px; } .app-wordmark { font-size:20px; } .dashboard-value { padding:16px 16px 12px; } .dashboard-stat { padding:12px; } .dashboard-quick-grid { column-gap:4px; } .dashboard-context { justify-content:flex-start; } }
+@media(prefers-reduced-motion:reduce) { .more-dialog[open] { animation:none; } .dashboard-action:active .dashboard-action-icon { transform:none; } }
