@@ -18,9 +18,10 @@ interface Settings {
   fxDate: string;
 }
 
-type Appearance = "midnight" | "black" | "light";
+type Appearance = "graphite" | "midnight" | "black" | "light";
 
 const APPEARANCES: { id: Appearance; label: string; hint: string; swatch: string }[] = [
+  { id: "graphite", label: "Graphite", hint: "Soft charcoal", swatch: "#101012" },
   { id: "black", label: "Pure Black", hint: "True black, OLED", swatch: "#000000" },
   { id: "midnight", label: "Midnight", hint: "Dark, navy tint", swatch: "#0a0e1a" },
   { id: "light", label: "Light", hint: "Light background", swatch: "#f0f2f7" },
@@ -37,9 +38,11 @@ function applyAppearance(a: Appearance) {
       localStorage.removeItem("bgColor");
     } else {
       el.removeAttribute("data-theme");
-      el.setAttribute("data-bg", a === "midnight" ? "midnight" : "black");
+      if (a === "graphite") el.removeAttribute("data-bg");
+      else el.setAttribute("data-bg", a);
       localStorage.setItem("theme", "dark");
-      localStorage.setItem("bgColor", a === "midnight" ? "midnight" : "black");
+      if (a === "graphite") localStorage.removeItem("bgColor");
+      else localStorage.setItem("bgColor", a);
     }
   } catch {}
 }
@@ -48,9 +51,10 @@ function readAppearance(): Appearance {
   try {
     if (localStorage.getItem("theme") === "light") return "light";
     const bg = localStorage.getItem("bgColor");
+    if (bg === "black") return "black";
     if (bg === "midnight" || bg === "blue") return "midnight";
   } catch {}
-  return "black";
+  return "graphite";
 }
 
 /** Every settings section is its own box with the heading inside. */
@@ -95,10 +99,10 @@ export default function SettingsPage() {
     }
   }
 
-  const [appearance, setAppearance] = useState<Appearance>("black");
+  const [appearance, setAppearance] = useState<Appearance>("graphite");
 
   useEffect(() => {
-    // start "midnight" so SSR/CSR markup matches; sync from localStorage after mount
+    // Match the default graphite surface on the server, then restore the saved choice.
     const sync = () => {
       const cur = readAppearance();
       setAppearance(cur);
@@ -196,17 +200,17 @@ export default function SettingsPage() {
             </Field>
             <div className="col-span-2">
               <Field label="Appearance">
-                <div className="grid grid-cols-3 gap-2 mt-1">
+                <div className="grid grid-cols-2 gap-2 mt-1">
                   {APPEARANCES.map((opt) => (
                     <button
                       key={opt.id}
                       onClick={() => selectAppearance(opt.id)}
                       aria-pressed={appearance === opt.id}
-                      className={`rounded-xl border-2 p-2 text-left transition-all ${appearance === opt.id ? "border-rainbow shadow-lg shadow-[#a78bfa]/20" : "border-line hover:border-muted"}`}
+                      className={`rounded-xl border p-3 text-left transition-colors ${appearance === opt.id ? "border-rainbow" : "border-line hover:border-muted"}`}
                     >
                       <span className="block h-8 rounded-lg border border-line" style={{ background: opt.swatch }} />
                       <span className="mt-1.5 block text-xs font-semibold">{opt.label}</span>
-                      <span className="block text-[10px] text-muted">{opt.hint}</span>
+                      <span className="block text-[11px] text-muted">{opt.hint}</span>
                     </button>
                   ))}
                 </div>

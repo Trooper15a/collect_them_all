@@ -6,7 +6,7 @@ import { useHidePrices } from "@/lib/ui-prefs";
 
 import type { Point } from "./PriceChart";
 
-export function PriceChartPlot({ data, currency, height = 180, color }: { data: Point[]; currency: string; height?: number; color?: string }) {
+export function PriceChartPlot({ data, currency, height = 180, color, fillOpacity = 0.35 }: { data: Point[]; currency: string; height?: number; color?: string; fillOpacity?: number }) {
   const hidePrices = useHidePrices();
   const pts = (data ?? []).filter((d) => d.value != null);
   if (pts.length < 2) {
@@ -30,7 +30,7 @@ export function PriceChartPlot({ data, currency, height = 180, color }: { data: 
       <AreaChart data={plotPts} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
         <defs>
           <linearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={stroke} stopOpacity={0.35} />
+            <stop offset="0%" stopColor={stroke} stopOpacity={fillOpacity} />
             <stop offset="100%" stopColor={stroke} stopOpacity={0} />
           </linearGradient>
         </defs>

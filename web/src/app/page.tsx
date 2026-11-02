@@ -6,10 +6,9 @@ import { PriceAlertControl } from "@/components/PriceAlertControl";
 import { PriceChart } from "@/components/PriceChart";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { FirstBinderMilestone } from "@/components/FirstBinderMilestone";
-import { CardImage, Delta, Empty, Money, Segmented, Skeleton } from "@/components/ui";
+import { CardImage, Delta, Empty, Money, Skeleton } from "@/components/ui";
 import { RANGES, type Range } from "@/lib/format";
 import { variantLabel } from "@/lib/types";
-import { useHidePrices } from "@/lib/ui-prefs";
 
 interface SlimItem {
   id: number;
@@ -73,7 +72,6 @@ export default function HomePage() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [alerts, setAlerts] = useState<AlertRow[]>([]);
   const [showAllAlerts, setShowAllAlerts] = useState(false);
-  const hidePrices = useHidePrices();
   const loadAlerts = () =>
     fetch("/api/alerts")
       .then((r) => r.json())
@@ -118,69 +116,49 @@ export default function HomePage() {
 
   return (
     <PullToRefresh onRefresh={async () => { await load(); await loadAlerts(); }}>
-    <div className="pb-2">
-      {/* ── Header ── */}
-      <header className="pt-2 pb-1 flex items-baseline justify-between anim-widget d1">
-        <h1 className="text-xl font-bold uppercase tracking-wider">RipnPull</h1>
-        <span className="text-[11px] text-muted">{c} · fx {data.fxDate}</span>
-      </header>
+    <div className="dashboard">
+      <h1 className="sr-only">Your collection</h1>
 
       {/* ── Widget: Portfolio Value ── */}
-      <div className="card-surface rounded-3xl p-5 mt-2 anim-widget d1">
-        <div className="flex items-start justify-between">
-          <div>
-            <div className="text-xs text-muted font-medium">Total Value</div>
-            <div className="text-4xl font-bold tabular tracking-tight mt-1">
-              <Money amount={s.value} currency={c} />
-            </div>
-          </div>
-          {s.change24h !== 0 && (
-            <div
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold anim-pop ${
-                hidePrices ? "bg-white/[0.06] text-muted" : s.change24h >= 0 ? "bg-up/15 text-up" : "bg-down/15 text-down"
-              }`}
-            >
-              {/* hide-prices: no ▲/▼ — the arrow alone leaks trend direction */}
-              {!hidePrices && (s.change24h >= 0 ? "▲" : "▼")} <Money amount={Math.abs(s.change24h)} currency={c} />
-            </div>
-          )}
+      <section className="dashboard-value" aria-label="Collection value">
+        <div className="flex items-center justify-between gap-3 text-xs text-muted">
+          <span>Collection value</span>
+          <span className="text-[11px]">{c} · FX {data.fxDate}</span>
         </div>
+        <div className="dashboard-amount"><Money amount={s.value} currency={c} /></div>
+        <p className="dashboard-change"><Delta amount={s.change24h} currency={c} /><span className="text-muted"> today</span></p>
 
-        <div className="mt-3 -mx-2">
-          <PriceChart data={data.series.map((p) => ({ date: p.date, value: p.value }))} currency={c} height={140} />
+        <div className="mt-3">
+          <PriceChart data={data.series.map((p) => ({ date: p.date, value: p.value }))} currency={c} height={88} fillOpacity={0.08} />
         </div>
-        <div className="mt-2 flex justify-center">
-          <Segmented value={range} onChange={setRange} size="xs" options={RANGES.map((r) => ({ value: r, label: r }))} />
+        <div className="dashboard-ranges" aria-label="Value history period">
+          {RANGES.map((r) => <button type="button" key={r} aria-pressed={range === r} onClick={() => setRange(r)}>{r === "ALL" ? "All" : r}</button>)}
         </div>
-      </div>
+      </section>
 
       {/* ── Widget: Stats Showcase ── */}
-      <div className="grid grid-cols-2 gap-2 mt-3 anim-widget d2">
-        <GlowStat icon="cards" label="Cards" value={String(s.itemCount)} sub={`${s.uniqueCount} unique`} color="accent" />
-        <GlowStat icon="binders" label="Binders" value={String(data.stats?.portfolioCount ?? 0)} sub={`${data.stats?.setsStarted ?? 0} sets tracked`} color="purple" />
-        <GlowStat icon="cost" label="Cost Basis" value={<Money amount={s.cost} currency={c} />} sub={s.cost > 0 ? <><Delta amount={s.gain} currency={c} /> gain</> : "No cost data"} color="blue" />
-        <GlowStat icon="roi" label="All Time" value={<Delta pct={s.gainPct} />} sub={s.change24h !== 0 ? <><Delta amount={s.change24h} currency={c} /> today</> : "No change today"} color="green" />
+      <div className="grid grid-cols-2 gap-2 mt-3" aria-label="Collection summary">
+        <Stat label="Cards" value={String(s.itemCount)} sub={`${s.uniqueCount} unique`} />
+        <Stat label="Binders" value={String(data.stats?.portfolioCount ?? 0)} sub={`${data.stats?.setsStarted ?? 0} sets tracked`} />
+        <Stat label="Cost basis" value={<Money amount={s.cost} currency={c} />} sub={s.cost > 0 ? <><Delta amount={s.gain} currency={c} /> vs cost</> : "No cost data"} />
+        <Stat label="All-time return" value={<Delta pct={s.gainPct} />} sub={s.cost > 0 ? "Since added" : "Cost data needed"} />
       </div>
 
       <FirstBinderMilestone itemCount={s.itemCount} />
 
       {/* ── Widget: Ring Stats ── */}
       {data.stats && (data.stats.tcgCount > 0 || data.stats.avgCardValue > 0) && (
-        <div className="grid grid-cols-3 gap-2 mt-2 anim-widget d3">
-          <RingStat pct={Math.min(data.stats.tcgCount * 7, 100)} label="TCGs" value={String(data.stats.tcgCount)} color="var(--color-accent)" />
-          <RingStat pct={data.stats.overallPct} label="Complete" value={`${data.stats.overallPct}%`} color="var(--color-up)" />
-          <div className="card-surface rounded-2xl p-3 flex flex-col items-center justify-center text-center">
-            <div className="text-lg font-bold tabular"><Money amount={data.stats.avgCardValue} currency={c} /></div>
-            <div className="text-[10px] text-muted uppercase tracking-wider mt-0.5">Avg Value</div>
-            {data.stats.topTcg && <div className="text-[10px] text-accent mt-1 truncate max-w-full">{data.stats.topTcg.name}</div>}
-          </div>
+        <div className="dashboard-context">
+          <span>{data.stats.tcgCount} card game{data.stats.tcgCount === 1 ? "" : "s"}</span>
+          <span>{data.stats.overallPct}% complete</span>
+          <span><Money amount={data.stats.avgCardValue} currency={c} /> avg value</span>
         </div>
       )}
 
       {/* ── Widget: Quick Actions ── */}
-      <div className="card-surface rounded-3xl p-4 mt-3 anim-widget d4">
-        <div className="text-xs text-muted font-medium mb-3">Quick Actions</div>
-        <div className="grid grid-cols-4 gap-2 stagger-children">
+      <section className="dashboard-section" aria-label="Quick actions">
+        <h2 className="dashboard-heading">Quick actions</h2>
+        <div className="dashboard-quick-grid">
           <ActionBtn href="/scan" label="Scan">
             <path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" />
             <rect x="8" y="7" width="8" height="10" rx="1" />
@@ -199,8 +177,6 @@ export default function HomePage() {
             <circle cx="7.5" cy="19.5" r="1.5" />
             <circle cx="17.5" cy="19.5" r="1.5" />
           </ActionBtn>
-        </div>
-        <div className="grid grid-cols-3 gap-2 mt-2 stagger-children">
           <ActionBtn href="/grade" label="Pre-grade">
             <circle cx="12" cy="12" r="9" strokeDasharray="4 2" />
             <line x1="12" y1="3" x2="12" y2="21" />
@@ -209,22 +185,22 @@ export default function HomePage() {
           <ActionBtn href="/wishlist" label="Wishlist">
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
           </ActionBtn>
-          <ActionBtn href="/opens" label="Box Opens">
+          <ActionBtn href="/opens" label="Box opens">
             <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
             <path d="m3.3 7 8.7 5 8.7-5M12 22V12" />
           </ActionBtn>
         </div>
-      </div>
+      </section>
 
       {alerts.length > 3 && <button className="mt-3 text-xs text-accent" onClick={() => setShowAllAlerts((value) => !value)}>{showAllAlerts ? "Show fewer alerts" : `Show all alerts (${alerts.length})`}</button>}
       {/* ── Widget: Triggered Alerts ── */}
       {triggeredAlerts.length > 0 && (
-        <div className="card-surface rounded-3xl p-4 mt-3 anim-widget d5">
+        <div className="dashboard-section dashboard-collection">
           <div className="flex items-center gap-2 mb-3">
-            <span className="w-2 h-2 rounded-full bg-down anim-pulse" />
-            <span className="text-xs text-muted font-medium">{triggeredAlerts.length} Price Alert{triggeredAlerts.length > 1 ? "s" : ""} Triggered</span>
+            <span className="w-2 h-2 rounded-full bg-down" />
+            <span className="text-sm font-medium">{triggeredAlerts.length} Price Alert{triggeredAlerts.length > 1 ? "s" : ""} Triggered</span>
           </div>
-          <ul className="space-y-2 stagger-children">
+          <ul className="space-y-2">
             {triggeredAlerts.slice(0, showAllAlerts ? undefined : 3).map((a) => (
               <li key={a.id} className="flex items-center gap-3 rounded-2xl bg-down/[0.06] p-3 tap-scale">
                 <Link href={`/cards/${encodeURIComponent(a.card.id)}?variant=${encodeURIComponent(a.variantType)}`} className="flex items-center gap-3 flex-1 min-w-0">
@@ -235,7 +211,7 @@ export default function HomePage() {
                   </div>
                 </Link>
                 <div className="text-right">
-                  <div className="font-semibold text-sm"><Money amount={a.currentPrice} currency={a.currency ?? "USD"} /></div>
+                  <div className="font-medium text-sm"><Money amount={a.currentPrice} currency={a.currency ?? "USD"} /></div>
                   <div className="text-xs"><Delta pct={a.changePct} /></div>
                 </div>
                 <PriceAlertControl cardId={a.card.id} cardName={a.card.name} initialAlert={a} onChanged={loadAlerts} />
@@ -247,25 +223,25 @@ export default function HomePage() {
 
       {/* ── Widget: Collection Progress ── */}
       {!empty && data.stats && data.stats.setsStarted > 0 && (
-        <div className="card-surface rounded-3xl p-4 mt-3 anim-widget d5">
-          <div className="text-xs text-muted font-medium mb-3">Collection</div>
+        <div className="dashboard-section dashboard-collection">
+          <div className="dashboard-heading">Collection</div>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-semibold">{data.stats.overallPct}% complete</span>
+            <span className="text-sm font-medium">{data.stats.overallPct}% complete</span>
             <span className="text-xs text-muted">{data.stats.setsStarted} sets started</span>
           </div>
-          <div className="h-2.5 rounded-full bg-white/[0.06] overflow-hidden">
-            <div className="h-full bg-accent rounded-full anim-bar" style={{ width: `${data.stats.overallPct}%` }} />
+          <div className="h-1 rounded-full bg-line overflow-hidden">
+            <div className="h-full bg-accent rounded-full" style={{ width: `${data.stats.overallPct}%` }} />
           </div>
 
           {data.stats.closestSet && (
             <div className="mt-4 rounded-2xl bg-white/[0.03] border border-line p-3">
               <div className="flex items-center justify-between">
                 <div className="text-xs text-muted">Closest to complete</div>
-                <div className="text-xs font-semibold tabular">{data.stats.closestSet.pct}%</div>
+                <div className="text-xs font-medium tabular">{data.stats.closestSet.pct}%</div>
               </div>
-              <div className="text-sm font-semibold mt-1">{data.stats.closestSet.name}</div>
+              <div className="text-sm font-medium mt-1">{data.stats.closestSet.name}</div>
               <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden mt-2">
-                <div className="h-full bg-up rounded-full anim-bar" style={{ width: `${data.stats.closestSet.pct}%` }} />
+                <div className="h-full bg-up rounded-full" style={{ width: `${data.stats.closestSet.pct}%` }} />
               </div>
               <div className="text-[11px] text-muted mt-1">{data.stats.closestSet.owned}/{data.stats.closestSet.total} · {data.stats.closestSet.missing} to go</div>
             </div>
@@ -275,10 +251,10 @@ export default function HomePage() {
             <Link href={`/cards/${encodeURIComponent(data.stats.cheapestMissing.id)}`} className="mt-3 flex items-center gap-3 rounded-2xl bg-white/[0.03] border border-line p-3 tap-scale hover-lift">
               <CardImage id={data.stats.cheapestMissing.id} className="w-10 rounded-md" alt="" />
               <div className="flex-1 min-w-0">
-                <div className="text-[10px] text-muted uppercase tracking-wider">Cheapest missing</div>
+                <div className="text-[11px] text-muted">Cheapest missing</div>
                 <div className="text-sm font-medium truncate">{data.stats.cheapestMissing.name}</div>
               </div>
-              <div className="text-sm font-semibold"><Money amount={data.stats.cheapestMissing.price} currency={c} /></div>
+              <div className="text-sm font-medium"><Money amount={data.stats.cheapestMissing.price} currency={c} /></div>
             </Link>
           )}
         </div>
@@ -286,22 +262,22 @@ export default function HomePage() {
 
       {/* ── Widget: Movers ── */}
       {!empty && movers.length > 0 && (
-        <div className="card-surface rounded-3xl p-4 mt-3 anim-widget d6">
+        <div className="dashboard-section">
           <div className="flex items-center justify-between mb-3">
-            <div className="text-xs text-muted font-medium">Today&apos;s Movers</div>
-            <span className="w-2 h-2 rounded-full bg-up anim-pulse" />
+            <div className="text-sm font-medium">Today&apos;s movers</div>
+            <span className="w-2 h-2 rounded-full bg-up" />
           </div>
-          <ul className="space-y-1 stagger-children">
+          <ul className="space-y-1 ">
             {movers.map((i) => (
               <li key={i.id}>
-                <Link href={`/cards/${encodeURIComponent(i.cardId)}`} className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.03] tap-scale">
+                <Link href={`/cards/${encodeURIComponent(i.cardId)}`} className="dashboard-row">
                   <CardImage id={i.cardId} className="w-9 rounded-md" alt="" />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate">{i.name}</div>
                     <div className="text-[11px] text-muted truncate">{i.setName}</div>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-semibold tabular"><Money amount={i.value} currency={c} /></div>
+                    <div className="text-sm font-medium tabular"><Money amount={i.value} currency={c} /></div>
                     <div className="text-xs"><Delta amount={i.change24h != null ? i.change24h * i.quantity : null} pct={i.change24hPct} currency={c} /></div>
                   </div>
                 </Link>
@@ -311,14 +287,14 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* ── Widget: Most Valuable ── */}
+      {/* ── Widget: Most valuable ── */}
       {!empty && (data.mostValuable ?? []).length > 0 && (
-        <div className="card-surface rounded-3xl p-4 mt-3 anim-widget d7">
-          <div className="text-xs text-muted font-medium mb-3">Most Valuable</div>
-          <ul className="space-y-1 stagger-children">
+        <div className="dashboard-section">
+          <div className="dashboard-heading">Most valuable</div>
+          <ul className="space-y-1 ">
             {(data.mostValuable ?? []).slice(0, 5).map((i) => (
               <li key={i.id}>
-                <Link href={`/cards/${encodeURIComponent(i.cardId)}`} className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.03] tap-scale">
+                <Link href={`/cards/${encodeURIComponent(i.cardId)}`} className="dashboard-row">
                   <CardImage id={i.cardId} className="w-9 rounded-md" alt="" />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate">{i.name}</div>
@@ -327,7 +303,7 @@ export default function HomePage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-semibold tabular"><Money amount={i.value} currency={c} /></div>
+                    <div className="text-sm font-medium tabular"><Money amount={i.value} currency={c} /></div>
                     <div className="text-xs"><Delta pct={i.change24hPct} /></div>
                   </div>
                 </Link>
@@ -339,18 +315,18 @@ export default function HomePage() {
 
       {/* ── Widget: Gains & Losses ── */}
       {!empty && (data.biggestGains.length > 0 || data.biggestLosses.length > 0) && (
-        <div className="grid grid-cols-2 gap-2 mt-3 anim-widget d8">
+        <div className="grid grid-cols-2 gap-2 mt-6">
           {data.biggestGains.length > 0 && (
             <div className="card-surface rounded-2xl p-3">
-              <div className="text-[10px] text-up font-semibold uppercase tracking-wider mb-2">Top Gains</div>
-              <ul className="space-y-2 stagger-children">
+              <div className="text-[11px] text-up font-medium mb-2">Top gains</div>
+              <ul className="space-y-2 ">
                 {data.biggestGains.slice(0, 3).map((i) => (
                   <li key={i.id}>
                     <Link href={`/cards/${encodeURIComponent(i.cardId)}`} className="flex items-center gap-2 tap-scale">
                       <CardImage id={i.cardId} className="w-7 rounded" alt="" />
                       <div className="flex-1 min-w-0">
                         <div className="text-xs font-medium truncate">{i.name}</div>
-                        <div className="text-[10px]"><Delta pct={i.gainPct} /></div>
+                        <div className="text-[11px]"><Delta pct={i.gainPct} /></div>
                       </div>
                     </Link>
                   </li>
@@ -360,15 +336,15 @@ export default function HomePage() {
           )}
           {data.biggestLosses.length > 0 && (
             <div className="card-surface rounded-2xl p-3">
-              <div className="text-[10px] text-down font-semibold uppercase tracking-wider mb-2">Top Losses</div>
-              <ul className="space-y-2 stagger-children">
+              <div className="text-[11px] text-down font-medium mb-2">Top losses</div>
+              <ul className="space-y-2 ">
                 {data.biggestLosses.slice(0, 3).map((i) => (
                   <li key={i.id}>
                     <Link href={`/cards/${encodeURIComponent(i.cardId)}`} className="flex items-center gap-2 tap-scale">
                       <CardImage id={i.cardId} className="w-7 rounded" alt="" />
                       <div className="flex-1 min-w-0">
                         <div className="text-xs font-medium truncate">{i.name}</div>
-                        <div className="text-[10px]"><Delta pct={i.gainPct} /></div>
+                        <div className="text-[11px]"><Delta pct={i.gainPct} /></div>
                       </div>
                     </Link>
                   </li>
@@ -381,9 +357,9 @@ export default function HomePage() {
 
       {/* ── Non-triggered alerts (compact) ── */}
       {alerts.filter((a) => !a.triggered).length > 0 && (
-        <div className="card-surface rounded-3xl p-4 mt-3 anim-widget d8">
-          <div className="text-xs text-muted font-medium mb-3">Watching ({alerts.filter((a) => !a.triggered).length})</div>
-          <ul className="space-y-1 stagger-children">
+        <div className="dashboard-section">
+          <div className="dashboard-heading">Watching ({alerts.filter((a) => !a.triggered).length})</div>
+          <ul className="space-y-1">
             {alerts.filter((a) => !a.triggered).slice(0, showAllAlerts ? undefined : 4).map((a) => (
               <li key={a.id} className="flex items-center gap-2">
                 <Link href={`/cards/${encodeURIComponent(a.card.id)}?variant=${encodeURIComponent(a.variantType)}`} className="flex flex-1 min-w-0 items-center gap-3 p-2 rounded-xl hover:bg-white/[0.03] tap-scale">
@@ -393,7 +369,7 @@ export default function HomePage() {
                     <div className="text-[11px] text-muted">{variantLabel(a.variantType)} · {a.direction === "drop" ? "↓" : a.direction === "rise" ? "↑" : "±"}{a.thresholdPct}% alert</div>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-semibold tabular"><Money amount={a.currentPrice} currency={a.currency ?? "USD"} /></div>
+                    <div className="text-sm font-medium tabular"><Money amount={a.currentPrice} currency={a.currency ?? "USD"} /></div>
                     <div className="text-xs"><Delta pct={a.changePct} /></div>
                   </div>
                 </Link>
@@ -409,7 +385,7 @@ export default function HomePage() {
         <div className="mt-6 anim-widget d5">
           <Empty>
             Your collection is empty.{" "}
-            <Link href="/scan" className="text-accent font-semibold">
+            <Link href="/scan" className="text-accent font-medium">
               Scan or search
             </Link>{" "}
             for a card to get started.
@@ -423,66 +399,25 @@ export default function HomePage() {
 
 /* ── Sub-components ── */
 
-const GLOW_ICONS: Record<string, React.ReactNode> = {
-  cards: <><rect x="3" y="3" width="18" height="18" rx="3" /><path d="M9 3v18M3 9h18" /></>,
-  binders: <><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></>,
-  cost: <><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></>,
-  roi: <><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" /></>,
-};
-const GLOW_COLORS: Record<string, string> = {
-  accent: "from-accent/20 to-accent/5",
-  purple: "from-purple-500/20 to-purple-500/5",
-  blue: "from-blue-500/20 to-blue-500/5",
-  green: "from-emerald-500/20 to-emerald-500/5",
-};
-
-function GlowStat({ icon, label, value, sub, color }: { icon: string; label: string; value: React.ReactNode; sub: React.ReactNode; color: string }) {
+function Stat({ label, value, sub }: { label: string; value: React.ReactNode; sub: React.ReactNode }) {
   return (
-    <div className={`relative overflow-hidden card-surface rounded-2xl p-3.5 tap-scale`}>
-      <div className={`absolute inset-0 bg-gradient-to-br ${GLOW_COLORS[color] ?? GLOW_COLORS.accent} pointer-events-none`} />
-      <div className="relative flex items-start gap-2.5">
-        <div className="w-8 h-8 rounded-xl bg-white/[0.08] flex items-center justify-center shrink-0">
-          <svg viewBox="0 0 24 24" className="w-4 h-4 text-fg/70" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            {GLOW_ICONS[icon]}
-          </svg>
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-[10px] text-muted uppercase tracking-wider">{label}</div>
-          <div className="text-lg font-bold tabular mt-0.5 leading-tight">{value}</div>
-          <div className="text-[11px] text-muted mt-0.5 truncate">{sub}</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function RingStat({ pct, label, value, color }: { pct: number; label: string; value: string; color: string }) {
-  const r = 20;
-  const circ = 2 * Math.PI * r;
-  const offset = circ - (circ * Math.min(pct, 100)) / 100;
-  return (
-    <div className="card-surface rounded-2xl p-3 flex flex-col items-center justify-center text-center tap-scale">
-      <div className="relative w-12 h-12">
-        <svg viewBox="0 0 48 48" className="w-full h-full -rotate-90">
-          <circle cx="24" cy="24" r={r} fill="none" stroke="currentColor" strokeWidth="3" className="text-white/[0.06]" />
-          <circle cx="24" cy="24" r={r} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset} className="anim-bar" />
-        </svg>
-        <div className="absolute inset-0 flex items-center justify-center text-[11px] font-bold tabular">{value}</div>
-      </div>
-      <div className="text-[10px] text-muted uppercase tracking-wider mt-1.5">{label}</div>
+    <div className="dashboard-stat">
+      <div className="dashboard-stat-label">{label}</div>
+      <div className="dashboard-stat-value">{value}</div>
+      <div className="dashboard-stat-meta">{sub}</div>
     </div>
   );
 }
 
 function ActionBtn({ href, label, children }: { href: string; label: string; children: React.ReactNode }) {
   return (
-    <Link href={href} className="flex flex-col items-center gap-1.5 tap-scale">
-      <div className="w-12 h-12 rounded-2xl bg-accent flex items-center justify-center">
+    <Link href={href} className="dashboard-action">
+      <div className="dashboard-action-icon">
         <svg viewBox="0 0 24 24" className="w-5 h-5 text-black" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           {children}
         </svg>
       </div>
-      <span className="text-[10px] font-medium text-center leading-tight">{label}</span>
+      <span className="text-xs font-medium text-center leading-tight">{label}</span>
     </Link>
   );
 }

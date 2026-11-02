@@ -1,6 +1,6 @@
 /**
  * Applies the saved appearance before paint to avoid a flash.
- * Black (true black) is the default. "midnight" is the navy tint option.
+ * Graphite is the default; saved true-black and midnight choices stay available.
  * Light theme and background are mutually exclusive: "light" clears data-bg.
  * Migrates old "blue" bgColor to "midnight".
  */
