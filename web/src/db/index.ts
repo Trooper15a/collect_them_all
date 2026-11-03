@@ -15,11 +15,24 @@ export const alertsSchemaReady = alertMigrationGlobal.__alertsSchemaReady ??= cl
 );
 void alertsSchemaReady.catch((error) => console.error("[db] alerts.direction migration failed", error));
 
+const premiumGlobal = globalThis as typeof globalThis & { __premiumSchemaReady?: Promise<void> };
+export function ensurePremiumSchema(): Promise<void> {
+  if (premiumGlobal.__premiumSchemaReady) return premiumGlobal.__premiumSchemaReady;
+  const ready = (async () => {
+    await client.unsafe(`ALTER TABLE users ADD COLUMN IF NOT EXISTS premium BOOLEAN NOT NULL DEFAULT false`);
+    await client.unsafe(`ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT`);
+    await client.unsafe(`ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_since TEXT`);
+  })().catch(error => {
+    if (premiumGlobal.__premiumSchemaReady === ready) delete premiumGlobal.__premiumSchemaReady;
+    throw error;
+  });
+  premiumGlobal.__premiumSchemaReady = ready;
+  return ready;
+}
+void ensurePremiumSchema().catch((error) => console.error("[db] premium schema migration failed", error));
+
 const migrated = (globalThis as Record<string, unknown>).__dbMigrated;
 if (!migrated) {
   (globalThis as Record<string, unknown>).__dbMigrated = true;
   client.unsafe(`ALTER TABLE portfolios ADD COLUMN IF NOT EXISTS accent_color TEXT`).catch(() => {});
-  client.unsafe(`ALTER TABLE users ADD COLUMN IF NOT EXISTS premium BOOLEAN NOT NULL DEFAULT false`).catch((error) => console.error("[db] users.premium migration failed", error));
-  client.unsafe(`ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT`).catch((error) => console.error("[db] users.stripe_customer_id migration failed", error));
-  client.unsafe(`ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_since TEXT`).catch((error) => console.error("[db] users.premium_since migration failed", error));
 }
