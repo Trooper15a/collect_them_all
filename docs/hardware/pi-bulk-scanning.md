@@ -2,7 +2,11 @@
 
 Open `/scan?camera=pi` in current Chrome, sign in, connect the Pi by USB, and select **Connect Pi camera**. Allow Chrome's local-network permission. The preview, scan-area selection, calibration, capture, recognition, review and queue all run inside the live app. No local camera page or separate popup is used.
 
-Fit the scan outline to the card position by clicking opposite corners in the preview. Clear the stand and select **Stand is empty — start automatic scanning**. A settled card triggers identification. Strong separated matches enter the existing bulk queue automatically; uncertain matches pause for confirmation. Remove the card completely before placing the next one. Identical physical copies can then be scanned separately. Finish scanning to review and save the bulk queue with **Add all**.
+Fit the scan outline to the card position by clicking opposite corners in the preview. Clear the stand and select **Stand is empty — start automatic scanning**. A settled card triggers identification. Strong separated matches enter the ready queue automatically; uncertain matches pause for confirmation and remain in the review list if deferred. Remove the card completely before placing the next one. Identical physical copies can then be scanned separately.
+
+**Finish scanning** always opens a results dialog, including when nothing was queued. It lists ready cards and unconfirmed identifications and includes a destination binder selector. Use **Review match** to resolve uncertain cards, **Ignore this capture** to discard a suspect identification, **Add next** for variant/condition review, or **Add all** to save ready cards. A save confirmation names the destination binder. Both ready cards and unconfirmed identifications persist in the browser. The finish URL reopens results after a refresh.
+
+An empty-stand background comparison checks the changed object's boundaries and portrait proportions before allowing automatic queueing. Suspected photo-edge cutoffs, scan-area cutoffs and incomplete shapes go to review, even with a strong match. This is a conservative framing heuristic, not a guarantee that every partial card will be detected.
 
 Detection uses serial full-resolution captures from the existing service, so each placement takes several seconds. A fixed camera, stable lighting and a tightly fitted scan area help. Moving the camera or changing the area requires empty-stand recalibration. Stop cancels capture and prevents late inference from starting a new queue operation. Failed matching preserves the photo for manual retry.
 
