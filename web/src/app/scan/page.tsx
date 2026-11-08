@@ -18,6 +18,7 @@ import { TCGS } from "@/lib/types";
 import { useActiveTcgHydrated } from "@/lib/ui-prefs";
 
 interface RecentScan { id: string; name: string; setName: string | null; ts: number; }
+interface ScanReview { id: string; matches: Match[]; issue?: string; }
 
 export default function ScanPage() {
   const { data: session } = useSession();
@@ -43,18 +44,28 @@ export default function ScanPage() {
   const [showAllGames, setShowAllGames] = useState(false);
   const [guestQueue, setGuestQueue] = useState<AddSheetCard[]>([]);
   const [storageReady, setStorageReady] = useState(false);
+  const [scanResultsOpen, setScanResultsOpen] = useState(false);
+  const [pendingScans, setPendingScans] = useState<ScanReview[]>([]);
+  const [activeReviewId, setActiveReviewId] = useState<string | null>(null);
+  const [saveSummary, setSaveSummary] = useState("");
   const GUEST_QUEUE_LIMIT = 10;
 
   // Load persisted state after mount (SSR-safe defaults above avoid hydration mismatch).
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect -- one-time localStorage restore after mount; lazy useState initializers would break SSR/hydration */
     try {
+      if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("review") === "1") setScanResultsOpen(true);
       if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("camera") === "pi") {
         setPiMode(true);
         setBulkMode(true);
         setScanning(true);
       }
       if (localStorage.getItem("bulkMode") === "1") setBulkMode(true);
+      const reviews = localStorage.getItem("bulkScanReview");
+      if (reviews) {
+        const parsed = JSON.parse(reviews);
+        if (Array.isArray(parsed)) setPendingScans(parsed.filter((entry) => typeof entry?.id === "string" && Array.isArray(entry.matches) && entry.matches.length > 0));
+      }
       const q = localStorage.getItem("bulkQueue");
       if (q) {
         const parsed = JSON.parse(q);
@@ -114,6 +125,10 @@ export default function ScanPage() {
     try { localStorage.setItem("bulkQueue", JSON.stringify(bulkQueue)); } catch {}
   }, [bulkQueue, storageReady]);
   useEffect(() => {
+    if (!storageReady) return;
+    try { localStorage.setItem("bulkScanReview", JSON.stringify(pendingScans)); } catch {}
+  }, [pendingScans, storageReady]);
+  useEffect(() => {
     try { localStorage.setItem("bulkMode", bulkMode ? "1" : "0"); } catch {}
   }, [bulkMode]);
 
@@ -134,7 +149,7 @@ export default function ScanPage() {
     return null;
   }
 
-  async function chooseMatch(m: Match) {
+  async function chooseMatch(m: Match, reviewId: string | null = null) {
     if (resolvingId) return false;
     haptic("medium");
     setResolvingId(m.card.id);
@@ -152,12 +167,14 @@ export default function ScanPage() {
             showToast(`Guest limit reached (${GUEST_QUEUE_LIMIT}). Sign in to save more!`, "info");
           }
           setScanning(true);
-        } else if (bulkMode || standMode) {
+        } else if (bulkMode || standMode || reviewId) {
           setBulkQueue((prev) => [...prev, card]);
-          setScanning(true);
+          if (bulkMode || standMode) setScanning(true);
         } else {
           setAdding(card);
         }
+        if (reviewId) setPendingScans((previous) => previous.filter((scan) => scan.id !== reviewId));
+        setActiveReviewId(null);
         return true;
       } else {
         setResolveError(`No priced listing found for ${m.card.name ?? m.card.id}. Try searching by name.`);
@@ -168,6 +185,12 @@ export default function ScanPage() {
       setResolvingId(null);
     }
     return false;
+  }
+
+  function finishScanning() {
+    setScanning(false); setPiMode(false); setBulkMode(false); setStandMode(false);
+    setMatches(null); setActiveReviewId(null); setSaveSummary(""); setScanResultsOpen(true);
+    if (typeof window !== "undefined") window.history.replaceState(null, "", "/scan?review=1");
   }
 
   function handleDiscoveryCard(card: DiscoveryCard) {
@@ -193,6 +216,7 @@ export default function ScanPage() {
       </header>
 
       <CardDiscovery initialTcg={tcg} allowCamera onSelect={handleDiscoveryCard} />
+      {(bulkQueue.length > 0 || pendingScans.length > 0) && <Button className="mt-3" onClick={finishScanning}>Review scanned cards ({bulkQueue.length + pendingScans.length})</Button>}
 
       {isLoggedIn && (
         <div className="mt-3 flex justify-end gap-2">
@@ -211,17 +235,20 @@ export default function ScanPage() {
           <button type="button" onClick={() => setResolveError(null)} aria-label="Dismiss error">✕</button>
         </div>
       )}
-      {scanning && piMode && <PiBulkScanner onClose={() => { setScanning(false); setPiMode(false); setBulkMode(false); setMatches(null); }} onMatches={async (m, automatic) => {
+      {scanning && piMode && <PiBulkScanner onClose={finishScanning} onMatches={async (m, automatic, capture) => {
         haptic("heavy"); setShowAllGames(false);
-        const clear = automatic && isLoggedIn ? clearPiMatch(m) : null;
-        if (clear) return await chooseMatch(clear);
-        setMatches(m);
-      }} paused={!!matches || resolvingId !== null} count={bulkQueue.length} tcg={tcg} lang="all" />}
+        const reviewId = capture?.captureId ?? crypto.randomUUID();
+        setPendingScans((previous) => [...previous.filter((scan) => scan.id !== reviewId), { id: reviewId, matches: m, issue: capture?.issue }]);
+        const clear = automatic && !capture?.issue && isLoggedIn ? clearPiMatch(m) : null;
+        if (clear) return await chooseMatch(clear, reviewId);
+        setActiveReviewId(reviewId); setMatches(m);
+      }} paused={!!matches || resolvingId !== null} count={bulkQueue.length} reviewCount={pendingScans.length} tcg={tcg} lang="all" />}
       {scanning && !piMode && (!matches || standMode) && <Scanner onClose={() => { setScanning(false); setBulkMode(false); setStandMode(false); }} onMatches={(m) => { haptic("heavy"); setShowAllGames(false); setMatches(m); }} paused={!!matches} bulkMode={bulkMode} standMode={standMode} bulkCount={bulkQueue.length} lang="all" />}
       {matches && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
-          <button className="absolute inset-0 bg-black/70" onClick={() => setMatches(null)} aria-label="Close" />
+          <button className="absolute inset-0 bg-black/70" onClick={() => { setMatches(null); setActiveReviewId(null); }} aria-label="Close" />
           <div className="relative glass w-full max-w-lg rounded-t-3xl p-5 pb-[max(env(safe-area-inset-bottom),20px)] anim-widget d1" style={{ animationName: "slide-up-sheet" }}>
+            {pendingScans.find((scan) => scan.id === activeReviewId)?.issue && <p role="alert" className="text-sm text-down mb-3">Framing needs review: {pendingScans.find((scan) => scan.id === activeReviewId)?.issue}</p>}
             <div className="text-xs text-muted mb-3">Compare the image, language, set and number. Confirm the finish before saving; match scores are similarity only.</div>
             {activeTcgLabel && gameMatches && (
               <div className="text-[11px] text-muted mb-2 flex items-center justify-between gap-2">
@@ -242,7 +269,7 @@ export default function ScanPage() {
             <ul className="divide-y divide-line stagger-children">
               {(visibleMatches ?? []).map((m, i) => (
                 <li key={m.card.id}>
-                  <button onClick={() => chooseMatch(m)} disabled={resolvingId !== null} className="w-full flex items-center gap-3 py-2.5 text-left disabled:opacity-50">
+                  <button onClick={() => chooseMatch(m, activeReviewId)} disabled={resolvingId !== null} className="w-full flex items-center gap-3 py-2.5 text-left disabled:opacity-50">
                     <CardImage id={m.card.id} directUrl={scanThumbnailUrl(m.card)} eager priority={i < 2} className="w-12 rounded-md" alt="" />
                     <div className="flex-1 min-w-0">
                       <div className={`font-medium truncate ${i === 0 ? "text-up" : ""}`}>{m.card.name}</div>
@@ -260,13 +287,30 @@ export default function ScanPage() {
                 </li>
               ))}
             </ul>
-            <Button variant="ghost" className="w-full mt-3" onClick={() => setMatches(null)}>
-              Scan again
+            <Button variant="ghost" className="w-full mt-3" onClick={() => { setMatches(null); setActiveReviewId(null); }}>
+              {activeReviewId ? "Review later" : "Scan again"}
             </Button>
+            {activeReviewId && <Button variant="ghost" className="w-full mt-2" onClick={() => {
+              setPendingScans((previous) => previous.filter((scan) => scan.id !== activeReviewId)); setActiveReviewId(null); setMatches(null);
+            }}>Ignore this capture</Button>}
           </div>
         </div>
       )}
-      {!isLoggedIn && !scanning && (
+      {scanResultsOpen && !isLoggedIn && <div className="fixed inset-0 z-[45] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Scan results">
+        <button className="absolute inset-0 bg-black/70" onClick={() => setScanResultsOpen(false)} aria-label="Close scan results" />
+        <section className="relative card-surface rounded-3xl p-5 w-full max-w-lg max-h-[85vh] overflow-y-auto">
+          <h2 className="font-semibold">Scanned cards ({guestQueue.length + pendingScans.length})</h2>
+          {guestQueue.length === 0 && pendingScans.length === 0 && <p className="text-sm text-muted mt-3">No cards were queued.</p>}
+          <ul className="divide-y divide-line my-3">
+            {guestQueue.map((card, index) => <li key={`${card.id}-${index}`} className="py-2 text-sm">{card.name}</li>)}
+            {pendingScans.map((scan) => <li key={scan.id} className="py-2 text-sm">{scan.matches[0].card.name ?? "Identified card"} · Needs confirmation</li>)}
+          </ul>
+          <p className="text-sm text-muted mb-3">Sign in to review these cards and choose a destination binder.</p>
+          <Link href="/login?callbackUrl=%2Fscan%3Freview%3D1" className="text-accent underline">Sign in to save your scans</Link>
+          <Button variant="ghost" className="ml-3" onClick={() => setScanResultsOpen(false)}>Close</Button>
+        </section>
+      </div>}
+      {!isLoggedIn && !scanning && !scanResultsOpen && (
         <div className="card-surface rounded-3xl p-4 mt-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-semibold">
@@ -318,35 +362,48 @@ export default function ScanPage() {
           </div>
         </div>
       )}
-      {isLoggedIn && bulkQueue.length > 0 && !scanning && (
-        <div className="card-surface rounded-3xl p-4 mt-4">
+      {isLoggedIn && (bulkQueue.length > 0 || pendingScans.length > 0 || scanResultsOpen) && !scanning && (
+        <div className={scanResultsOpen ? "fixed inset-0 z-[45] flex items-center justify-center p-4" : ""} role={scanResultsOpen ? "dialog" : undefined} aria-modal={scanResultsOpen || undefined} aria-label="Scan results">
+        {scanResultsOpen && <button className="absolute inset-0 bg-black/70" onClick={() => setScanResultsOpen(false)} aria-label="Close scan results" />}
+        <div className={`card-surface rounded-3xl p-4 mt-4 ${scanResultsOpen ? "relative w-full max-w-lg max-h-[85vh] overflow-y-auto" : ""}`}>
+          {scanResultsOpen && <Button variant="ghost" className="float-right" onClick={() => setScanResultsOpen(false)}>Close</Button>}
           <div className="flex items-center justify-between mb-3">
-            <div><h3 className="text-sm font-semibold">Scanned cards ({bulkQueue.length})</h3><p className="text-xs text-muted">Review each card’s variant and condition before saving, or add all with your bulk defaults.</p></div>
+            <div><h3 className="text-sm font-semibold">Scanned cards ({bulkQueue.length + pendingScans.length})</h3><p className="text-xs text-muted">{bulkQueue.length} ready to save · {pendingScans.length} need confirmation. Choose a binder below, then save your cards.</p></div>
             <div className="flex gap-2">
               {confirmingClear ? (
                 <>
-                  <Button variant="danger" className="text-xs !py-1.5 !px-3" onClick={() => { setBulkQueue([]); setConfirmingClear(false); showToast("Queue cleared", "info"); }}>Confirm clear</Button>
+                  <Button variant="danger" className="text-xs !py-1.5 !px-3" onClick={() => { setBulkQueue([]); setPendingScans([]); setConfirmingClear(false); showToast("Queue cleared", "info"); }}>Confirm clear</Button>
                   <Button variant="ghost" className="text-xs !py-1.5 !px-3" onClick={() => setConfirmingClear(false)}>Keep</Button>
                 </>
               ) : (
                 <Button variant="ghost" className="text-xs !py-1.5 !px-3" onClick={() => setConfirmingClear(true)}>Clear</Button>
               )}
-              <Button className="text-xs !py-1.5 !px-3" onClick={() => { setAdding(bulkQueue[0]); }}>Add next</Button>
+              <Button disabled={!bulkQueue.length} className="text-xs !py-1.5 !px-3" onClick={() => { setAdding(bulkQueue[0]); }}>Add next</Button>
             </div>
           </div>
+          {saveSummary && <p className="text-sm text-up mb-3" role="status">{saveSummary}</p>}
+          {bulkQueue.length === 0 && pendingScans.length === 0 && !saveSummary && <p className="text-sm text-muted mb-3">No cards were queued. Identified cards that need confirmation will appear here before saving.</p>}
+          {pendingScans.map((scan) => <div key={scan.id} className="flex items-center gap-3 py-2 border-b border-line">
+            <CardImage id={scan.matches[0].card.id} directUrl={scanThumbnailUrl(scan.matches[0].card)} className="w-10 rounded-md" alt="" />
+            <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{scan.matches[0].card.name ?? "Identified card"}</p><p className="text-xs text-muted">Needs confirmation{scan.issue ? ` · ${scan.issue}` : ""}</p></div>
+            <Button variant="ghost" onClick={() => { setActiveReviewId(scan.id); setMatches(scan.matches); }}>Review match</Button>
+            <button aria-label="Remove unconfirmed capture" onClick={() => setPendingScans((previous) => previous.filter((item) => item.id !== scan.id))}>✕</button>
+          </div>)}
           {portfoliosError && (
             <div className="text-xs text-down mb-3 flex items-center gap-2">
               <span>{portfoliosError}</span>
               <button type="button" className="underline font-semibold" onClick={loadPortfolios}>Retry</button>
             </div>
           )}
+          <p className="text-xs text-muted my-3">Review variant and condition with Add next, or use Add all with your bulk defaults.</p>
+          <label htmlFor="scan-destination" className="block text-xs font-semibold mb-2">Add cards to this binder</label>
           <div className="flex gap-2 mb-3">
-            <select className={`${inputCls} flex-1`} value={bulkPortfolioId ?? ""} onChange={(e) => setBulkPortfolioId(Number(e.target.value))}>
+            <select id="scan-destination" aria-label="Destination binder" className={`${inputCls} flex-1`} value={bulkPortfolioId ?? ""} onChange={(e) => setBulkPortfolioId(Number(e.target.value))}>
               {portfolios.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
             <Button
               variant="rainbow"
-              disabled={bulkAdding || !bulkPortfolioId}
+              disabled={bulkAdding || !bulkPortfolioId || bulkQueue.length === 0}
               onClick={async () => {
                 if (!bulkPortfolioId || bulkAdding) return;
                 setBulkAdding(true);
@@ -380,6 +437,7 @@ export default function ScanPage() {
                     setBulkProgress(i + 1);
                   }
                   setBulkQueue(failed);
+                  if (added > 0) setSaveSummary(`Added ${added} card${added === 1 ? "" : "s"} to ${portfolios.find((binder) => binder.id === bulkPortfolioId)?.name ?? "your binder"}.`);
                   if (failed.length === 0) showToast(`Added ${added} card${added === 1 ? "" : "s"}`, "up");
                   else showToast(`${added} added, ${failed.length} failed — kept in queue`, "down", { durationMs: 6000 });
                 } finally {
@@ -404,6 +462,7 @@ export default function ScanPage() {
               </li>
             ))}
           </ul>
+        </div>
         </div>
       )}
       {recentScans.length > 0 && !scanning && bulkQueue.length === 0 && (

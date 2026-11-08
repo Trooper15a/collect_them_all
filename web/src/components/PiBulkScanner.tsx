@@ -6,16 +6,17 @@ import { getScanEngine } from "@/lib/scanner/engine";
 import { preprocess } from "@/lib/scanner/preprocess";
 import { capturePi, connectPi } from "@/lib/scanner/pi-camera";
 import { StandDetector, imageFingerprint } from "@/lib/scanner/stand-detector";
+import { framingIssue, sampleScene, type SceneSample } from "@/lib/scanner/pi-framing";
 import type { CropRect } from "@/lib/grading/analysis";
 import type { Match } from "@/lib/scanner/matcher";
 
 type Props = {
-  onMatches: (matches: Match[], automatic?: boolean) => void | boolean | Promise<void | boolean>;
-  onClose: () => void; paused: boolean; count: number; tcg: string; lang: string;
+  onMatches: (matches: Match[], automatic?: boolean, capture?: { captureId: string; issue?: string }) => void | boolean | Promise<void | boolean>;
+  onClose: () => void; paused: boolean; count: number; reviewCount?: number; tcg: string; lang: string;
 };
 const DEFAULT_CROP = { x: 0.3, y: 0.06, width: 0.4, height: 0.88 };
 
-export function PiBulkScanner({ onMatches, onClose, paused, count, tcg, lang }: Props) {
+export function PiBulkScanner({ onMatches, onClose, paused, count, reviewCount = 0, tcg, lang }: Props) {
   const alive = useRef(false);
   const locked = useRef(false);
   const detector = useRef(new StandDetector());
@@ -26,6 +27,8 @@ export function PiBulkScanner({ onMatches, onClose, paused, count, tcg, lang }: 
   const generation = useRef(0);
   const cancelRun = useCallback(() => { generation.current++; }, []);
   const region = useRef<CropRect>(DEFAULT_CROP);
+  const emptyScene = useRef<SceneSample | null>(null);
+  const captureId = useRef("");
   const [crop, setCrop] = useState<CropRect>(DEFAULT_CROP);
   const [corner, setCorner] = useState<{ x: number; y: number } | null>(null);
   const [url, setUrl] = useState("");
@@ -52,6 +55,7 @@ export function PiBulkScanner({ onMatches, onClose, paused, count, tcg, lang }: 
     const bitmap = await createImageBitmap(blob);
     if (!alive.current || request.signal.aborted) { bitmap.close(); throw new Error("Capture stopped."); }
     image.current?.close(); image.current = bitmap;
+    captureId.current = crypto.randomUUID();
     if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
     objectUrl.current = URL.createObjectURL(blob); setUrl(objectUrl.current);
     return bitmap;
@@ -69,7 +73,8 @@ export function PiBulkScanner({ onMatches, onClose, paused, count, tcg, lang }: 
     const matches = await engine.match(input, 5, current.tcg, current.lang);
     if (!alive.current || (auto && token !== generation.current)) return;
     if (!matches.length) throw new Error("No matches. Check the scan area and try again.");
-    const queued = await controls.current.onMatches(matches, auto);
+    const issue = auto ? (emptyScene.current ? framingIssue(sampleScene(bitmap), emptyScene.current, region.current) : "Calibrate the empty stand before automatic queueing.") : undefined;
+    const queued = await controls.current.onMatches(matches, auto && !issue, { captureId: captureId.current, issue });
     if (!alive.current) return;
     if (queued === false) throw new Error("Could not queue this card. Retry identification or check the match manually.");
     setStatus(queued ? "Card queued — remove it, then place the next card."
@@ -91,6 +96,7 @@ export function PiBulkScanner({ onMatches, onClose, paused, count, tcg, lang }: 
       } else {
         const bitmap = await takePhoto();
         if (kind === "calibrate") {
+          emptyScene.current = sampleScene(bitmap);
           detector.current.calibrate(imageFingerprint(bitmap, region.current));
           setStatus("Ready — place a card in the scan area."); setRunning(true);
         } else setStatus("Check the scan area. Click two opposite corners to fit the card, then clear the stand and start automatic scanning.");
@@ -158,7 +164,7 @@ export function PiBulkScanner({ onMatches, onClose, paused, count, tcg, lang }: 
 
   return <section className="card-surface rounded-2xl p-4 mt-4 space-y-3" aria-label="Pi bulk scanner">
     <div className="flex justify-between items-center gap-3">
-      <h2 className="font-semibold">Pi bulk scan · {count} queued</h2>
+      <h2 className="font-semibold">Pi bulk scan · {count} ready · {reviewCount} to review</h2>
       <Button variant="ghost" onClick={onClose}>Finish scanning</Button>
     </div>
     <p className="text-sm text-muted">Place a card, let it settle, then remove it after it’s queued. Clear matches queue automatically; uncertain matches ask for review. Everything stays on this page.</p>
