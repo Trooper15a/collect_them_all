@@ -4,7 +4,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const ts = require("typescript");
 
-function clientHarness(entry, { hidden = false, props = {}, exportName = "default", params = { id: "tp:test" }, extraModules = {}, query = new URLSearchParams(), fetch = async () => ({ ok: true, json: async () => ({}) }) } = {}) {
+function clientHarness(entry, { hidden = false, props = {}, exportName = "default", params = { id: "tp:test" }, extraModules = {}, globals = {}, query = new URLSearchParams(), fetch = async () => ({ ok: true, json: async () => ({}) }) } = {}) {
   const slots = [], effects = [], cleanups = [];
   let cursor = 0;
   const hooks = {
@@ -47,7 +47,7 @@ function clientHarness(entry, { hidden = false, props = {}, exportName = "defaul
     vm.runInNewContext(ts.transpileModule(fs.readFileSync(file, "utf8"), {
       compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
     }).outputText, {
-      exports, fetch, URL, URLSearchParams, setTimeout, clearTimeout, AbortController,
+      exports, fetch, URL, URLSearchParams, setTimeout, clearTimeout, AbortController, ...globals,
       require: (name) => {
         if (modules[name]) return modules[name];
         const target = name.startsWith("@/") ? path.join(__dirname, "../src", name.slice(2)) : path.resolve(path.dirname(file), name);

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AddToPortfolioSheet, type AddSheetCard } from "@/components/AddToPortfolioSheet";
 import { CardDiscovery, type DiscoveryCard } from "@/components/CardDiscovery";
 import { Scanner } from "@/components/Scanner";
+import { PiBulkScanner } from "@/components/PiBulkScanner";
 import { ScanLanguageBadge } from "@/components/ScanLanguageBadge";
 import { showToast } from "@/components/Toast";
 import { Button, CardImage, Money, inputCls } from "@/components/ui";
@@ -25,6 +26,7 @@ export default function ScanPage() {
   const [scanning, setScanning] = useState(false);
   const [bulkMode, setBulkMode] = useState(false);
   const [standMode, setStandMode] = useState(false);
+  const [piMode, setPiMode] = useState(false);
   const [bulkQueue, setBulkQueue] = useState<AddSheetCard[]>([]);
   const [confirmingClear, setConfirmingClear] = useState(false);
   const [matches, setMatches] = useState<Match[] | null>(null);
@@ -46,6 +48,11 @@ export default function ScanPage() {
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect -- one-time localStorage restore after mount; lazy useState initializers would break SSR/hydration */
     try {
+      if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("camera") === "pi") {
+        setPiMode(true);
+        setBulkMode(true);
+        setScanning(true);
+      }
       if (localStorage.getItem("bulkMode") === "1") setBulkMode(true);
       const q = localStorage.getItem("bulkQueue");
       if (q) {
@@ -187,10 +194,11 @@ export default function ScanPage() {
 
       {isLoggedIn && (
         <div className="mt-3 flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => { setBulkMode(true); setStandMode(false); setScanning(true); }}>
+          <a href="/scan?camera=pi" className="self-center text-sm font-semibold text-accent underline">Pi bulk scan</a>
+          <Button variant="ghost" onClick={() => { setPiMode(false); setBulkMode(true); setStandMode(false); setScanning(true); }}>
             Bulk scan
           </Button>
-          <Button variant="ghost" onClick={() => { setStandMode(true); setBulkMode(false); setScanning(true); }}>
+          <Button variant="ghost" onClick={() => { setPiMode(false); setStandMode(true); setBulkMode(false); setScanning(true); }}>
             Stand scan
           </Button>
         </div>
@@ -201,7 +209,8 @@ export default function ScanPage() {
           <button type="button" onClick={() => setResolveError(null)} aria-label="Dismiss error">✕</button>
         </div>
       )}
-      {scanning && (!matches || standMode) && <Scanner onClose={() => { setScanning(false); setBulkMode(false); setStandMode(false); }} onMatches={(m) => { haptic("heavy"); setShowAllGames(false); setMatches(m); }} paused={!!matches} bulkMode={bulkMode} standMode={standMode} bulkCount={bulkQueue.length} lang="all" />}
+      {scanning && piMode && <PiBulkScanner onClose={() => { setScanning(false); setPiMode(false); setBulkMode(false); setMatches(null); }} onMatches={(m) => { haptic("heavy"); setShowAllGames(false); setMatches(m); }} paused={!!matches} count={bulkQueue.length} tcg={tcg} lang="all" />}
+      {scanning && !piMode && (!matches || standMode) && <Scanner onClose={() => { setScanning(false); setBulkMode(false); setStandMode(false); }} onMatches={(m) => { haptic("heavy"); setShowAllGames(false); setMatches(m); }} paused={!!matches} bulkMode={bulkMode} standMode={standMode} bulkCount={bulkQueue.length} lang="all" />}
       {matches && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
           <button className="absolute inset-0 bg-black/70" onClick={() => setMatches(null)} aria-label="Close" />
