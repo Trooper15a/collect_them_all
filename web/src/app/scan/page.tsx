@@ -48,6 +48,7 @@ export default function ScanPage() {
   const [pendingScans, setPendingScans] = useState<ScanReview[]>([]);
   const [activeReviewId, setActiveReviewId] = useState<string | null>(null);
   const [saveSummary, setSaveSummary] = useState("");
+  const [scanNotice, setScanNotice] = useState("");
   const GUEST_QUEUE_LIMIT = 10;
 
   // Load persisted state after mount (SSR-safe defaults above avoid hydration mismatch).
@@ -187,9 +188,12 @@ export default function ScanPage() {
     return false;
   }
 
-  function finishScanning() {
+  function finishScanning(notice?: string) {
     setScanning(false); setPiMode(false); setBulkMode(false); setStandMode(false);
     setMatches(null); setActiveReviewId(null); setSaveSummary(""); setScanResultsOpen(true);
+    setScanNotice(notice ?? (bulkQueue.length + pendingScans.length + guestQueue.length === 0
+      ? "No card reached identification. Keep each card in place until the ready/review count increases, then remove it and wait for Ready before the next card."
+      : ""));
     if (typeof window !== "undefined") window.history.replaceState(null, "", "/scan?review=1");
   }
 
@@ -216,7 +220,7 @@ export default function ScanPage() {
       </header>
 
       <CardDiscovery initialTcg={tcg} allowCamera onSelect={handleDiscoveryCard} />
-      {(bulkQueue.length > 0 || pendingScans.length > 0) && <Button className="mt-3" onClick={finishScanning}>Review scanned cards ({bulkQueue.length + pendingScans.length})</Button>}
+      {(bulkQueue.length > 0 || pendingScans.length > 0) && <Button className="mt-3" onClick={() => finishScanning()}>Review scanned cards ({bulkQueue.length + pendingScans.length})</Button>}
 
       {isLoggedIn && (
         <div className="mt-3 flex justify-end gap-2">
@@ -381,6 +385,7 @@ export default function ScanPage() {
               <Button disabled={!bulkQueue.length} className="text-xs !py-1.5 !px-3" onClick={() => { setAdding(bulkQueue[0]); }}>Add next</Button>
             </div>
           </div>
+          {scanNotice && <p className="text-sm text-down mb-3" role="alert">Scanner stopped: {scanNotice}</p>}
           {saveSummary && <p className="text-sm text-up mb-3" role="status">{saveSummary}</p>}
           {bulkQueue.length === 0 && pendingScans.length === 0 && !saveSummary && <p className="text-sm text-muted mb-3">No cards were queued. Identified cards that need confirmation will appear here before saving.</p>}
           {pendingScans.map((scan) => <div key={scan.id} className="flex items-center gap-3 py-2 border-b border-line">

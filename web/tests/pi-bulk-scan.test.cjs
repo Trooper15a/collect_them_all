@@ -84,10 +84,10 @@ test("stand detection ignores motion/exposure shifts and requires removal before
   const d = new StandDetector(); d.calibrate(empty);
   assert.equal(frameDistance(empty, new Float32Array(300).fill(130)), 0);
   for (let i = 0; i < 8; i++) assert.equal(d.observe(i % 2 ? card : hand), "settling");
-  d.observe(card); assert.equal(d.observe(card), "capture");
+  d.observe(empty); d.observe(card); assert.equal(d.observe(card), "capture");
   for (let i = 0; i < 5; i++) assert.equal(d.observe(card), "remove");
   d.observe(empty); assert.equal(d.observe(card), "remove");
-  d.observe(empty); d.observe(empty); d.observe(card); d.observe(card);
+  d.observe(empty); d.observe(empty); d.observe(card);
   assert.equal(d.observe(card), "capture");
 });
 
@@ -216,4 +216,51 @@ test("refreshing finished results restores ready and unconfirmed cards without r
   assert.equal(nodes(tree, n => n.type === "PiBulkScanner").length, 0);
   assert.equal(JSON.parse(storage.get("bulkQueue")).length, 1);
   assert.equal(JSON.parse(storage.get("bulkScanReview")).length, 1);
+});
+
+test("horizontal lighting bands do not look like a card or prevent stable placement detection", () => {
+  const { StandDetector, frameDistance } = pure("lib/scanner/stand-detector.ts");
+  const empty = new Float32Array(32 * 32 * 3).fill(100);
+  const banded = (card, phase) => Float32Array.from(empty, (value, i) => {
+    const pixel = Math.floor(i / 3), x = pixel % 32, y = Math.floor(pixel / 32);
+    return value + (Math.floor((y + phase) / 3) % 2 ? 22 : -22) + (card ? (x % 4 < 2 ? 40 : -40) : 0);
+  });
+  assert.ok(frameDistance(empty, banded(false, 1)) < 1);
+  const detector = new StandDetector(); detector.calibrate(empty);
+  assert.equal(detector.observe(banded(false, 1)), "empty");
+  assert.equal(detector.observe(banded(true, 1)), "settling");
+  assert.equal(detector.observe(banded(true, 3)), "capture");
+  assert.equal(detector.observe(banded(true, 2)), "remove");
+  detector.observe(banded(false, 2)); detector.observe(banded(false, 4));
+  detector.observe(banded(true, 2));
+  assert.equal(detector.observe(banded(true, 4)), "capture");
+});
+
+test("Finish waits for the current identification and keeps its result before closing", async () => {
+  const timers = new Map(); let release, closed = 0;
+  const { h, props, accepted, button, click } = cameraHarness({ timers, match: () => new Promise(resolve => { release = resolve; }) });
+  props.onClose = () => { closed++; };
+  h.render(); await h.flush();
+  await click("Connect Pi camera"); await click("Stand is empty — start automatic scanning");
+  const [id, tick] = timers.entries().next().value; timers.delete(id); tick(); await settle();
+  button("Finish scanning").props.onClick();
+  assert.equal(closed, 0);
+  release(matches); await settle();
+  assert.equal(accepted.length, 1);
+  assert.equal(closed, 1);
+});
+
+test("whole-card framing remains valid when horizontal lighting bands move", () => {
+  const { framingIssue } = pure("lib/scanner/pi-framing.ts", { Uint8ClampedArray, Uint8Array });
+  const width = 96, height = 64;
+  function scene(card, phase) {
+    const pixels = new Uint8ClampedArray(width * height * 4);
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+      const color = card && x >= 35 && x <= 60 && y >= 7 && y <= 56 ? [220, 120, 30] : [90, 90, 90];
+      const band = Math.floor((y + phase) / 4) % 2 ? 22 : -22;
+      pixels.set([...color.map(value => value + band), 255], (y * width + x) * 4);
+    }
+    return { width, height, pixels, aspect: 16 / 9 };
+  }
+  assert.equal(framingIssue(scene(true, 3), scene(false, 0), { x: 0.3, y: 0.06, width: 0.4, height: 0.88 }), undefined);
 });

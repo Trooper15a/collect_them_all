@@ -3,45 +3,51 @@
 export class StandDetector {
   private empty: Float32Array | null = null;
   private previous: Float32Array | null = null;
-  private presentFrames = 0;
   private emptyFrames = 0;
   private waitingForRemoval = false;
+  cardPresent = false;
 
   calibrate(frame: Float32Array) {
     this.empty = frame.slice();
     this.previous = null;
-    this.presentFrames = this.emptyFrames = 0;
+    this.emptyFrames = 0;
+    this.cardPresent = false;
     this.waitingForRemoval = false;
   }
 
   observe(frame: Float32Array): "empty" | "settling" | "capture" | "remove" {
     if (!this.empty) throw new Error("Calibrate the empty stand first.");
     const distance = frameDistance(frame, this.empty);
+    this.cardPresent = distance >= 12;
     const stable = this.previous !== null && frameDistance(frame, this.previous) < 4;
     this.previous = frame.slice();
     if (distance < 6) {
-      this.presentFrames = 0;
       if (++this.emptyFrames >= 2) this.waitingForRemoval = false;
       return this.waitingForRemoval ? "remove" : "empty";
     }
     this.emptyFrames = 0;
     if (this.waitingForRemoval) return "remove";
-    if (distance < 12 || !stable) { this.presentFrames = 0; return "settling"; }
-    if (++this.presentFrames < 2) return "settling";
+    if (distance < 12 || !stable) return "settling";
     this.waitingForRemoval = true;
-    this.presentFrames = 0;
     return "capture";
   }
 }
 
-/** Ignore uniform exposure/color shifts; retain spatial card texture. */
+/** Ignore horizontal rolling-shutter lighting bands as well as exposure shifts.
+ * Compare spatial texture within each row, rather than treating moving light
+ * stripes on the empty white stand as a card or continued motion. */
 export function frameDistance(a: Float32Array, b: Float32Array): number {
   if (a.length !== b.length || !a.length || a.length % 3) throw new Error("Invalid stand fingerprint.");
-  const offsets = [0, 0, 0];
-  for (let i = 0; i < a.length; i++) offsets[i % 3] += a[i] - b[i];
-  for (let c = 0; c < 3; c++) offsets[c] /= a.length / 3;
+  const side = Math.sqrt(a.length / 3);
+  const rows = Number.isInteger(side) ? side : 1;
+  const rowLength = a.length / rows;
   let total = 0;
-  for (let i = 0; i < a.length; i++) total += Math.abs(a[i] - b[i] - offsets[i % 3]);
+  for (let row = 0; row < rows; row++) {
+    const offsets = [0, 0, 0], start = row * rowLength;
+    for (let i = 0; i < rowLength; i++) offsets[i % 3] += a[start + i] - b[start + i];
+    for (let c = 0; c < 3; c++) offsets[c] /= rowLength / 3;
+    for (let i = 0; i < rowLength; i++) total += Math.abs(a[start + i] - b[start + i] - offsets[i % 3]);
+  }
   return total / a.length;
 }
 

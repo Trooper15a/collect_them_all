@@ -12,7 +12,7 @@ import type { Match } from "@/lib/scanner/matcher";
 
 type Props = {
   onMatches: (matches: Match[], automatic?: boolean, capture?: { captureId: string; issue?: string }) => void | boolean | Promise<void | boolean>;
-  onClose: () => void; paused: boolean; count: number; reviewCount?: number; tcg: string; lang: string;
+  onClose: (notice?: string) => void; paused: boolean; count: number; reviewCount?: number; tcg: string; lang: string;
 };
 const DEFAULT_CROP = { x: 0.3, y: 0.06, width: 0.4, height: 0.88 };
 
@@ -23,7 +23,9 @@ export function PiBulkScanner({ onMatches, onClose, paused, count, reviewCount =
   const image = useRef<ImageBitmap | null>(null);
   const objectUrl = useRef("");
   const activeRequest = useRef<AbortController | null>(null);
-  const controls = useRef({ paused, onMatches, tcg, lang });
+  const controls = useRef({ paused, onMatches, onClose, tcg, lang });
+  const finishRequested = useRef(false);
+  const finishError = useRef<string | undefined>(undefined);
   const generation = useRef(0);
   const cancelRun = useCallback(() => { generation.current++; }, []);
   const region = useRef<CropRect>(DEFAULT_CROP);
@@ -37,8 +39,9 @@ export function PiBulkScanner({ onMatches, onClose, paused, count, reviewCount =
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("Connect your Pi over USB, then connect the camera here.");
+  const [finishing, setFinishing] = useState(false);
 
-  useEffect(() => { controls.current = { paused, onMatches, tcg, lang }; }, [paused, onMatches, tcg, lang]);
+  useEffect(() => { controls.current = { paused, onMatches, onClose, tcg, lang }; }, [paused, onMatches, onClose, tcg, lang]);
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -61,7 +64,7 @@ export function PiBulkScanner({ onMatches, onClose, paused, count, reviewCount =
     return bitmap;
   }
 
-  async function identify(bitmap: ImageBitmap, auto: boolean) {
+  async function identify(bitmap: ImageBitmap, auto: boolean, reviewReason?: string) {
     const token = generation.current;
     const crop = region.current;
     const input = preprocess(bitmap, { x: crop.x * bitmap.width, y: crop.y * bitmap.height,
@@ -73,7 +76,7 @@ export function PiBulkScanner({ onMatches, onClose, paused, count, reviewCount =
     const matches = await engine.match(input, 5, current.tcg, current.lang);
     if (!alive.current || (auto && token !== generation.current)) return;
     if (!matches.length) throw new Error("No matches. Check the scan area and try again.");
-    const issue = auto ? (emptyScene.current ? framingIssue(sampleScene(bitmap), emptyScene.current, region.current) : "Calibrate the empty stand before automatic queueing.") : undefined;
+    const issue = reviewReason ?? (auto ? (emptyScene.current ? framingIssue(sampleScene(bitmap), emptyScene.current, region.current) : "Calibrate the empty stand before automatic queueing.") : undefined);
     const queued = await controls.current.onMatches(matches, auto && !issue, { captureId: captureId.current, issue });
     if (!alive.current) return;
     if (queued === false) throw new Error("Could not queue this card. Retry identification or check the match manually.");
@@ -82,8 +85,9 @@ export function PiBulkScanner({ onMatches, onClose, paused, count, reviewCount =
   }
 
   async function action(kind: "connect" | "calibrate" | "capture" | "identify") {
-    if (locked.current || paused) return;
+    if (locked.current || paused || finishRequested.current) return;
     locked.current = true; setBusy(true); setError(""); setRunning(false);
+    finishError.current = undefined;
     try {
       if (kind === "connect") {
         setStatus("Connecting to the Pi — allow local-network access if Chrome asks.");
@@ -103,12 +107,16 @@ export function PiBulkScanner({ onMatches, onClose, paused, count, reviewCount =
       }
     } catch (cause) {
       if (alive.current) {
-        setError(cause instanceof Error ? cause.message : "Pi camera operation failed.");
+        finishError.current = cause instanceof Error ? cause.message : "Pi camera operation failed.";
+        setError(finishError.current);
         setStatus("Scanning stopped. Resolve the error, then try again.");
       }
     } finally {
       locked.current = false;
-      if (alive.current) setBusy(false);
+      if (alive.current) {
+        setBusy(false);
+        if (finishRequested.current) controls.current.onClose(finishError.current);
+      }
     }
   }
 
@@ -117,33 +125,38 @@ export function PiBulkScanner({ onMatches, onClose, paused, count, reviewCount =
     let stopped = false;
     let timer: ReturnType<typeof setTimeout>;
     const tick = async () => {
-      if (stopped) return;
+      if (stopped || finishRequested.current) return;
       if (!controls.current.paused && !locked.current) {
         locked.current = true; setBusy(true);
         try {
           const bitmap = await takePhoto();
           if (stopped || !alive.current) return;
           const state = detector.current.observe(imageFingerprint(bitmap, region.current));
-          if (state === "capture") {
+          if (state === "capture" || (finishRequested.current && state === "settling" && detector.current.cardPresent)) {
             setStatus("Card settled — identifying…");
-            await identify(bitmap, true);
+            await identify(bitmap, !finishRequested.current, finishRequested.current ? "Final capture — confirm this card before saving." : undefined);
           } else setStatus(state === "empty" ? "Ready — place a card in the scan area."
             : state === "remove" ? "Remove the scanned card before placing the next one."
-            : "Waiting for the card to settle…");
+            : detector.current.cardPresent ? "Card detected — keep it still until the ready/review count increases."
+            : "Checking the empty stand — keep the camera still.");
         } catch (cause) {
           if (!stopped && alive.current) {
-            setError(cause instanceof Error ? cause.message : "Automatic scanning failed.");
+            finishError.current = cause instanceof Error ? cause.message : "Automatic scanning failed.";
+            setError(finishError.current);
             setRunning(false); setStatus("Scanning paused. Check the photo and retry identification, or restart with the stand empty.");
           }
           return;
         } finally {
           locked.current = false;
-          if (alive.current) setBusy(false);
+          if (alive.current) {
+            setBusy(false);
+            if (finishRequested.current) controls.current.onClose(finishError.current);
+          }
         }
       }
-      if (!stopped) timer = setTimeout(() => void tick(), 1000);
+      if (!stopped && !finishRequested.current) timer = setTimeout(() => void tick(), 250);
     };
-    timer = setTimeout(() => void tick(), 1000);
+    timer = setTimeout(() => void tick(), 250);
     return () => { stopped = true; cancelRun(); clearTimeout(timer); activeRequest.current?.abort(); };
     // Capture/recognition use current props through controls; do not restart an in-flight loop on a parent render.
   }, [running, cancelRun]);
@@ -165,9 +178,12 @@ export function PiBulkScanner({ onMatches, onClose, paused, count, reviewCount =
   return <section className="card-surface rounded-2xl p-4 mt-4 space-y-3" aria-label="Pi bulk scanner">
     <div className="flex justify-between items-center gap-3">
       <h2 className="font-semibold">Pi bulk scan · {count} ready · {reviewCount} to review</h2>
-      <Button variant="ghost" onClick={onClose}>Finish scanning</Button>
+      <Button variant="ghost" disabled={finishing} onClick={() => {
+        finishRequested.current = true; setFinishing(true);
+        if (!locked.current) controls.current.onClose(finishError.current);
+      }}>{finishing ? "Finishing current capture…" : "Finish scanning"}</Button>
     </div>
-    <p className="text-sm text-muted">Place a card, let it settle, then remove it after it’s queued. Clear matches queue automatically; uncertain matches ask for review. Everything stays on this page.</p>
+    <p className="text-sm text-muted">Hold each card still until the ready/review count increases. Remove it, wait for “Ready”, then place the next card. Clear matches queue automatically; uncertain matches ask for review.</p>
     <div className="flex flex-wrap gap-2">
       <Button onClick={() => void action("connect")} disabled={busy || paused || running}>{connected ? "Reconnect Pi camera" : "Connect Pi camera"}</Button>
       {connected && !running && <Button disabled={busy || paused || !!corner} onClick={() => void action("calibrate")}>Stand is empty — start automatic scanning</Button>}
