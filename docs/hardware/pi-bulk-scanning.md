@@ -1,30 +1,34 @@
-# Pi bulk scanning
+# Automatic Pi bulk scanning
 
-The Scan page has a signed-in **Pi bulk scan** link. This performs a full page load so Chrome preserves the connection to the separate Pi camera window. Select **Open Pi camera**, capture the front, and send the photo. Return to the app, adjust the suggested crop by clicking opposite card corners if necessary, then choose **Identify card**. Confirm a match to queue it. Repeat, select **Finish scanning**, then use the existing bulk **Add all** controls.
+Open `/scan?camera=pi` in current Chrome, sign in, connect the Pi by USB, and select **Connect Pi camera**. Allow Chrome's local-network permission. The preview, scan-area selection, calibration, capture, recognition, review and queue all run inside the live app. No local camera page or separate popup is used.
 
-Messages are accepted only from the opened Pi window, configured Pi origin and current random session, with JPEG validation. New images are ignored while processing or reviewing matches. Failed identification can be retried. A successful identification clears the preview to avoid accidentally scanning the same capture twice. Two physical copies can still be captured and queued separately.
+Fit the scan outline to the card position by clicking opposite corners in the preview. Clear the stand and select **Stand is empty — start automatic scanning**. A settled card triggers identification. Strong separated matches enter the existing bulk queue automatically; uncertain matches pause for confirmation. Remove the card completely before placing the next one. Identical physical copies can then be scanned separately. Finish scanning to review and save the bulk queue with **Add all**.
 
-The existing Pi grading page can send photos without an update using its **Send photo to pre-grader** button. Either side label is accepted for scanning; photograph the card front. The new Pi bundle renames this button for bulk scanning and keeps the side set to front.
+Detection uses serial full-resolution captures from the existing service, so each placement takes several seconds. A fixed camera, stable lighting and a tightly fitted scan area help. Moving the camera or changing the area requires empty-stand recalibration. Stop cancels capture and prevents late inference from starting a new queue operation. Failed matching preserves the photo for manual retry.
 
-## Optional Pi page update
+## One-time Pi service update
 
-In Windows PowerShell:
+The Pi service must advertise `directCapture: true` at `/api/health` and allow CORS requests from the exact RipnPull origins. Local preview origins on localhost are also supported. Other origins are rejected. Camera requests omit browser credentials and target only the fixed USB address `http://10.12.194.1:8000`. Chrome's local-network permission is required; the app does not expose the Pi to the public internet.
+
+Use the prepared `usb-camera-auto-install.tar.gz` archive from the project folder. In Windows PowerShell:
 
 ```powershell
-scp "C:\Users\isadi\Downloads\collecter copy\usb-camera-bulk-install.tar.gz" trooper@10.12.194.1:/home/trooper/raspberry-pi-ble-camera/
+scp "C:\Users\isadi\Downloads\collecter copy\usb-camera-auto-install.tar.gz" trooper@10.12.194.1:/home/trooper/
 ssh trooper@10.12.194.1
 ```
 
-On the Pi:
+At the Pi prompt:
 
 ```bash
-cd ~/raspberry-pi-ble-camera
-tar -xzf usb-camera-bulk-install.tar.gz
-sudo bash pi/scripts/install-usb.sh
+mkdir -p ~/raspberry-pi-ble-camera
+tar -xzf ~/usb-camera-auto-install.tar.gz -C ~/raspberry-pi-ble-camera
+sudo bash ~/raspberry-pi-ble-camera/pi/scripts/install-usb.sh
 ```
 
-Refresh the camera window afterward. This archive includes the rebuilt page and existing capture service files. It does not deploy the main app.
+The installer restarts the service after updating it. Scanning thereafter needs only the live app. The Pi source is maintained in the separate `raspberry-pi-ble-camera` project.
 
-## Validation
+## Verification
 
-Automated coverage exercises sender validation, photo receipt, crop preprocessing, failed-match recovery, match confirmation into the existing bulk queue, and pausing during review. Test the full physical capture-to-collection flow after deploying the main app; this requires a signed-in app session and the connected Pi. The release checkout passes full app typechecking, changed-file lint, 29 relevant tests and a production build. The build logs database connection warnings because there is no database in the local checkout.
+Tests cover insertion/motion/exposure changes, stable removal and repeated copies, direct capture and JPEG validation, cancellation during inference, automatic queueing, uncertainty review, and recovery from failed matching. The Pi service tests exercise preflight, approved and rejected origins, health capabilities and capture. Full physical testing requires installing the Pi update and using a signed-in live app session.
+
+Similarity thresholds are conservative heuristics, not calibrated certainty. Review the queued card, language, set and finish before saving.
