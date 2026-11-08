@@ -34,7 +34,8 @@ async function load(): Promise<ScanEngine> {
   try {
     const ort = await import("onnxruntime-web");
     ort.env.wasm.wasmPaths = "/ort/";
-    ort.env.wasm.numThreads = Math.min(4, navigator.hardwareConcurrency || 2);
+    ort.env.wasm.numThreads = globalThis.crossOriginIsolated
+      ? Math.min(4, navigator.hardwareConcurrency || 2) : 1;
     let session: InferenceSession;
     let backend = "wasm";
     try {
