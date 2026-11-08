@@ -17,14 +17,14 @@ export function framingIssue(current: SceneSample, empty: SceneSample, crop: Cro
   const { width, height, pixels, aspect } = current;
   if (width !== empty.width || height !== empty.height || pixels.length !== empty.pixels.length) return "Camera position changed — recalibrate the empty stand.";
   const size = width * height;
-  const offsets = [0, 1, 2].map(channel => {
-    const differences = Array.from({ length: size }, (_, i) => pixels[i * 4 + channel] - empty.pixels[i * 4 + channel]);
-    differences.sort((a, b) => a - b); return differences[Math.floor(size / 2)];
-  });
+  const offsets = Array.from({ length: height }, (_, row) => [0, 1, 2].map(channel => {
+    const differences = Array.from({ length: width }, (_, x) => pixels[(row * width + x) * 4 + channel] - empty.pixels[(row * width + x) * 4 + channel]);
+    differences.sort((a, b) => a - b); return differences[Math.floor(width / 2)];
+  }));
   const changed = new Uint8Array(size);
   for (let i = 0; i < size; i++) {
     let difference = 0;
-    for (let channel = 0; channel < 3; channel++) difference += Math.abs(pixels[i * 4 + channel] - empty.pixels[i * 4 + channel] - offsets[channel]);
+    for (let channel = 0; channel < 3; channel++) difference += Math.abs(pixels[i * 4 + channel] - empty.pixels[i * 4 + channel] - offsets[Math.floor(i / width)][channel]);
     changed[i] = difference / 3 > 24 ? 1 : 0;
   }
   // Join small gaps in artwork before finding the main changed object.

@@ -8,7 +8,9 @@ Fit the scan outline to the card position by clicking opposite corners in the pr
 
 An empty-stand background comparison checks the changed object's boundaries and portrait proportions before allowing automatic queueing. Suspected photo-edge cutoffs, scan-area cutoffs and incomplete shapes go to review, even with a strong match. This is a conservative framing heuristic, not a guarantee that every partial card will be detected.
 
-Detection uses serial full-resolution captures from the existing service, so each placement takes several seconds. A fixed camera, stable lighting and a tightly fitted scan area help. Moving the camera or changing the area requires empty-stand recalibration. Stop cancels capture and prevents late inference from starting a new queue operation. Failed matching preserves the photo for manual retry.
+Detection uses serial full-resolution captures from the existing service, so each placement takes several seconds (about 3.3 seconds per photo in the measured Pi setup). Two consistent photos trigger recognition. Keep each card in place until the ready/review count increases, then remove it and wait for Ready before placing the next card. Moving the camera or changing the area requires empty-stand recalibration. Stop cancels capture and prevents late inference from starting a new queue operation. Finish waits for a current identification before opening results; a final present-but-unsettled capture is sent to review. Failed matching preserves the photo for manual retry and carries the error into finished results.
+
+Presence and stability comparison removes RGB offsets separately for each image row to suppress horizontal lighting bands on the white stand. Recorded empty-stand images that differed by 8.6–10.9 with the prior comparison differ by about 0.7 with the correction; a real card remains distinct at about 25.5. The same lighting correction is applied to framing background subtraction. The recorded local sequence correctly transitions from empty to capture, rearms on removal, and captures a second placement. Personal camera frames are not included in the repository.
 
 ## One-time Pi service update
 
