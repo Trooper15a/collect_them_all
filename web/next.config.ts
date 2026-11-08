@@ -23,7 +23,6 @@ const nextConfig: NextConfig = {
       },
       // The Pi camera opens on a different origin and returns JPEGs through window.opener.
       { source: "/grade", headers: [{ key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" }] },
-      { source: "/scan", headers: [{ key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" }] },
       { source: "/model/(.*)", headers: [{ key: "Cache-Control", value: "public, max-age=604800" }] },
       { source: "/icons/(.*)", headers: [{ key: "Cache-Control", value: "public, max-age=604800" }] },
       // APIs may contain owner-specific fields even on public catalog routes.

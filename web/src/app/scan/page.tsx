@@ -7,6 +7,7 @@ import { AddToPortfolioSheet, type AddSheetCard } from "@/components/AddToPortfo
 import { CardDiscovery, type DiscoveryCard } from "@/components/CardDiscovery";
 import { Scanner } from "@/components/Scanner";
 import { PiBulkScanner } from "@/components/PiBulkScanner";
+import { clearPiMatch } from "@/lib/scanner/pi-auto";
 import { ScanLanguageBadge } from "@/components/ScanLanguageBadge";
 import { showToast } from "@/components/Toast";
 import { Button, CardImage, Money, inputCls } from "@/components/ui";
@@ -134,7 +135,7 @@ export default function ScanPage() {
   }
 
   async function chooseMatch(m: Match) {
-    if (resolvingId) return;
+    if (resolvingId) return false;
     haptic("medium");
     setResolvingId(m.card.id);
     try {
@@ -142,7 +143,6 @@ export default function ScanPage() {
       setMatches(null);
       if (!bulkMode && !standMode) setScanning(false);
       if (card) {
-        // eslint-disable-next-line react-hooks/purity -- event handler (tap on a match row), not render; rule false-positives through the .map() callback
         const scan: RecentScan = { id: card.id, name: card.name, setName: card.setName ?? null, ts: Date.now() };
         setRecentScans((prev) => [scan, ...prev.filter((s) => s.id !== card.id)].slice(0, 10));
         if (!isLoggedIn) {
@@ -158,6 +158,7 @@ export default function ScanPage() {
         } else {
           setAdding(card);
         }
+        return true;
       } else {
         setResolveError(`No priced listing found for ${m.card.name ?? m.card.id}. Try searching by name.`);
       }
@@ -166,6 +167,7 @@ export default function ScanPage() {
     } finally {
       setResolvingId(null);
     }
+    return false;
   }
 
   function handleDiscoveryCard(card: DiscoveryCard) {
@@ -209,7 +211,12 @@ export default function ScanPage() {
           <button type="button" onClick={() => setResolveError(null)} aria-label="Dismiss error">✕</button>
         </div>
       )}
-      {scanning && piMode && <PiBulkScanner onClose={() => { setScanning(false); setPiMode(false); setBulkMode(false); setMatches(null); }} onMatches={(m) => { haptic("heavy"); setShowAllGames(false); setMatches(m); }} paused={!!matches} count={bulkQueue.length} tcg={tcg} lang="all" />}
+      {scanning && piMode && <PiBulkScanner onClose={() => { setScanning(false); setPiMode(false); setBulkMode(false); setMatches(null); }} onMatches={async (m, automatic) => {
+        haptic("heavy"); setShowAllGames(false);
+        const clear = automatic && isLoggedIn ? clearPiMatch(m) : null;
+        if (clear) return await chooseMatch(clear);
+        setMatches(m);
+      }} paused={!!matches || resolvingId !== null} count={bulkQueue.length} tcg={tcg} lang="all" />}
       {scanning && !piMode && (!matches || standMode) && <Scanner onClose={() => { setScanning(false); setBulkMode(false); setStandMode(false); }} onMatches={(m) => { haptic("heavy"); setShowAllGames(false); setMatches(m); }} paused={!!matches} bulkMode={bulkMode} standMode={standMode} bulkCount={bulkQueue.length} lang="all" />}
       {matches && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
