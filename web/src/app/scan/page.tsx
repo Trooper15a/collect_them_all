@@ -191,9 +191,7 @@ export default function ScanPage() {
   function finishScanning(notice?: string) {
     setScanning(false); setPiMode(false); setBulkMode(false); setStandMode(false);
     setMatches(null); setActiveReviewId(null); setSaveSummary(""); setScanResultsOpen(true);
-    setScanNotice(notice ?? (bulkQueue.length + pendingScans.length + guestQueue.length === 0
-      ? "No card reached identification. Keep each card in place until the ready/review count increases, then remove it and wait for Ready before the next card."
-      : ""));
+    setScanNotice(notice ?? "");
     if (typeof window !== "undefined") window.history.replaceState(null, "", "/scan?review=1");
   }
 
@@ -387,7 +385,7 @@ export default function ScanPage() {
           </div>
           {scanNotice && <p className="text-sm text-down mb-3" role="alert">Scanner stopped: {scanNotice}</p>}
           {saveSummary && <p className="text-sm text-up mb-3" role="status">{saveSummary}</p>}
-          {bulkQueue.length === 0 && pendingScans.length === 0 && !saveSummary && <p className="text-sm text-muted mb-3">No cards were queued. Identified cards that need confirmation will appear here before saving.</p>}
+          {bulkQueue.length === 0 && pendingScans.length === 0 && !saveSummary && <p className="text-sm text-muted mb-3">No cards were queued. Keep each card in place until the ready/review count increases, then remove it and wait for Ready before the next card.</p>}
           {pendingScans.map((scan) => <div key={scan.id} className="flex items-center gap-3 py-2 border-b border-line">
             <CardImage id={scan.matches[0].card.id} directUrl={scanThumbnailUrl(scan.matches[0].card)} className="w-10 rounded-md" alt="" />
             <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{scan.matches[0].card.name ?? "Identified card"}</p><p className="text-xs text-muted">Needs confirmation{scan.issue ? ` · ${scan.issue}` : ""}</p></div>

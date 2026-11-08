@@ -120,6 +120,7 @@ test("Pi automatic clear matches reuse the bulk queue and uncertain matches open
   }, fetch: async url => ({ ok: true, json: async () => url.includes("/api/cards/") ? { card: { id: "card1", name: "Card one" } } : { portfolios: [] } }) });
   h.render(); await h.flush();
   let pi = nodes(h.render(), n => n.type === "PiBulkScanner")[0];
+  const initialFinish = pi.props.onClose;
   assert.equal(await pi.props.onMatches(matches, true), true);
   pi = nodes(h.render(), n => n.type === "PiBulkScanner")[0]; assert.equal(pi.props.count, 1);
   await pi.props.onMatches([{ ...matches[0], score: 0.8 }, matches[1]], true);
@@ -127,6 +128,8 @@ test("Pi automatic clear matches reuse the bulk queue and uncertain matches open
   await choose.props.onClick();
   pi = nodes(h.render(), n => n.type === "PiBulkScanner")[0]; assert.equal(pi.props.count, 2);
   assert.equal(nodes(h.render(), n => n.type === "Scanner").length, 0);
+  initialFinish();
+  assert.doesNotMatch(text(h.render()), /No card reached identification/);
 });
 
 test("Finish scanning opens a results dialog even when no cards were queued", async () => {
