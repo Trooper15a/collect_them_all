@@ -8,6 +8,7 @@ import { CardDiscovery, type DiscoveryCard } from "@/components/CardDiscovery";
 import { Scanner } from "@/components/Scanner";
 import { PiBulkScanner } from "@/components/PiBulkScanner";
 import { clearPiMatch } from "@/lib/scanner/pi-auto";
+import type { PiScanProgress } from "@/lib/scanner/pi-progress";
 import { ScanLanguageBadge } from "@/components/ScanLanguageBadge";
 import { showToast } from "@/components/Toast";
 import { Button, CardImage, Money, inputCls } from "@/components/ui";
@@ -49,6 +50,7 @@ export default function ScanPage() {
   const [activeReviewId, setActiveReviewId] = useState<string | null>(null);
   const [saveSummary, setSaveSummary] = useState("");
   const [scanNotice, setScanNotice] = useState("");
+  const [scanProgress, setScanProgress] = useState<PiScanProgress>({ captured: 0, identified: 0, failed: 0 });
   const GUEST_QUEUE_LIMIT = 10;
 
   // Load persisted state after mount (SSR-safe defaults above avoid hydration mismatch).
@@ -63,6 +65,13 @@ export default function ScanPage() {
       }
       if (localStorage.getItem("bulkMode") === "1") setBulkMode(true);
       const reviews = localStorage.getItem("bulkScanReview");
+      const progress = localStorage.getItem("piScanProgress");
+      try {
+        if (progress) {
+          const parsed = JSON.parse(progress);
+          if ([parsed?.captured, parsed?.identified, parsed?.failed].every((value) => Number.isInteger(value) && value >= 0)) setScanProgress(parsed);
+        }
+      } catch { /* Invalid counters must not prevent restoring queued cards. */ }
       if (reviews) {
         const parsed = JSON.parse(reviews);
         if (Array.isArray(parsed)) setPendingScans(parsed.filter((entry) => typeof entry?.id === "string" && Array.isArray(entry.matches) && entry.matches.length > 0));
@@ -129,6 +138,10 @@ export default function ScanPage() {
     if (!storageReady) return;
     try { localStorage.setItem("bulkScanReview", JSON.stringify(pendingScans)); } catch {}
   }, [pendingScans, storageReady]);
+  useEffect(() => {
+    if (!storageReady) return;
+    try { localStorage.setItem("piScanProgress", JSON.stringify(scanProgress)); } catch {}
+  }, [scanProgress, storageReady]);
   useEffect(() => {
     try { localStorage.setItem("bulkMode", bulkMode ? "1" : "0"); } catch {}
   }, [bulkMode]);
@@ -237,12 +250,13 @@ export default function ScanPage() {
           <button type="button" onClick={() => setResolveError(null)} aria-label="Dismiss error">✕</button>
         </div>
       )}
-      {scanning && piMode && <PiBulkScanner onClose={finishScanning} onMatches={async (m, automatic, capture) => {
+      {scanning && piMode && <PiBulkScanner onClose={finishScanning} onProgress={setScanProgress} onMatches={async (m, automatic, capture) => {
         haptic("heavy"); setShowAllGames(false);
         const reviewId = capture?.captureId ?? crypto.randomUUID();
         setPendingScans((previous) => [...previous.filter((scan) => scan.id !== reviewId), { id: reviewId, matches: m, issue: capture?.issue }]);
         const clear = automatic && !capture?.issue && isLoggedIn ? clearPiMatch(m) : null;
         if (clear) return await chooseMatch(clear, reviewId);
+        if (automatic) return "review";
         setActiveReviewId(reviewId); setMatches(m);
       }} paused={!!matches || resolvingId !== null} count={bulkQueue.length} reviewCount={pendingScans.length} tcg={tcg} lang="all" />}
       {scanning && !piMode && (!matches || standMode) && <Scanner onClose={() => { setScanning(false); setBulkMode(false); setStandMode(false); }} onMatches={(m) => { haptic("heavy"); setShowAllGames(false); setMatches(m); }} paused={!!matches} bulkMode={bulkMode} standMode={standMode} bulkCount={bulkQueue.length} lang="all" />}
@@ -384,6 +398,7 @@ export default function ScanPage() {
             </div>
           </div>
           {scanNotice && <p className="text-sm text-down mb-3" role="alert">Scanner stopped: {scanNotice}</p>}
+          {(scanProgress.captured > 0 || scanProgress.failed > 0) && <p className="text-sm text-muted mb-3">This run: {scanProgress.captured} captured · {scanProgress.identified} identified · {scanProgress.failed} need retry.</p>}
           {saveSummary && <p className="text-sm text-up mb-3" role="status">{saveSummary}</p>}
           {bulkQueue.length === 0 && pendingScans.length === 0 && !saveSummary && <p className="text-sm text-muted mb-3">No cards were queued. Keep each card in place until the ready/review count increases, then remove it and wait for Ready before the next card.</p>}
           {pendingScans.map((scan) => <div key={scan.id} className="flex items-center gap-3 py-2 border-b border-line">
