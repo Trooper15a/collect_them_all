@@ -9,7 +9,7 @@ function load(file, stubs, extra = {}) {
   return exports;
 }
 const schema = new Proxy({}, { get: () => new Proxy({}, { get: (_, key) => key }) });
-const common = { "next/server": { NextResponse: Response }, "drizzle-orm": { eq() {}, and() {}, or() {}, sql() {} }, "@/lib/auth": { requireUserId: async () => "alice" }, "@/lib/types": { TCG_IDS: ["pokemon"] }, "@/lib/format": { RANGES: ["1M"] } };
+const common = { "@/lib/languages": load("lib/languages.ts", {}), "next/server": { NextResponse: Response }, "drizzle-orm": { eq() {}, and() {}, or() {}, sql() {} }, "@/lib/auth": { requireUserId: async () => "alice" }, "@/lib/types": { TCG_IDS: ["pokemon"] }, "@/lib/format": { RANGES: ["1M"] } };
 const request = { nextUrl: new URL("https://example.test/api?range=1M") };
 
 test("card history, exchange rates and display currency load concurrently", async () => {

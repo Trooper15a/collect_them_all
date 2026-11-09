@@ -1,3 +1,5 @@
+import { isExtraPokemonLanguage, type LanguageFilter } from "./languages";
+import { dexSearch, dexSets } from "./tcgdex";
 import { and, eq, ilike, or, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { cached } from "./cache";
@@ -25,9 +27,9 @@ const RARITY_ALIASES: Record<string, string> = {
   promo: "promo",
 };
 
-export function sourceOf(cardId: string): "pw" | "sf" | "ygo" | "tp" {
+export function sourceOf(cardId: string): "pw" | "sf" | "ygo" | "tp" | "td" {
   const p = cardId.split(":")[0];
-  if (p === "pw" || p === "sf" || p === "ygo" || p === "tp") return p;
+  if (p === "pw" || p === "sf" || p === "ygo" || p === "tp" || p === "td") return p;
   throw new Error(`unknown card id prefix: ${cardId}`);
 }
 
@@ -239,7 +241,7 @@ export async function refreshCardPrices(cardId: string) {
 export interface SearchOpts {
   q: string;
   tcg?: Tcg | "all";
-  lang?: "eng" | "jap" | "all";
+  lang?: LanguageFilter;
   limit?: number;
 }
 
@@ -264,7 +266,7 @@ export async function searchCards(opts: SearchOpts): Promise<{ cards: CardSummar
   // Case-insensitive matching (ilike) so lowercase queries like "pikachu" still find cards.
   const conditions = words.map((w) => or(ilike(schema.cards.name, `%${w}%`), ilike(schema.cards.cardNumber, `${w}%`), ilike(schema.cards.setCode, w), ilike(schema.cards.setName, `%${w}%`)));
   for (const r of rarityWords) conditions.push(ilike(schema.cards.rarity, `%${r}%`));
-  conditions.push(sql`${schema.cards.id} like 'tp:%'`);
+  conditions.push(sql`(${schema.cards.id} like 'tp:%' OR ${schema.cards.id} like 'td:%')`);
   if (tcg !== "all") conditions.push(eq(schema.cards.tcg, tcg));
   if (lang !== "all") conditions.push(eq(schema.cards.language, lang));
   const localRows = await db
@@ -275,6 +277,15 @@ export async function searchCards(opts: SearchOpts): Promise<{ cards: CardSummar
     .limit(400);
   const merged = new Map<string, NormalizedCard>(localRows.map((r) => [r.id, rowToCard(r)]));
 
+  if ((tcg === "pokemon" || tcg === "all") && isExtraPokemonLanguage(lang)) {
+    try {
+      const extra = await dexSearch(lang, q, limit);
+      for (const card of extra) { await upsertCard(card); merged.set(card.id, card); }
+      warnings.push("Chinese and Korean catalog coverage and images are incomplete. Search by native card name, set code or number. Language-specific prices are unavailable.");
+    } catch {
+      warnings.push("The Pokémon language catalog is temporarily unavailable. Showing saved results.");
+    }
+  }
   const byPrinting = new Map<string, NormalizedCard>();
   let missingMarketData = false;
   for (const c of merged.values()) {
@@ -316,6 +327,7 @@ export async function searchCards(opts: SearchOpts): Promise<{ cards: CardSummar
     return (b.price?.amount ?? 0) - (a.price?.amount ?? 0);
   });
   if (missingMarketData) warnings.push("Some results have no market data yet — prices appear after the next price sync.");
+  if (isExtraPokemonLanguage(lang) && !cards.length && !warnings.length) warnings.push("No saved Pokémon cards for this language. Select Pokémon to search its catalog.");
   return { cards: cards.slice(0, Math.max(60, limit * 2)), warnings };
 }
 
@@ -334,7 +346,14 @@ export async function getPriceHistory(cardId: string, variant?: string) {
   }));
 }
 
-export async function listSets(tcg: Tcg | "all", lang: "eng" | "jap" | "all") {
+export async function listSets(tcg: Tcg | "all", lang: LanguageFilter) {
+  if ((tcg === "pokemon" || tcg === "all") && isExtraPokemonLanguage(lang)) {
+    const sets = await dexSets(lang);
+    for (const set of sets) {
+      const values = { id: `pokemon:${set.id}:${lang}`, tcg: "pokemon", code: set.id, name: set.name, language: lang, total: set.cardCount?.total ?? null };
+      await db.insert(schema.sets).values(values).onConflictDoUpdate({ target: schema.sets.id, set: values });
+    }
+  }
   const rows = await db.select().from(schema.sets);
   const hasTcg = tcg === "all" ? rows.length > 0 : rows.some((r) => r.tcg === tcg);
   if (!hasTcg) await syncSets(tcg);

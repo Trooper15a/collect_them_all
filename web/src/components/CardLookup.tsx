@@ -1,4 +1,5 @@
 'use client';
+import { languageOptions } from "@/lib/languages";
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -40,7 +41,7 @@ export function CardLookup() {
     <LookupTabs active="cards" />
     <section aria-label="Card search filters" className="card-surface rounded-2xl p-4 space-y-3">
       <Field label="Search cards"><input className={inputCls} value={query} onChange={(event) => setQuery(event.target.value)} maxLength={120} placeholder="e.g. Charizard 151 or Pikachu promo" autoComplete="off" /></Field>
-      <div className="flex gap-3 items-end"><Field label="Language"><select className={`${inputCls} text-xs`} value={language} onChange={(event) => setLanguage(event.target.value)}><option value="all">English + Japanese</option><option value="eng">English</option><option value="jap">Japanese</option></select></Field><p className="text-[11px] text-muted pb-3">Uses the game selected in the game picker.</p></div>
+      <div className="flex gap-3 items-end"><Field label="Language"><select className={`${inputCls} text-xs`} value={language} onChange={(event) => setLanguage(event.target.value)}><option value="all">All languages</option>{languageOptions(tcg).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></Field><p className="text-[11px] text-muted pb-3">Uses the selected game. For Chinese or Korean Pokémon, choose its language and search by native name, set code or number.</p></div>
     </section>
     {search.length < 2 ? <div className="rounded-2xl border border-dashed border-line p-6 text-sm text-muted text-center">Enter at least two characters to find cards across the catalog.</div>
       : result?.error ? <div role="alert" className="rounded-xl border border-down/30 p-4 text-sm"><p>{result.error}</p><button type="button" className="text-accent underline mt-3" onClick={() => { setResource(null); setRetry((value) => value + 1); }}>Retry card search</button></div>

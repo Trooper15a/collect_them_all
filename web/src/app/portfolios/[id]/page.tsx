@@ -1,4 +1,5 @@
 "use client";
+import { languageOptions, type LanguageFilter } from "@/lib/languages";
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -54,7 +55,7 @@ export default function PortfolioPage() {
   const [range, setRange] = useState<Range>("1M");
   const [data, setData] = useState<Data | null>(null);
   const [sort, setSort] = useState<Sort>("value");
-  const [langFilter, setLangFilter] = useState<"all" | "eng" | "jap">("all");
+  const [langFilter, setLangFilter] = useState<LanguageFilter>("all");
   const [editing, setEditing] = useState<Item | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [renameBusy, setRenameBusy] = useState(false);
@@ -298,11 +299,7 @@ export default function PortfolioPage() {
           value={langFilter}
           onChange={setLangFilter}
           size="xs"
-          options={[
-            { value: "all", label: "All" },
-            { value: "eng", label: "EN" },
-            { value: "jap", label: "JP" },
-          ]}
+          options={[{ value: "all", label: "All languages" }, ...languageOptions(data?.portfolio.tcgId ?? "all")]}
         />
       </div>
 

@@ -43,5 +43,5 @@ export function rangeToDays(r: Range): number | null {
 }
 
 export function langLabel(l: string | null | undefined) {
-  return { eng: "EN", jap: "JP", chn: "CN", kor: "KR", fr: "FR", de: "DE", it: "IT", es: "ES", pt: "PT" }[l ?? ""] ?? (l ?? "").toUpperCase();
+  return { eng: "EN", jap: "JP", chn: "CN", "zh-cn": "CN", "zh-tw": "TW", kor: "KR", fr: "FR", de: "DE", it: "IT", es: "ES", pt: "PT" }[l ?? ""] ?? (l ?? "").toUpperCase();
 }

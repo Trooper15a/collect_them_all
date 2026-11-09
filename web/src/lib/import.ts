@@ -1,3 +1,4 @@
+import { normalizeCardLanguage, type CardLanguage } from "./languages";
 import { and, eq, like, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { rowToCard } from "./cards";
@@ -17,7 +18,7 @@ export interface ImportRow {
   name: string;
   number: string | null;
   set: string | null;
-  language: "eng" | "jap" | null;
+  language: CardLanguage | null;
   quantity: number;
   condition: string;
   cost: number | null;
@@ -90,13 +91,6 @@ function col(raw: Record<string, string>, keys: string[]) {
   return null;
 }
 
-function normLang(v: string | null): "eng" | "jap" | null {
-  if (!v) return null;
-  const s = v.toLowerCase();
-  if (/^(jap|jp|ja|japanese|日本)/.test(s)) return "jap";
-  if (/^(eng|en|english)/.test(s)) return "eng";
-  return null;
-}
 
 function normCondition(v: string | null): string {
   const s = (v ?? "").toLowerCase().replace(/[^a-z]/g, "");
@@ -158,7 +152,7 @@ export async function previewImport(text: string): Promise<ImportRow[]> {
       name,
       number: col(raw, COL.number),
       set: col(raw, COL.set),
-      language: normLang(col(raw, COL.language)),
+      language: normalizeCardLanguage(col(raw, COL.language)),
       quantity: Math.max(1, Number(col(raw, COL.quantity) ?? 1) || 1),
       condition: normCondition(col(raw, COL.condition)),
       cost: col(raw, COL.cost) != null ? Number(String(col(raw, COL.cost)).replace(/[^0-9.]/g, "")) || null : null,

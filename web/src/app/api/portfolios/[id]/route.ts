@@ -1,3 +1,4 @@
+import { CARD_LANGUAGES } from "@/lib/languages";
 import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -12,7 +13,7 @@ import { summarize, valuedItems, valueSeries } from "@/lib/portfolio";
 const Patch = z.object({
   name: z.string().trim().min(1).max(80).optional(),
   tcgId: z.enum(TCG_IDS).nullable().optional(),
-  language: z.enum(["eng", "jap"]).nullable().optional(),
+  language: z.enum(CARD_LANGUAGES).nullable().optional(),
   accentColor: z.string().max(20).nullable().optional(),
 });
 

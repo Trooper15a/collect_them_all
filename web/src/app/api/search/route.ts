@@ -1,3 +1,4 @@
+import { CARD_LANGUAGES } from "@/lib/languages";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { TCG_IDS } from "@/lib/types";
@@ -6,7 +7,7 @@ import { searchCards } from "@/lib/cards";
 const Query = z.object({
   q: z.string().min(1).max(120),
   tcg: z.enum(["all", ...TCG_IDS]).default("all"),
-  lang: z.enum(["all", "eng", "jap"]).default("all"),
+  lang: z.enum(["all", ...CARD_LANGUAGES]).default("all"),
   limit: z.coerce.number().int().min(1).max(60).default(24),
 });
 
