@@ -1,10 +1,9 @@
-/** Detect changes relative to an empty stand. A captured card must be removed
- * before another can trigger, even if the next card is an identical copy. */
+/** Detect a settled new top card without requiring an empty stand between cards. */
 export class StandDetector {
   private empty: Float32Array | null = null;
   private previous: Float32Array | null = null;
   private emptyFrames = 0;
-  private waitingForRemoval = false;
+  private captured: Float32Array | null = null;
   cardPresent = false;
 
   calibrate(frame: Float32Array) {
@@ -12,23 +11,31 @@ export class StandDetector {
     this.previous = null;
     this.emptyFrames = 0;
     this.cardPresent = false;
-    this.waitingForRemoval = false;
+    this.captured = null;
   }
 
-  observe(frame: Float32Array): "empty" | "settling" | "capture" | "remove" {
+  /** Explicitly count a visually identical physical copy, after it is placed. */
+  requestNextCopy() {
+    this.captured = null;
+    this.previous = null;
+  }
+
+  observe(frame: Float32Array): "empty" | "settling" | "capture" | "unchanged" {
     if (!this.empty) throw new Error("Calibrate the empty stand first.");
     const distance = frameDistance(frame, this.empty);
     this.cardPresent = distance >= 12;
     const stable = this.previous !== null && frameDistance(frame, this.previous) < 4;
     this.previous = frame.slice();
     if (distance < 6) {
-      if (++this.emptyFrames >= 2) this.waitingForRemoval = false;
-      return this.waitingForRemoval ? "remove" : "empty";
+      if (++this.emptyFrames >= 2) this.captured = null;
+      return this.captured ? "unchanged" : "empty";
     }
     this.emptyFrames = 0;
-    if (this.waitingForRemoval) return "remove";
+    // Keep the last captured image as the reference: a passing hand must not
+    // rearm the same card, and slow changes must not drift the reference.
+    if (this.captured && frameDistance(frame, this.captured) < 8) return "unchanged";
     if (distance < 12 || !stable) return "settling";
-    this.waitingForRemoval = true;
+    this.captured = frame.slice();
     return "capture";
   }
 }

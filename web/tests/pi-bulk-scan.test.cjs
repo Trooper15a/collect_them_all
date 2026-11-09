@@ -81,7 +81,7 @@ test("automatic capture sends clear matches for automatic queueing", async () =>
   await click("Stop automatic scanning");
 });
 
-test("stand detection ignores motion/exposure shifts and requires removal before another identical copy", () => {
+test("stand detection ignores motion/exposure shifts and supports removal for another identical copy", () => {
   const { StandDetector, frameDistance } = pure("lib/scanner/stand-detector.ts");
   const empty = new Float32Array(300).fill(90);
   const card = Float32Array.from(empty, (_, i) => i % 6 < 3 ? 30 : 180);
@@ -90,8 +90,8 @@ test("stand detection ignores motion/exposure shifts and requires removal before
   assert.equal(frameDistance(empty, new Float32Array(300).fill(130)), 0);
   for (let i = 0; i < 8; i++) assert.equal(d.observe(i % 2 ? card : hand), "settling");
   d.observe(empty); d.observe(card); assert.equal(d.observe(card), "capture");
-  for (let i = 0; i < 5; i++) assert.equal(d.observe(card), "remove");
-  d.observe(empty); assert.equal(d.observe(card), "remove");
+  for (let i = 0; i < 5; i++) assert.equal(d.observe(card), "unchanged");
+  d.observe(empty); assert.equal(d.observe(card), "unchanged");
   d.observe(empty); d.observe(empty); d.observe(card);
   assert.equal(d.observe(card), "capture");
 });
@@ -247,7 +247,7 @@ test("horizontal lighting bands do not look like a card or prevent stable placem
   assert.equal(detector.observe(banded(false, 1)), "empty");
   assert.equal(detector.observe(banded(true, 1)), "settling");
   assert.equal(detector.observe(banded(true, 3)), "capture");
-  assert.equal(detector.observe(banded(true, 2)), "remove");
+  assert.equal(detector.observe(banded(true, 2)), "unchanged");
   detector.observe(banded(false, 2)); detector.observe(banded(false, 4));
   detector.observe(banded(true, 2));
   assert.equal(detector.observe(banded(true, 4)), "capture");
@@ -306,5 +306,52 @@ test("deferring an automatic match schedules the next capture instead of opening
     assert.ok(timers.size > 0);
   }
   assert.equal(reviews, 2);
+  await click("Stop automatic scanning");
+});
+
+
+test("four cards placed on top trigger once each without an empty stand between them", () => {
+  const { StandDetector } = pure("lib/scanner/stand-detector.ts");
+  const empty = new Float32Array(32 * 32 * 3).fill(100);
+  const cards = [0, 1, 2, 3].map(phase => Float32Array.from(empty, (_, i) => {
+    const x = Math.floor(i / 3) % 32;
+    return 100 + ((x + phase) % 8 < 4 ? 45 : -45);
+  }));
+  const detector = new StandDetector(); detector.calibrate(empty);
+  for (const card of cards) {
+    assert.equal(detector.observe(card), "settling");
+    assert.equal(detector.observe(card), "capture");
+    for (let repeat = 0; repeat < 6; repeat++) assert.equal(detector.observe(card), "unchanged");
+  }
+});
+
+test("a passing hand and lighting drift do not requeue an unchanged top card", () => {
+  const { StandDetector } = pure("lib/scanner/stand-detector.ts");
+  const empty = new Float32Array(32 * 32 * 3).fill(100);
+  const card = Float32Array.from(empty, (_, i) => 100 + (Math.floor(i / 3) % 8 < 4 ? 45 : -45));
+  const hand = Float32Array.from(empty, (_, i) => 100 + (Math.floor(i / 3) % 5 < 2 ? 65 : -65));
+  const detector = new StandDetector(); detector.calibrate(empty);
+  detector.observe(card); assert.equal(detector.observe(card), "capture");
+  assert.equal(detector.observe(hand), "settling");
+  assert.equal(detector.observe(card), "unchanged");
+  const lit = Float32Array.from(card, (value, i) => value + (Math.floor(i / 96) % 2 ? 10 : -10));
+  assert.equal(detector.observe(lit), "unchanged");
+  detector.requestNextCopy();
+  assert.equal(detector.observe(card), "settling");
+  assert.equal(detector.observe(card), "capture");
+  assert.equal(detector.observe(card), "unchanged");
+});
+
+
+test("the identical-copy control rearms a held stack without stopping automatic scanning", async () => {
+  const timers = new Map(); let requested = 0;
+  const { h, click } = cameraHarness({ timers, match: async () => matches,
+    detector: class { calibrate() {} observe() { return "unchanged"; } requestNextCopy() { requested++; } } });
+  h.render(); await h.flush();
+  await click("Connect Pi camera"); await click("Stand is empty \u2014 start automatic scanning");
+  await click("Scan identical copy");
+  assert.equal(requested, 1);
+  assert.ok(nodes(h.render(), n => text(n) === "Stop automatic scanning" && n.props?.onClick).length);
+  assert.doesNotMatch(text(h.render()), /Remove the scanned card/);
   await click("Stop automatic scanning");
 });
