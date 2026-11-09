@@ -9,21 +9,24 @@ import { StandDetector, imageFingerprint } from "@/lib/scanner/stand-detector";
 import { framingIssue, sampleScene, type SceneSample } from "@/lib/scanner/pi-framing";
 import type { CropRect } from "@/lib/grading/analysis";
 import type { Match } from "@/lib/scanner/matcher";
+import { PiScanCounter, type PiScanProgress } from "@/lib/scanner/pi-progress";
 
 type Props = {
-  onMatches: (matches: Match[], automatic?: boolean, capture?: { captureId: string; issue?: string }) => void | boolean | Promise<void | boolean>;
+  onMatches: (matches: Match[], automatic?: boolean, capture?: { captureId: string; issue?: string }) => void | boolean | "review" | Promise<void | boolean | "review">;
+  onProgress?: (progress: PiScanProgress) => void;
   onClose: (notice?: string) => void; paused: boolean; count: number; reviewCount?: number; tcg: string; lang: string;
 };
 const DEFAULT_CROP = { x: 0.3, y: 0.06, width: 0.4, height: 0.88 };
 
-export function PiBulkScanner({ onMatches, onClose, paused, count, reviewCount = 0, tcg, lang }: Props) {
+export function PiBulkScanner({ onMatches, onClose, onProgress, paused, count, reviewCount = 0, tcg, lang }: Props) {
   const alive = useRef(false);
   const locked = useRef(false);
   const detector = useRef(new StandDetector());
   const image = useRef<ImageBitmap | null>(null);
   const objectUrl = useRef("");
   const activeRequest = useRef<AbortController | null>(null);
-  const controls = useRef({ paused, onMatches, onClose, tcg, lang });
+  const controls = useRef({ paused, onMatches, onClose, onProgress, tcg, lang });
+  const counter = useRef(new PiScanCounter());
   const finishRequested = useRef(false);
   const finishError = useRef<string | undefined>(undefined);
   const generation = useRef(0);
@@ -40,8 +43,9 @@ export function PiBulkScanner({ onMatches, onClose, paused, count, reviewCount =
   const [error, setError] = useState("");
   const [status, setStatus] = useState("Connect your Pi over USB, then connect the camera here.");
   const [finishing, setFinishing] = useState(false);
+  const [progress, setProgress] = useState<PiScanProgress>({ captured: 0, identified: 0, failed: 0 });
 
-  useEffect(() => { controls.current = { paused, onMatches, onClose, tcg, lang }; }, [paused, onMatches, onClose, tcg, lang]);
+  useEffect(() => { controls.current = { paused, onMatches, onClose, onProgress, tcg, lang }; }, [paused, onMatches, onClose, onProgress, tcg, lang]);
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -65,23 +69,34 @@ export function PiBulkScanner({ onMatches, onClose, paused, count, reviewCount =
   }
 
   async function identify(bitmap: ImageBitmap, auto: boolean, reviewReason?: string) {
-    const token = generation.current;
-    const crop = region.current;
-    const input = preprocess(bitmap, { x: crop.x * bitmap.width, y: crop.y * bitmap.height,
-      w: crop.width * bitmap.width, h: crop.height * bitmap.height });
-    const current = controls.current;
-    const engine = await getScanEngine();
-    if (!alive.current || (auto && token !== generation.current)) return;
-    if (engine.status !== "ready") throw new Error(engine.error ?? "Scanner unavailable. Try again.");
-    const matches = await engine.match(input, 5, current.tcg, current.lang);
-    if (!alive.current || (auto && token !== generation.current)) return;
-    if (!matches.length) throw new Error("No matches. Check the scan area and try again.");
-    const issue = reviewReason ?? (auto ? (emptyScene.current ? framingIssue(sampleScene(bitmap), emptyScene.current, region.current) : "Calibrate the empty stand before automatic queueing.") : undefined);
-    const queued = await controls.current.onMatches(matches, auto && !issue, { captureId: captureId.current, issue });
-    if (!alive.current) return;
-    if (queued === false) throw new Error("Could not queue this card. Retry identification or check the match manually.");
-    setStatus(queued ? "Card queued — remove it, then place the next card."
-      : "Check the suggested matches to continue.");
+    const id = captureId.current;
+    counter.current.start(id); reportProgress();
+    try {
+      const token = generation.current;
+      const crop = region.current;
+      const input = preprocess(bitmap, { x: crop.x * bitmap.width, y: crop.y * bitmap.height,
+        w: crop.width * bitmap.width, h: crop.height * bitmap.height });
+      const current = controls.current;
+      const engine = await getScanEngine();
+      if (!alive.current || (auto && token !== generation.current)) return;
+      if (engine.status !== "ready") throw new Error(engine.error ?? "Scanner unavailable. Try again.");
+      const matches = await engine.match(input, 5, current.tcg, current.lang);
+      if (!alive.current || (auto && token !== generation.current)) return;
+      if (!matches.length) throw new Error("No matches. Check the scan area and try again.");
+      counter.current.identified(id); reportProgress();
+      const issue = reviewReason ?? (auto ? (emptyScene.current ? framingIssue(sampleScene(bitmap), emptyScene.current, region.current) : "Calibrate the empty stand before automatic queueing.") : undefined);
+      const queued = await controls.current.onMatches(matches, auto, { captureId: id, issue });
+      if (!alive.current) return;
+      if (queued === false) throw new Error("Could not queue this card. Retry identification or check the match manually.");
+      setStatus(queued === "review" ? "Captured for review at the end \u2014 remove this card, then wait for Ready."
+        : queued ? "Card queued \u2014 remove it, then wait for Ready." : "Check the suggested matches to continue.");
+    } catch (cause) {
+      counter.current.failed(id); reportProgress(); throw cause;
+    }
+  }
+
+  function reportProgress() {
+    const next = counter.current.snapshot(); setProgress(next); controls.current.onProgress?.(next);
   }
 
   async function action(kind: "connect" | "calibrate" | "capture" | "identify") {
@@ -90,6 +105,7 @@ export function PiBulkScanner({ onMatches, onClose, paused, count, reviewCount =
     finishError.current = undefined;
     try {
       if (kind === "connect") {
+        reportProgress();
         setStatus("Connecting to the Pi — allow local-network access if Chrome asks.");
         await connectPi();
         if (!alive.current) return;
@@ -134,7 +150,7 @@ export function PiBulkScanner({ onMatches, onClose, paused, count, reviewCount =
           const state = detector.current.observe(imageFingerprint(bitmap, region.current));
           if (state === "capture" || (finishRequested.current && state === "settling" && detector.current.cardPresent)) {
             setStatus("Card settled — identifying…");
-            await identify(bitmap, !finishRequested.current, finishRequested.current ? "Final capture — confirm this card before saving." : undefined);
+            await identify(bitmap, true, finishRequested.current ? "Final capture — confirm this card before saving." : undefined);
           } else setStatus(state === "empty" ? "Ready — place a card in the scan area."
             : state === "remove" ? "Remove the scanned card before placing the next one."
             : detector.current.cardPresent ? "Card detected — keep it still until the ready/review count increases."
@@ -159,6 +175,7 @@ export function PiBulkScanner({ onMatches, onClose, paused, count, reviewCount =
     timer = setTimeout(() => void tick(), 250);
     return () => { stopped = true; cancelRun(); clearTimeout(timer); activeRequest.current?.abort(); };
     // Capture/recognition use current props through controls; do not restart an in-flight loop on a parent render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, cancelRun]);
 
   function selectCrop(event: MouseEvent<HTMLButtonElement>) {
@@ -177,19 +194,26 @@ export function PiBulkScanner({ onMatches, onClose, paused, count, reviewCount =
 
   return <section className="card-surface rounded-2xl p-4 mt-4 space-y-3" aria-label="Pi bulk scanner">
     <div className="flex justify-between items-center gap-3">
-      <h2 className="font-semibold">Pi bulk scan · {count} ready · {reviewCount} to review</h2>
+      <h2 className="font-semibold">Pi bulk scan · {progress.captured} captured this run</h2>
       <Button variant="ghost" disabled={finishing} onClick={() => {
         finishRequested.current = true; setFinishing(true);
         if (!locked.current) controls.current.onClose(finishError.current);
       }}>{finishing ? "Finishing current capture…" : "Finish scanning"}</Button>
     </div>
-    <p className="text-sm text-muted">Hold each card still until the ready/review count increases. Remove it, wait for “Ready”, then place the next card. Clear matches queue automatically; uncertain matches ask for review.</p>
+    <p className="text-sm text-muted">Hold each card until Captured increases. Remove it and wait for Ready before the next card. Uncertain matches stay in Review later while scanning continues.</p>
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-xl bg-elev p-3" aria-label="Scan counters">
+      <div><strong className="block text-xl tabular">{progress.captured}</strong><span className="text-xs text-muted">Captured this run</span></div>
+      <div><strong className="block text-xl tabular">{progress.identified}</strong><span className="text-xs text-muted">Identified this run</span></div>
+      <div><strong className="block text-xl tabular">{count}</strong><span className="text-xs text-muted">Ready to save</span></div>
+      <div><strong className="block text-xl tabular">{reviewCount}</strong><span className="text-xs text-muted">Review later</span></div>
+    </div>
+    {progress.failed > 0 && <p className="text-sm text-down">{progress.failed} captured card{progress.failed === 1 ? " needs" : "s need"} a retry.</p>}
     <div className="flex flex-wrap gap-2">
       <Button onClick={() => void action("connect")} disabled={busy || paused || running}>{connected ? "Reconnect Pi camera" : "Connect Pi camera"}</Button>
       {connected && !running && <Button disabled={busy || paused || !!corner} onClick={() => void action("calibrate")}>Stand is empty — start automatic scanning</Button>}
       {running && <Button variant="ghost" onClick={() => { generation.current++; setRunning(false); activeRequest.current?.abort(); setStatus("Automatic scanning stopped."); }}>Stop automatic scanning</Button>}
     </div>
-    <p role="status" className="text-sm text-accent">{status}</p>
+    <p role="status" className={`rounded-xl border p-3 text-base font-semibold ${running && !paused && status.startsWith("Ready —") ? "text-up border-up/40" : "text-accent border-line"}`}>{running && !paused && status.startsWith("Ready —") ? "Ready for next card" : status}</p>
     <p className="text-xs text-muted">First time: allow local-network access in Chrome. The Pi needs the direct-camera service update. Detection takes several seconds per card; leave this page open.</p>
     {url && <>
       <p className="text-xs text-muted">{corner ? "Now click the opposite corner of the card area." : "The outline is the scan area. Stop scanning to adjust it by clicking two opposite corners, then recalibrate with the stand empty."}</p>

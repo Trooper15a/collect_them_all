@@ -40,7 +40,8 @@ function cameraHarness({ match, detector, timers, issue } = {}) {
 }
 
 test("Pi connects and previews inside the app without any popup, and matching can retry", async () => {
-  const { h, accepted, click } = cameraHarness();
+  const { h, props, accepted, click } = cameraHarness();
+  const progress = []; props.onProgress = value => progress.push(value);
   h.render(); await h.flush();
   await click("Connect Pi camera");
   assert.equal(nodes(h.render(), n => n.type === "img").length, 1);
@@ -49,6 +50,10 @@ test("Pi connects and previews inside the app without any popup, and matching ca
   await click("Identify card");
   assert.equal(accepted[0].m, matches);
   assert.equal(accepted[0].auto, false);
+  assert.equal(progress.at(-1).captured, 1);
+  assert.equal(progress.at(-1).identified, 1);
+  assert.equal(progress.at(-1).failed, 0);
+  assert.ok(progress.some(value => value.failed === 1));
 });
 
 test("calibrated automatic capture identifies without clicks and stops late inference from queueing", async () => {
@@ -111,7 +116,7 @@ test("direct Pi requests use fixed USB address, permission hint and omitted cred
   bad = true; await assert.rejects(camera.capturePi(), /invalid JPEG/);
 });
 
-test("Pi automatic clear matches reuse the bulk queue and uncertain matches open the existing chooser", async () => {
+test("four automatic identifications retain one ready card and three reviews without pausing", async () => {
   const h = clientHarness("app/scan/page.tsx", { globals: { crypto: require("node:crypto").webcrypto, window: { location: { search: "?camera=pi" }, history: { replaceState() {} } }, localStorage: { getItem: () => null, setItem() {} } }, extraModules: {
     "@/components/PiBulkScanner": { PiBulkScanner: "PiBulkScanner" },
     "@/components/CardDiscovery": { CardDiscovery: "CardDiscovery" },
@@ -123,13 +128,20 @@ test("Pi automatic clear matches reuse the bulk queue and uncertain matches open
   const initialFinish = pi.props.onClose;
   assert.equal(await pi.props.onMatches(matches, true), true);
   pi = nodes(h.render(), n => n.type === "PiBulkScanner")[0]; assert.equal(pi.props.count, 1);
-  await pi.props.onMatches([{ ...matches[0], score: 0.8 }, matches[1]], true);
-  const choose = nodes(h.render(), n => n.type === "button" && text(n).includes("Card one"))[0];
-  await choose.props.onClick();
-  pi = nodes(h.render(), n => n.type === "PiBulkScanner")[0]; assert.equal(pi.props.count, 2);
+  for (let i = 0; i < 3; i++) {
+    assert.equal(await pi.props.onMatches([{ ...matches[0], score: 0.8 }, matches[1]], true, { captureId: `uncertain-${i}` }), "review");
+    pi = nodes(h.render(), n => n.type === "PiBulkScanner")[0];
+    assert.equal(pi.props.paused, false);
+    assert.equal(pi.props.count, 1);
+    assert.equal(pi.props.reviewCount, i + 1);
+  }
+  pi.props.onProgress({ captured: 4, identified: 4, failed: 0 });
   assert.equal(nodes(h.render(), n => n.type === "Scanner").length, 0);
   initialFinish();
-  assert.doesNotMatch(text(h.render()), /No card reached identification/);
+  const dialog = nodes(h.render(), n => n.props?.role === "dialog" && n.props["aria-label"] === "Scan results")[0];
+  assert.match(text(dialog), /1 ready to save .* 3 need confirmation/);
+  assert.match(text(dialog), /4 captured .* 4 identified .* 0 need retry/);
+  assert.equal(nodes(dialog, n => text(n) === "Review match" && n.props?.onClick).length, 3);
 });
 
 test("Finish scanning opens a results dialog even when no cards were queued", async () => {
@@ -175,13 +187,13 @@ test("Finish scanning retains uncertain identified cards and offers a destinatio
   assert.match(text(h.render()), /Added 1 card to My binder/);
 });
 
-test("suspect framing prevents automatic queueing even for a strong match", async () => {
+test("automatic framing warnings retain their source so the parent can defer review", async () => {
   const timers = new Map();
   const { h, accepted, click } = cameraHarness({ timers, match: async () => matches, issue: "The card may be cut off." });
   h.render(); await h.flush();
   await click("Connect Pi camera"); await click("Stand is empty — start automatic scanning");
   const [id, tick] = timers.entries().next().value; timers.delete(id); tick(); await settle();
-  assert.equal(accepted[0].auto, false);
+  assert.equal(accepted[0].auto, true);
   assert.match(accepted[0].capture.issue, /cut off/);
   await click("Stop automatic scanning");
 });
@@ -206,6 +218,7 @@ test("framing check sends half cards, edge cutoffs and scan-area cutoffs to revi
 test("refreshing finished results restores ready and unconfirmed cards without reopening the camera", async () => {
   const storage = new Map([
     ["bulkQueue", JSON.stringify([{ id: "card1", name: "Card one" }])],
+    ["piScanProgress", JSON.stringify({ captured: 4, identified: 2, failed: 2 })],
     ["bulkScanReview", JSON.stringify([{ id: "pending-copy", matches }])],
   ]);
   const h = clientHarness("app/scan/page.tsx", { globals: { window: { location: { search: "?review=1" } }, localStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value) } }, extraModules: {
@@ -215,6 +228,7 @@ test("refreshing finished results restores ready and unconfirmed cards without r
   h.render(); await h.flush(); h.render(); await h.flush();
   const tree = h.render();
   const dialog = nodes(tree, n => n.props?.role === "dialog" && n.props["aria-label"] === "Scan results")[0];
+  assert.match(text(dialog), /4 captured .* 2 identified .* 2 need retry/);
   assert.ok(dialog); assert.match(text(dialog), /1 ready to save · 1 need confirmation/);
   assert.equal(nodes(tree, n => n.type === "PiBulkScanner").length, 0);
   assert.equal(JSON.parse(storage.get("bulkQueue")).length, 1);
@@ -266,4 +280,31 @@ test("whole-card framing remains valid when horizontal lighting bands move", () 
     return { width, height, pixels, aspect: 16 / 9 };
   }
   assert.equal(framingIssue(scene(true, 3), scene(false, 0), { x: 0.3, y: 0.06, width: 0.4, height: 0.88 }), undefined);
+});
+
+
+test("capture counts distinguish polling frames, retries, identified cards and failures", () => {
+  const { PiScanCounter } = pure("lib/scanner/pi-progress.ts");
+  const counter = new PiScanCounter();
+  counter.start("a"); counter.failed("a"); counter.start("a"); counter.identified("a");
+  counter.start("b"); counter.failed("b");
+  assert.equal(counter.snapshot().captured, 2);
+  assert.equal(counter.snapshot().identified, 1);
+  assert.equal(counter.snapshot().failed, 1);
+});
+
+test("deferring an automatic match schedules the next capture instead of opening a blocking chooser", async () => {
+  const timers = new Map();
+  const { h, props, click } = cameraHarness({ timers, match: async () => matches });
+  let reviews = 0;
+  props.onMatches = () => { reviews++; return "review"; };
+  h.render(); await h.flush();
+  await click("Connect Pi camera"); await click("Stand is empty \u2014 start automatic scanning");
+  for (let i = 0; i < 2; i++) {
+    const [id, tick] = timers.entries().next().value; timers.delete(id); tick(); await settle();
+    assert.match(text(h.render()), /Captured for review at the end/);
+    assert.ok(timers.size > 0);
+  }
+  assert.equal(reviews, 2);
+  await click("Stop automatic scanning");
 });
