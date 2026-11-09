@@ -88,8 +88,8 @@ export function PiBulkScanner({ onMatches, onClose, onProgress, paused, count, r
       const queued = await controls.current.onMatches(matches, auto, { captureId: id, issue });
       if (!alive.current) return;
       if (queued === false) throw new Error("Could not queue this card. Retry identification or check the match manually.");
-      setStatus(queued === "review" ? "Captured for review at the end \u2014 remove this card, then wait for Ready."
-        : queued ? "Card queued \u2014 remove it, then wait for Ready." : "Check the suggested matches to continue.");
+      setStatus(queued === "review" ? "Captured for review at the end \u2014 place the next card on top."
+        : queued ? "Card queued \u2014 place the next card on top." : "Check the suggested matches to continue.");
     } catch (cause) {
       counter.current.failed(id); reportProgress(); throw cause;
     }
@@ -152,7 +152,7 @@ export function PiBulkScanner({ onMatches, onClose, onProgress, paused, count, r
             setStatus("Card settled — identifying…");
             await identify(bitmap, true, finishRequested.current ? "Final capture — confirm this card before saving." : undefined);
           } else setStatus(state === "empty" ? "Ready — place a card in the scan area."
-            : state === "remove" ? "Remove the scanned card before placing the next one."
+            : state === "unchanged" ? "Ready \u2014 place the next card on top."
             : detector.current.cardPresent ? "Card detected — keep it still until the ready/review count increases."
             : "Checking the empty stand — keep the camera still.");
         } catch (cause) {
@@ -200,7 +200,7 @@ export function PiBulkScanner({ onMatches, onClose, onProgress, paused, count, r
         if (!locked.current) controls.current.onClose(finishError.current);
       }}>{finishing ? "Finishing current capture…" : "Finish scanning"}</Button>
     </div>
-    <p className="text-sm text-muted">Hold each card until Captured increases. Remove it and wait for Ready before the next card. Uncertain matches stay in Review later while scanning continues.</p>
+    <p className="text-sm text-muted">Place each new card on top of the stack and hold it still until Captured increases. You do not need to remove the previous card. Uncertain matches stay in Review later while scanning continues.</p>
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-xl bg-elev p-3" aria-label="Scan counters">
       <div><strong className="block text-xl tabular">{progress.captured}</strong><span className="text-xs text-muted">Captured this run</span></div>
       <div><strong className="block text-xl tabular">{progress.identified}</strong><span className="text-xs text-muted">Identified this run</span></div>
@@ -208,9 +208,11 @@ export function PiBulkScanner({ onMatches, onClose, onProgress, paused, count, r
       <div><strong className="block text-xl tabular">{reviewCount}</strong><span className="text-xs text-muted">Review later</span></div>
     </div>
     {progress.failed > 0 && <p className="text-sm text-down">{progress.failed} captured card{progress.failed === 1 ? " needs" : "s need"} a retry.</p>}
+    <p className="text-xs text-muted">For an identical copy, place it on top and select Scan identical copy once. The camera may not see a change between identical cards.</p>
     <div className="flex flex-wrap gap-2">
       <Button onClick={() => void action("connect")} disabled={busy || paused || running}>{connected ? "Reconnect Pi camera" : "Connect Pi camera"}</Button>
       {connected && !running && <Button disabled={busy || paused || !!corner} onClick={() => void action("calibrate")}>Stand is empty — start automatic scanning</Button>}
+      {running && <Button disabled={paused || finishing} onClick={() => { detector.current.requestNextCopy(); setStatus("Identical copy requested \u2014 keep the new top card still."); }}>Scan identical copy</Button>}
       {running && <Button variant="ghost" onClick={() => { generation.current++; setRunning(false); activeRequest.current?.abort(); setStatus("Automatic scanning stopped."); }}>Stop automatic scanning</Button>}
     </div>
     <p role="status" className={`rounded-xl border p-3 text-base font-semibold ${running && !paused && status.startsWith("Ready —") ? "text-up border-up/40" : "text-accent border-line"}`}>{running && !paused && status.startsWith("Ready —") ? "Ready for next card" : status}</p>

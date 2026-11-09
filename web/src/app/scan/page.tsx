@@ -400,7 +400,7 @@ export default function ScanPage() {
           {scanNotice && <p className="text-sm text-down mb-3" role="alert">Scanner stopped: {scanNotice}</p>}
           {(scanProgress.captured > 0 || scanProgress.failed > 0) && <p className="text-sm text-muted mb-3">This run: {scanProgress.captured} captured · {scanProgress.identified} identified · {scanProgress.failed} need retry.</p>}
           {saveSummary && <p className="text-sm text-up mb-3" role="status">{saveSummary}</p>}
-          {bulkQueue.length === 0 && pendingScans.length === 0 && !saveSummary && <p className="text-sm text-muted mb-3">No cards were queued. Keep each card in place until the ready/review count increases, then remove it and wait for Ready before the next card.</p>}
+          {bulkQueue.length === 0 && pendingScans.length === 0 && !saveSummary && <p className="text-sm text-muted mb-3">No cards were queued. Keep each card in place until Captured increases, then place the next card on top and hold it still.</p>}
           {pendingScans.map((scan) => <div key={scan.id} className="flex items-center gap-3 py-2 border-b border-line">
             <CardImage id={scan.matches[0].card.id} directUrl={scanThumbnailUrl(scan.matches[0].card)} className="w-10 rounded-md" alt="" />
             <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{scan.matches[0].card.name ?? "Identified card"}</p><p className="text-xs text-muted">Needs confirmation{scan.issue ? ` · ${scan.issue}` : ""}</p></div>
