@@ -250,14 +250,13 @@ export default function ScanPage() {
           <button type="button" onClick={() => setResolveError(null)} aria-label="Dismiss error">✕</button>
         </div>
       )}
-      {scanning && piMode && <PiBulkScanner onClose={finishScanning} onProgress={setScanProgress} onMatches={async (m, automatic, capture) => {
+      {scanning && piMode && <PiBulkScanner onClose={finishScanning} onProgress={setScanProgress} onMatches={async (m, _automatic, capture) => {
         haptic("heavy"); setShowAllGames(false);
         const reviewId = capture?.captureId ?? crypto.randomUUID();
         setPendingScans((previous) => [...previous.filter((scan) => scan.id !== reviewId), { id: reviewId, matches: m, issue: capture?.issue }]);
-        const clear = automatic && !capture?.issue && isLoggedIn ? clearPiMatch(m) : null;
+        const clear = isLoggedIn ? clearPiMatch(m) : null;
         if (clear) return await chooseMatch(clear, reviewId);
-        if (automatic) return "review";
-        setActiveReviewId(reviewId); setMatches(m);
+        return "review";
       }} paused={!!matches || resolvingId !== null} count={bulkQueue.length} reviewCount={pendingScans.length} tcg={tcg} lang="all" />}
       {scanning && !piMode && (!matches || standMode) && <Scanner onClose={() => { setScanning(false); setBulkMode(false); setStandMode(false); }} onMatches={(m) => { haptic("heavy"); setShowAllGames(false); setMatches(m); }} paused={!!matches} bulkMode={bulkMode} standMode={standMode} bulkCount={bulkQueue.length} lang="all" />}
       {matches && (
