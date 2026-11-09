@@ -1,3 +1,4 @@
+import { CARD_LANGUAGES } from "@/lib/languages";
 import { after, NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { TCG_IDS } from "@/lib/types";
@@ -11,7 +12,7 @@ import { setKey } from "@/lib/set-identity";
 
 const Query = z.object({
   tcg: z.enum(["all", ...TCG_IDS]).default("all"),
-  lang: z.enum(["all", "eng", "jap"]).default("all"),
+  lang: z.enum(["all", ...CARD_LANGUAGES]).default("all"),
 });
 
 // Normalize numeric denominators and leading zeros like cardNumberKey. Sealed

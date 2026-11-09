@@ -1,3 +1,4 @@
+import { CARD_LANGUAGES } from "@/lib/languages";
 import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -12,7 +13,7 @@ import { summarize, valuedItems } from "@/lib/portfolio";
 const Body = z.object({
   name: z.string().trim().min(1).max(80),
   tcgId: z.enum(TCG_IDS).nullable().optional(),
-  language: z.enum(["eng", "jap"]).nullable().optional(),
+  language: z.enum(CARD_LANGUAGES).nullable().optional(),
 });
 
 export async function GET(req: NextRequest) {

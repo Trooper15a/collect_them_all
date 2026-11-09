@@ -14,7 +14,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   const lang = req.nextUrl.searchParams.get("lang") ?? undefined;
   const [src, ...rest] = id.split(":");
   const sourceId = rest.join(":");
-  if (!sourceId || !["sf", "ygo", "tcgdex", "pcjp", "tp"].includes(src)) return new NextResponse("bad id", { status: 400 });
+  if (!sourceId || !["sf", "ygo", "tcgdex", "pcjp", "tp", "td"].includes(src)) return new NextResponse("bad id", { status: 400 });
 
   try {
     let upstream: Response;
@@ -29,6 +29,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       if (!url) url = (await getCard(id))?.imageUrl ?? null;
       if (!url) return new NextResponse("no image", { status: 404 });
       if (size === "low" && src === "sf") url = url.replace("/large/", "/normal/");
+      if (src === "td") url = url.replace(/\/(high|low)\.webp$/, `/${size}.webp`);
       if (src === "tp") url = url.replace(/_\d+w\.jpg$/, size === "low" ? "_400w.jpg" : "_in_1000x1000.jpg");
       upstream = await fetch(url, { headers: { "User-Agent": "ripnpull/0.1" } });
     }

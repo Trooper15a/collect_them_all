@@ -1,3 +1,6 @@
+import { isExtraPokemonLanguage } from "@/lib/languages";
+import { dexSetCards } from "@/lib/tcgdex";
+import { getCard, upsertCard } from "@/lib/cards";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
@@ -16,6 +19,17 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   const id = decodeURIComponent((await ctx.params).id);
   const [set] = await db.select().from(schema.sets).where(eq(schema.sets.id, id)).limit(1);
   if (!set) return NextResponse.json({ error: "Set not found" }, { status: 404 });
+  if (set.tcg === "pokemon" && isExtraPokemonLanguage(set.language)) {
+    try {
+      const extra = await dexSetCards(set.language, set.code);
+      for (const card of extra) {
+        // Set summaries can omit images and rarity present on full card records.
+        if (!await getCard(card.id)) await upsertCard(card);
+      }
+    } catch {
+      return NextResponse.json({ error: "Pokémon language catalog is temporarily unavailable. Please retry." }, { status: 503 });
+    }
+  }
   const currency = req.nextUrl.searchParams.get("currency") ?? await getUserSetting("currency", "USD");
   const fx = await getRates();
   const setFilter = and(eq(schema.cards.tcg, set.tcg), eq(schema.cards.language, set.language), eq(sql`lower(${schema.cards.setCode})`, set.code.toLowerCase()));

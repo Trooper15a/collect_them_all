@@ -1,4 +1,5 @@
 "use client";
+import { languageOptions, cardLanguageName } from "@/lib/languages";
 
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useState } from "react";
@@ -152,8 +153,7 @@ function Binders() {
           <Field label="Language (optional)">
             <select className={inputCls} value={language} onChange={(e) => setLanguage(e.target.value)}>
               <option value="">Any</option>
-              <option value="eng">English</option>
-              <option value="jap">Japanese</option>
+              {languageOptions(tcgId || "all").map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </Field>
           {error && <div className="col-span-2 text-sm text-down">{error}</div>}
@@ -200,7 +200,7 @@ function Binders() {
                     <div>
                       <div className="font-semibold">{p.name}</div>
                       <div className="text-xs text-muted">
-                        {p.summary.itemCount} cards{p.language ? ` · ${p.language === "jap" ? "Japanese" : "English"}` : ""}
+                        {p.summary.itemCount} cards{p.language ? ` · ${cardLanguageName(p.language)}` : ""}
                       </div>
                     </div>
                     <div className="text-right">

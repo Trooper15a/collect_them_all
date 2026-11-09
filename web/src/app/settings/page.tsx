@@ -446,7 +446,7 @@ function ImportPanel() {
     <div className="space-y-3 text-sm">
       <div className="text-muted">
         Bulk-load a spreadsheet. Columns are matched by name: <span className="font-mono text-fg">name</span> (required), <span className="font-mono text-fg">number</span>, <span className="font-mono text-fg">set</span>,{" "}
-        <span className="font-mono text-fg">language</span> (EN/JP), <span className="font-mono text-fg">quantity</span>, <span className="font-mono text-fg">condition</span>, <span className="font-mono text-fg">cost</span>,{" "}
+        <span className="font-mono text-fg">language</span> (EN/JP/zh-cn/zh-tw/KR), <span className="font-mono text-fg">quantity</span>, <span className="font-mono text-fg">condition</span>, <span className="font-mono text-fg">cost</span>,{" "}
         <span className="font-mono text-fg">currency</span>, <span className="font-mono text-fg">portfolio</span>, <span className="font-mono text-fg">notes</span>. The app&apos;s own CSV export re-imports as-is.
       </div>
       <div className="flex flex-wrap gap-2 items-center">

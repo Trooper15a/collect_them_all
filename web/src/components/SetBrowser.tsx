@@ -1,4 +1,5 @@
 "use client";
+import { languageOptions, type LanguageFilter } from "@/lib/languages";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -15,7 +16,7 @@ interface SetRow {
 
 export function SetBrowser({ ownedOnly = false, binderId }: { ownedOnly?: boolean; binderId?: number }) {
   const { tcg, hydrated } = useActiveTcgHydrated();
-  const [lang, setLang] = useState<"all" | "eng" | "jap">("all");
+  const [lang, setLang] = useState<LanguageFilter>("all");
   const [query, setQuery] = useState("");
   const [onlyOwned, setOnlyOwned] = useState(ownedOnly);
   const [result, setResult] = useState<{ key: string; sets: SetRow[] } | null>(null);
@@ -42,7 +43,7 @@ export function SetBrowser({ ownedOnly = false, binderId }: { ownedOnly?: boolea
     <input aria-label="Filter sets by name or code" className={inputCls} placeholder="Filter sets by name…" value={query} onChange={(e) => setQuery(e.target.value)} />
     <div className="mt-3 flex flex-wrap gap-3 items-center">
       <span className="text-xs text-muted">{tcg === "all" ? "All games" : TCGS.find((t) => t.id === tcg)?.label ?? tcg}</span>
-      <Segmented value={lang} onChange={setLang} size="xs" options={[{ value: "all", label: "EN + JP" }, { value: "eng", label: "EN" }, { value: "jap", label: "JP" }]} />
+      <Segmented value={lang} onChange={setLang} size="xs" options={[{ value: "all", label: "All languages" }, ...languageOptions(tcg)]} />
       {!ownedOnly && <label className="flex items-center gap-2 text-xs text-muted"><input type="checkbox" checked={onlyOwned} onChange={(e) => setOnlyOwned(e.target.checked)} />Owned only</label>}
     </div>
     {message ? <Empty>{message}<button className="block mx-auto mt-3 text-accent" onClick={() => setRetry((n) => n + 1)}>Retry</button></Empty> : !sets ? <Skeleton className="mt-4 h-32" /> : !list?.length ? <div className="mt-4"><Empty>{q ? "No sets match this name." : ownedOnly || onlyOwned ? "No owned sets match these filters. Add cards or choose another binder or game." : "No sets match these filters."}</Empty></div> : <ul className="mt-4 space-y-2">
