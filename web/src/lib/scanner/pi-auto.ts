@@ -1,11 +1,9 @@
 import type { Match } from "./matcher";
 
-/** Similarity alone is not certainty: require a strong best match and a clear
- * gap from every different catalog entry. The user can review the bulk queue. */
+/** Route the top similarity score using the user's strictly-above-90% policy.
+ * Ready cards still require the final destination/save action. */
 export function clearPiMatch(matches: Match[]): Match | null {
   const top = matches[0];
-  if (!top || !Number.isFinite(top.score) || top.score < 0.95 || matches.length < 2) return null;
-  const next = matches.find((match, index) => index > 0 && match.card.id !== top.card.id);
-  if (!next || !Number.isFinite(next.score) || top.score - next.score < 0.05) return null;
+  if (!top || !Number.isFinite(top.score) || top.score <= 0.9) return null;
   return top;
 }

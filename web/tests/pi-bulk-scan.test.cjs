@@ -15,7 +15,7 @@ function pure(file, globals = {}) {
   }).outputText, { exports, Float32Array, Error, Uint8Array, AbortSignal, ...globals });
   return exports;
 }
-function cameraHarness({ match, detector, timers, issue } = {}) {
+function cameraHarness({ match, detector, timers, issue, delays } = {}) {
   let calls = 0, accepted = [];
   const props = { paused: false, count: 0, tcg: "pokemon", lang: "eng", onClose() {}, onMatches: (m, auto, capture) => { accepted.push({ m, auto, capture }); return auto ? true : undefined; } };
   const h = clientHarness("components/PiBulkScanner.tsx", {
@@ -24,7 +24,7 @@ function cameraHarness({ match, detector, timers, issue } = {}) {
       Blob, Error, AbortController, crypto: require("node:crypto").webcrypto,
       URL: class extends URL { static createObjectURL() { return "blob:photo"; } static revokeObjectURL() {} },
       createImageBitmap: async () => ({ width: 1000, height: 600, close() {} }),
-      ...(timers ? { setTimeout: fn => { const id = Math.random(); timers.set(id, fn); return id; }, clearTimeout: id => timers.delete(id) } : {}),
+      ...(timers ? { setTimeout: (fn, delay) => { delays?.push(delay); const id = Math.random(); timers.set(id, fn); return id; }, clearTimeout: id => timers.delete(id) } : {}),
     },
     extraModules: {
       "@/lib/scanner/pi-camera": { connectPi: async () => {}, capturePi: async () => new Blob(["photo"]) },
@@ -96,11 +96,17 @@ test("stand detection ignores motion/exposure shifts and supports removal for an
   assert.equal(d.observe(card), "capture");
 });
 
-test("only strong separated matches autoqueue; ambiguous/single/invalid scores require review", () => {
+test("only scores strictly above 90 percent go straight to ready regardless of runner-up", () => {
   const { clearPiMatch } = pure("lib/scanner/pi-auto.ts");
-  assert.equal(clearPiMatch(matches), matches[0]);
-  for (const candidate of [[], [matches[0]], [{ ...matches[0], score: 0.9 }, matches[1]],
-    [matches[0], { ...matches[1], score: 0.96 }], [{ ...matches[0], score: NaN }, matches[1]]]) assert.equal(clearPiMatch(candidate), null);
+  for (const score of [0.90001, 0.91, 0.94, 1]) {
+    const top = { ...matches[0], score };
+    assert.equal(clearPiMatch([top]), top);
+    assert.equal(clearPiMatch([top, { ...matches[1], score: score - 0.001 }]), top);
+  }
+  for (const score of [0.9, 0.89, 0, NaN, Infinity, -Infinity]) {
+    assert.equal(clearPiMatch([{ ...matches[0], score }, matches[1]]), null);
+  }
+  assert.equal(clearPiMatch([]), null);
 });
 
 test("direct Pi requests use fixed USB address, permission hint and omitted credentials, and reject invalid JPEGs", async () => {
@@ -353,5 +359,41 @@ test("the identical-copy control rearms a held stack without stopping automatic 
   assert.equal(requested, 1);
   assert.ok(nodes(h.render(), n => text(n) === "Stop automatic scanning" && n.props?.onClick).length);
   assert.doesNotMatch(text(h.render()), /Remove the scanned card/);
+  await click("Stop automatic scanning");
+});
+
+
+test("Pi routes above-90 matches directly to ready even with framing notes, and defers the rest", async () => {
+  const h = clientHarness("app/scan/page.tsx", { globals: { crypto: require("node:crypto").webcrypto, window: { location: { search: "?camera=pi" }, history: { replaceState() {} } }, localStorage: { getItem: () => null, setItem() {} } }, extraModules: {
+    "@/components/PiBulkScanner": { PiBulkScanner: "PiBulkScanner" }, "@/components/CardDiscovery": { CardDiscovery: "CardDiscovery" },
+    "@/components/ScanLanguageBadge": { ScanLanguageBadge: "ScanLanguageBadge" }, "@/lib/scanner/use-scan-preparation": { useScanPreparation: () => () => {} },
+  }, fetch: async url => ({ ok: true, json: async () => url.includes("/api/cards/") ? { card: { id: "card1", name: "Card one" } } : { portfolios: [] } }) });
+  h.render(); await h.flush();
+  const pi = () => nodes(h.render(), n => n.type === "PiBulkScanner")[0];
+  for (const automatic of [true, false]) {
+    assert.equal(await pi().props.onMatches([{ ...matches[0], score: 0.94 }, { ...matches[1], score: 0.939 }], automatic, { captureId: `clear-${automatic}`, issue: "May be cut off" }), true);
+  }
+  assert.equal(pi().props.count, 2); assert.equal(pi().props.reviewCount, 0);
+  for (const score of [0.9, 0.89]) {
+    assert.equal(await pi().props.onMatches([{ ...matches[0], score }], true, { captureId: `review-${score}` }), "review");
+    assert.equal(pi().props.paused, false);
+  }
+  assert.equal(await pi().props.onMatches([{ ...matches[0], score: 0.8 }], false, { captureId: "manual-review" }), "review");
+  assert.equal(pi().props.paused, false); assert.equal(pi().props.reviewCount, 3);
+  pi().props.onClose();
+  assert.match(text(h.render()), /2 ready to save .* 3 need confirmation/);
+});
+
+
+test("automatic polling removes idle photo gaps while keeping recognition serial", async () => {
+  const timers = new Map(), delays = []; let release;
+  const { h, click } = cameraHarness({ timers, delays, match: () => new Promise(resolve => { release = resolve; }) });
+  h.render(); await h.flush();
+  await click("Connect Pi camera"); await click("Stand is empty \u2014 start automatic scanning");
+  assert.equal(delays.at(-1), 0);
+  const [id, tick] = timers.entries().next().value; timers.delete(id); tick(); await settle();
+  assert.equal(timers.size, 0, "do not start another capture while identification is pending");
+  release(matches); await settle();
+  assert.equal(delays.at(-1), 0); assert.equal(timers.size, 1);
   await click("Stop automatic scanning");
 });

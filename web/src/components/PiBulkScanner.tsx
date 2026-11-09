@@ -170,9 +170,11 @@ export function PiBulkScanner({ onMatches, onClose, onProgress, paused, count, r
           }
         }
       }
-      if (!stopped && !finishRequested.current) timer = setTimeout(() => void tick(), 250);
+      // Camera transfer and recognition already bound throughput. Only wait
+      // while paused; a running scan can request its next photo immediately.
+      if (!stopped && !finishRequested.current) timer = setTimeout(() => void tick(), controls.current.paused ? 250 : 0);
     };
-    timer = setTimeout(() => void tick(), 250);
+    timer = setTimeout(() => void tick(), 0);
     return () => { stopped = true; cancelRun(); clearTimeout(timer); activeRequest.current?.abort(); };
     // Capture/recognition use current props through controls; do not restart an in-flight loop on a parent render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -201,6 +203,7 @@ export function PiBulkScanner({ onMatches, onClose, onProgress, paused, count, r
       }}>{finishing ? "Finishing current capture…" : "Finish scanning"}</Button>
     </div>
     <p className="text-sm text-muted">Place each new card on top of the stack and hold it still until Captured increases. You do not need to remove the previous card. Uncertain matches stay in Review later while scanning continues.</p>
+    <p className="text-xs text-muted">Matches above 90% go straight to Ready to save. Scores of 90% or below stay in Review later until you finish.</p>
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-xl bg-elev p-3" aria-label="Scan counters">
       <div><strong className="block text-xl tabular">{progress.captured}</strong><span className="text-xs text-muted">Captured this run</span></div>
       <div><strong className="block text-xl tabular">{progress.identified}</strong><span className="text-xs text-muted">Identified this run</span></div>
