@@ -45,6 +45,8 @@ export default {
         return true;
       }
       // Public API endpoints (preserve existing public-API behavior).
+      // Stripe authenticates this exact endpoint with its raw-body signature.
+      if (pathname === "/api/stripe/webhook") return true;
       if (pathname === "/api/card-show/lookup") return true;
       if (pathname === "/api/investing" || pathname === "/api/investing/card") return true;
       if (

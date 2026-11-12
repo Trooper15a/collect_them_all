@@ -13,20 +13,29 @@ function bypassesGate(pathname: string) {
 export function OnboardingGate({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { status } = useSession();
+  const { data: session, status } = useSession();
+  const userId = status === "authenticated" ? session?.user?.id ?? null : null;
   const bypass = bypassesGate(pathname);
-  const [checkedPath, setCheckedPath] = useState<string | null>(null);
-  const [failedPath, setFailedPath] = useState<string | null>(null);
+  const introduction = pathname === "/onboarding" || pathname.startsWith("/onboarding/");
+  const [admission, setAdmission] = useState({ userId, introduction, checked: false, failedPath: null as string | null });
   const [attempt, setAttempt] = useState(0);
 
+  // Reset before rendering a different account or returning from the introduction.
+  // Only a successful check is reusable across routes in this mounted gate.
+  const sameScope = admission.userId === userId && admission.introduction === introduction;
+  if (!sameScope) {
+    setAdmission({ userId, introduction, checked: false, failedPath: null });
+  }
+  const admitted = sameScope && admission.checked;
+  const failedPath = sameScope ? admission.failedPath : null;
+
   const retry = useCallback(() => {
-    setCheckedPath(null);
-    setFailedPath(null);
+    setAdmission((current) => ({ ...current, checked: false, failedPath: null }));
     setAttempt((value) => value + 1);
   }, []);
 
   useEffect(() => {
-    if (bypass || status !== "authenticated") return;
+    if (bypass || status !== "authenticated" || !userId || admitted || failedPath === pathname) return;
 
     let active = true;
     const controller = new AbortController();
@@ -44,12 +53,10 @@ export function OnboardingGate({ children }: { children: ReactNode }) {
           router.replace("/onboarding");
           return;
         }
-        setFailedPath(null);
-        setCheckedPath(pathname);
-      } catch (error) {
-        if (!active || (error instanceof DOMException && error.name === "AbortError")) return;
-        setFailedPath(pathname);
-        setCheckedPath(pathname);
+        setAdmission({ userId, introduction: false, checked: true, failedPath: null });
+      } catch {
+        if (!active || controller.signal.aborted) return;
+        setAdmission({ userId, introduction: false, checked: false, failedPath: pathname });
       }
     }
 
@@ -58,11 +65,11 @@ export function OnboardingGate({ children }: { children: ReactNode }) {
       active = false;
       controller.abort();
     };
-  }, [attempt, bypass, pathname, router, status]);
+  }, [admitted, attempt, bypass, failedPath, pathname, router, status, userId]);
 
   if (bypass || status === "unauthenticated") return children;
 
-  if (status === "loading" || checkedPath !== pathname) {
+  if (status === "loading" || (!admitted && failedPath !== pathname)) {
     return (
       <div className="min-h-[60vh] grid place-items-center" role="status" aria-live="polite">
         <div className="flex items-center gap-3 text-sm text-muted">
